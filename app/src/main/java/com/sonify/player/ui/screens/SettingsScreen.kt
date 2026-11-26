@@ -94,6 +94,7 @@ import com.sonify.player.ui.theme.CoverArtSupport
 import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.usb.UsbVolumeController
 import com.sonify.player.usb.VolumeMath
+import com.sonify.player.wifi.WifiTransferState
 import kotlinx.coroutines.launch
 
 private enum class ActiveSheet {
@@ -137,11 +138,13 @@ fun SettingsScreen(
     activeSubsonicServer: SubsonicServerEntity?,
     downloadedCount: Int,
     downloadedTotalBytes: Long,
+    wifiTransferState: WifiTransferState,
     nativeBuildTime: String,
     onRebindRoute: () -> Unit,
     onScanNow: () -> Unit,
     onOpenSubsonicAccounts: () -> Unit,
     onOpenDownloadManager: () -> Unit,
+    onOpenWifiTransfer: () -> Unit,
     bottomPadding: Dp,
 ) {
     val colors = LocalHiFiColors.current
@@ -333,6 +336,16 @@ fun SettingsScreen(
         // ==================== 分组 3：资料库与导入 ====================
         SettingsGroupHeader("资料库与导入")
 
+        SettingsSelectItem(
+            icon = Icons.Rounded.Wifi,
+            title = "WiFi 局域网传歌",
+            subtitle = if (wifiTransferState.isRunning) {
+                "运行中 · ${wifiTransferState.primaryUrl}（手机/PC 浏览器均可访问）"
+            } else {
+                "手机或电脑浏览器扫码/局域网传无损，支持防重与上传历史"
+            },
+            onClick = onOpenWifiTransfer,
+        )
         SettingsSelectItem(
             icon = Icons.Rounded.Folder,
             title = "扫描目录管理",

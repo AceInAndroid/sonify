@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#121212" />
+  <title>Sonify · WiFi 局域网传歌</title>
+  <style>
+    :root {
+      --canvas: #121212;
+      --surface1: #181818;
+      --surface2: #242424;
+      --surface3: #2E2E2E;
+      --hairline: rgba(255, 255, 255, 0.09);
+      --text-primary: #FFFFFF;
+      --text-secondary: #B3B3B3;
+      --text-muted: #727272;
+      --accent: #E5A93C;
+      --on-accent: #140E02;
+      --exclusive-green: #1ED760;
+      --danger: #E85D5D;
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-pill: 999px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Segoe UI", Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--canvas);
+      color: var(--text-primary);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body {
+      padding-bottom: calc(28px + env(safe-area-inset-bottom));
+    }
+
+    /* 顶部栏 */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: color-mix(in srgb, var(--canvas) 92%, transparent);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--hairline);
+      padding: calc(12px + env(safe-area-inset-top)) 20px 12px;
+    }
+
+    .topbar-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .vinyl-logo {
+      width: 38px;
+      height: 38px;
+      flex-shrink: 0;
+    }
+
+    .vinyl-logo.spinning {
+      animation: spin 6s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-pills {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: var(--radius-pill);
+      background: var(--surface1);
+      border: 1px solid var(--hairline);
+      color: var(--text-secondary);
+      font-family: var(--mono);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--exclusive-green);
+      box-shadow: 0 0 8px var(--exclusive-green);
+    }
+
+    .dot.muted { background: var(--text-muted); box-shadow: none; }
+
+    /* 移动端胶囊 Tab */
+    .mobile-tabs {
+      display: none;
+      max-width: 1180px;
+      margin: 12px auto 0;
+      padding: 0 16px;
+      gap: 8px;
+    }
+
+    .mobile-tab-btn {
+      flex: 1;
+      border: 1px solid var(--hairline);
+      background: var(--surface1);
+      color: var(--text-secondary);
+      padding: 10px 14px;
+      border-radius: var(--radius-pill);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .mobile-tab-btn.active {
+      background: var(--accent);
+      color: var(--on-accent);
+      border-color: transparent;
+    }
+
+    /* 主网格容器：PC 双栏 / 手机单栏 */
+    .container {
+      max-width: 1180px;
+      margin: 18px auto 0;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--surface1);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .panel-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* 拖拽区 */
+    .dropzone {
+      border: 1.5px dashed rgba(255, 255, 255, 0.22);
+      border-radius: var(--radius-lg);
+      background: radial-gradient(circle at top center, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%), var(--surface2);
+      padding: 28px 18px;
+      text-align: center;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 16%, var(--surface2));
+      transform: scale(1.005);
+    }
+
+    .drop-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      margin: 0 auto 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      color: var(--accent);
+    }
+
+    .drop-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .drop-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: none;
+      border-radius: var(--radius-pill);
+      padding: 11px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.12s;
+      min-height: 42px;
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--on-accent);
+    }
+
+    .btn-secondary {
+      background: var(--surface3);
+      color: var(--text-primary);
+      border: 1px solid var(--hairline);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 6px 10px;
+      min-height: 32px;
+      font-size: 12px;
+    }
+
+    .btn-danger-ghost {
+      background: color-mix(in srgb, var(--danger) 14%, transparent);
+      color: var(--danger);
+      padding: 6px 12px;
+      min-height: 32px;
+      font-size: 12px;
+    }
+
+    /* 选项条 */
+    .options-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      background: var(--surface2);
+      font-size: 12px;
+      color: var(--text-secondary);
+      flex-wrap: wrap;
+    }
+
+    .toggle-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      color: var(--text-primary);
+    }
+
+    .toggle-label input {
+      accent-color: var(--accent);
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    /* 传输队列与历史列表 */
+    .list-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .card-item {
+      background: var(--surface2);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius-md);
+      padding: 11px 13px;
+    }
+
+    .card-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .item-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .item-name {
+      font-size: 13.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .item-meta {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      margin-top: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 10.5px;
+      font-weight: 600;
+      font-family: var(--mono);
+      background: var(--surface3);
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .badge.ok {
+      background: color-mix(in srgb, var(--exclusive-green) 16%, transparent);
+      color: var(--exclusive-green);
+    }
+
+    .badge.dup {
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      color: var(--accent);
+    }
+
+    .badge.err {
+      background: color-mix(in srgb, var(--danger) 18%, transparent);
+      color: var(--danger);
+    }
+
+    .badge.hires {
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
+      color: var(--accent);
+    }
+
+    .progress-track {
+      height: 4px;
+      width: 100%;
+      background: var(--surface3);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--exclusive-green);
+      border-radius: 99px;
+      transition: width 0.12s linear;
+    }
+
+    .search-box {
+      width: 100%;
+      padding: 10px 13px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--hairline);
+      background: var(--surface2);
+      color: var(--text-primary);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .search-box:focus { border-color: var(--accent); }
+
+    .filter-chips {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .chip {
+      border: 1px solid var(--hairline);
+      background: var(--surface2);
+      color: var(--text-secondary);
+      padding: 5px 12px;
+      border-radius: var(--radius-pill);
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .chip.active {
+      background: var(--accent);
+      color: var(--on-accent);
+      border-color: transparent;
+      font-weight: 600;
+    }
+
+    .history-scroll {
+      max-height: 60vh;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 36px 16px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* PIN 解锁遮罩 */
+    .pin-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(0, 0, 0, 0.82);
+      backdrop-filter: blur(10px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .pin-overlay.open { display: flex; }
+
+    .pin-card {
+      width: 100%;
+      max-width: 340px;
+      background: var(--surface1);
+      border: 1px solid var(--hairline);
+      border-radius: 18px;
+      padding: 24px 20px;
+      text-align: center;
+    }
+
+    .pin-input {
+      width: 100%;
+      margin: 14px 0 10px;
+      padding: 13px;
+      text-align: center;
+      letter-spacing: 0.45em;
+      font-size: 22px;
+      font-family: var(--mono);
+      font-weight: 700;
+      border-radius: 12px;
+      border: 1px solid var(--hairline);
+      background: var(--surface2);
+      color: var(--text-primary);
+      outline: none;
+    }
+
+    .pin-input:focus { border-color: var(--accent); }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(20px + env(safe-area-inset-bottom));
+      transform: translateX(-50%) translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      background: var(--surface2);
+      border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+      color: var(--text-primary);
+      padding: 10px 18px;
+      border-radius: var(--radius-pill);
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 60;
+      transition: all 0.2s ease;
+      max-width: 90vw;
+      text-align: center;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* 手机响应式适配 (< 860px) */
+    @media (max-width: 859px) {
+      .topbar { padding: calc(10px + env(safe-area-inset-top)) 14px 10px; }
+      .status-pills { width: 100%; justify-content: flex-start; }
+      .mobile-tabs { display: flex; }
+      .container {
+        grid-template-columns: 1fr;
+        padding: 0 14px;
+        margin-top: 12px;
+      }
+      .panel { padding: 15px; }
+      .panel.mobile-hidden { display: none; }
+      .dropzone { padding: 20px 14px; }
+      .drop-pc-only { display: none; }
+      .action-row { flex-direction: column; }
+      .action-row .btn { width: 100%; min-height: 48px; font-size: 14px; }
+      .history-scroll { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <svg id="vinylLogo" class="vinyl-logo" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="22" fill="#0B0B0D" stroke="rgba(255,255,255,0.16)" stroke-width="1.5"/>
+          <circle cx="24" cy="24" r="17" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+          <circle cx="24" cy="24" r="13" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+          <circle cx="24" cy="24" r="8.5" fill="var(--accent)"/>
+          <circle cx="24" cy="24" r="2.6" fill="#121212"/>
+        </svg>
+        <div>
+          <div class="brand-title">Sonify <span class="badge hires">WiFi 传歌</span></div>
+          <div id="deviceSub" class="brand-sub">正在连接手机服务…</div>
+        </div>
+      </div>
+      <div class="status-pills">
+        <div class="pill"><span class="dot"></span><span id="freeSpaceLabel">可用空间 --</span></div>
+        <div class="pill" id="usbPill" style="display:none;"><span class="dot"></span><span id="usbLabel">USB DAC</span></div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="mobile-tabs" aria-label="页面切换">
+    <button id="tabUploadBtn" class="mobile-tab-btn active" onclick="switchMobileTab('upload')">传歌上传</button>
+    <button id="tabHistoryBtn" class="mobile-tab-btn" onclick="switchMobileTab('history')">上传历史 (<span id="histTabCount">0</span>)</button>
+  </nav>
+
+  <main class="container">
+    <!-- 左栏 / 手机传歌 Tab -->
+    <section id="uploadPanel" class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">上传无损音乐</div>
+          <div class="panel-sub">支持 FLAC / WAV / ALAC / MP3 / M4A / OPUS 及配套 .lrc / 封面图</div>
+        </div>
+      </div>
+
+      <div id="dropzone" class="dropzone">
+        <div class="drop-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+          </svg>
+        </div>
+        <div class="drop-title drop-pc-only">拖拽音频文件或整个专辑文件夹到此处</div>
+        <div class="drop-desc">上传前自动计算文件指纹防重，已存在曲目零流量跳过；传完自动解析入库</div>
+
+        <div class="action-row">
+          <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">选择音频文件</button>
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('folderInput').click()">选择专辑文件夹</button>
+        </div>
+        <input id="fileInput" type="file" multiple accept="audio/*,.flac,.wav,.alac,.aiff,.aif,.wv,.ape,.lrc,.jpg,.jpeg,.png,.webp" style="display:none" />
+        <input id="folderInput" type="file" webkitdirectory directory multiple style="display:none" />
+      </div>
+
+      <div class="options-bar">
+        <label class="toggle-label">
+          <input id="autoSkipDup" type="checkbox" checked />
+          <span>防重：自动跳过重复文件</span>
+        </label>
+        <span id="queueSummary">等待选择文件</span>
+      </div>
+
+      <div id="queueList" class="list-wrap"></div>
+    </section>
+
+    <!-- 右栏 / 手机历史 Tab -->
+    <section id="historyPanel" class="panel mobile-hidden">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">上传历史</div>
+          <div id="historySubtitle" class="panel-sub">与手机端实时同步</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button type="button" class="btn btn-ghost" onclick="loadHistory()">刷新</button>
+          <button type="button" class="btn btn-danger-ghost" onclick="clearAllHistory()">清空记录</button>
+        </div>
+      </div>
+
+      <input id="historySearch" class="search-box" type="search" placeholder="搜索文件名、专辑路径或来源设备…" oninput="debouncedLoadHistory()" />
+
+      <div class="filter-chips">
+        <button class="chip active" data-filter="ALL" onclick="setHistoryFilter('ALL', this)">全部</button>
+        <button class="chip" data-filter="SUCCESS" onclick="setHistoryFilter('SUCCESS', this)">上传成功</button>
+        <button class="chip" data-filter="SKIPPED_DUPLICATE" onclick="setHistoryFilter('SKIPPED_DUPLICATE', this)">重复跳过</button>
+        <button class="chip" data-filter="FAILED" onclick="setHistoryFilter('FAILED', this)">失败</button>
+      </div>
+
+      <div id="historyList" class="list-wrap history-scroll">
+        <div class="empty">暂无上传历史</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 可选 4 位 PIN 码认证弹窗 -->
+  <div id="pinOverlay" class="pin-overlay">
+    <div class="pin-card">
+      <div class="panel-title">请输入 4 位访问码</div>
+      <div class="panel-sub" style="margin-top:6px;">请查看手机 Sonify「WiFi 传歌」界面显示的 4 位临时 PIN 码</div>
+      <input id="pinInput" class="pin-input" type="tel" maxlength="4" inputmode="numeric" placeholder="••••" />
+      <div id="pinErr" style="color:var(--danger);font-size:12px;min-height:18px;margin-bottom:10px;"></div>
+      <button type="button" class="btn btn-primary" style="width:100%;" onclick="submitPin()">验证并进入</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // ==================== 纯 JS SHA-256（兼容局域网明文 HTTP，不依赖 crypto.subtle） ====================
+    const SHA256_K = new Uint32Array([
+      0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+      0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+      0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+      0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+      0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+      0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+      0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+      0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+    ]);
+
+    function sha256Hex(bytes) {
+      const len = bytes.length;
+      const bitLenHi = Math.floor(len / 0x20000000);
+      const bitLenLo = (len << 3) >>> 0;
+      const paddedLen = ((len + 9 + 63) >> 6) << 6;
+      const buf = new Uint8Array(paddedLen);
+      buf.set(bytes);
+      buf[len] = 0x80;
+      const dv = new DataView(buf.buffer);
+      dv.setUint32(paddedLen - 8, bitLenHi, false);
+      dv.setUint32(paddedLen - 4, bitLenLo, false);
+
+      let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+      let h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+      const w = new Uint32Array(64);
+
+      for (let i = 0; i < paddedLen; i += 64) {
+        for (let t = 0; t < 16; t++) w[t] = dv.getUint32(i + t * 4, false);
+        for (let t = 16; t < 64; t++) {
+          const s0 = ((w[t-15] >>> 7) | (w[t-15] << 25)) ^ ((w[t-15] >>> 18) | (w[t-15] << 14)) ^ (w[t-15] >>> 3);
+          const s1 = ((w[t-2] >>> 17) | (w[t-2] << 15)) ^ ((w[t-2] >>> 19) | (w[t-2] << 13)) ^ (w[t-2] >>> 10);
+          w[t] = (w[t-16] + s0 + w[t-7] + s1) >>> 0;
+        }
+        let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+        for (let t = 0; t < 64; t++) {
+          const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+          const ch = (e & f) ^ (~e & g);
+          const temp1 = (h + S1 + ch + SHA256_K[t] + w[t]) >>> 0;
+          const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+          const maj = (a & b) ^ (a & c) ^ (b & c);
+          const temp2 = (S0 + maj) >>> 0;
+          h = g; g = f; f = e; e = (d + temp1) >>> 0;
+          d = c; c = b; b = a; a = (temp1 + temp2) >>> 0;
+        }
+        h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0;
+        h4 = (h4 + e) >>> 0; h5 = (h5 + f) >>> 0; h6 = (h6 + g) >>> 0; h7 = (h7 + h) >>> 0;
+      }
+      return [h0,h1,h2,h3,h4,h5,h6,h7].map(n => n.toString(16).padStart(8, '0')).join('');
+    }
+
+    const FULL_HASH_LIMIT = 4 * 1024 * 1024;
+    const SLICE_SIZE = 65536;
+
+    async function computeFastFingerprint(file) {
+      const size = file.size;
+      let bytes;
+      if (size <= FULL_HASH_LIMIT) {
+        bytes = new Uint8Array(await file.arrayBuffer());
+      } else {
+        const mid = Math.floor((size - SLICE_SIZE) / 2);
+        const tail = size - SLICE_SIZE;
+        const [a, b, c] = await Promise.all([
+          file.slice(0, SLICE_SIZE).arrayBuffer(),
+          file.slice(mid, mid + SLICE_SIZE).arrayBuffer(),
+          file.slice(tail, size).arrayBuffer()
+        ]);
+        bytes = new Uint8Array(SLICE_SIZE * 3);
+        bytes.set(new Uint8Array(a), 0);
+        bytes.set(new Uint8Array(b), SLICE_SIZE);
+        bytes.set(new Uint8Array(c), SLICE_SIZE * 2);
+      }
+      return `v1:${size}:${sha256Hex(bytes)}`;
+    }
+
+    // ==================== 状态与工具 ====================
+    let authToken = sessionStorage.getItem('sonify_wifi_token') || '';
+    let historyFilter = 'ALL';
+    let historyTimer = null;
+    let uploadQueue = [];
+    let isUploading = false;
+    let nextTaskId = 1;
+
+    function apiHeaders(extra = {}) {
+      const h = { ...extra };
+      if (authToken) h['X-Sonify-Token'] = authToken;
+      return h;
+    }
+
+    function formatBytes(n) {
+      if (!n || n <= 0) return '0 B';
+      const u = ['B', 'KB', 'MB', 'GB'];
+      let i = 0, v = n;
+      while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+      return `${v >= 100 || i === 0 ? v.toFixed(0) : v.toFixed(1)} ${u[i]}`;
+    }
+
+    function formatTime(ms) {
+      const d = new Date(ms);
+      const pad = x => String(x).padStart(2, '0');
+      return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function esc(s) {
+      return String(s || '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove('show'), 2600);
+    }
+
+    function switchMobileTab(tab) {
+      const up = document.getElementById('uploadPanel');
+      const hi = document.getElementById('historyPanel');
+      document.getElementById('tabUploadBtn').classList.toggle('active', tab === 'upload');
+      document.getElementById('tabHistoryBtn').classList.toggle('active', tab === 'history');
+      up.classList.toggle('mobile-hidden', tab !== 'upload');
+      hi.classList.toggle('mobile-hidden', tab !== 'history');
+      if (tab === 'history') loadHistory();
+    }
+
+    // ==================== 同步 App 主题与状态 ====================
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/status', { headers: apiHeaders() });
+        const st = await res.json();
+        if (st.theme) {
+          const root = document.documentElement.style;
+          root.setProperty('--canvas', st.theme.canvas);
+          root.setProperty('--surface1', st.theme.surface1);
+          root.setProperty('--surface2', st.theme.surface2);
+          root.setProperty('--surface3', st.theme.surface3);
+          root.setProperty('--accent', st.theme.accent);
+          root.setProperty('--on-accent', st.theme.onAccent);
+          root.setProperty('--exclusive-green', st.theme.exclusiveGreen);
+          root.setProperty('--danger', st.theme.danger);
+          const metaTheme = document.querySelector('meta[name="theme-color"]');
+          if (metaTheme) metaTheme.setAttribute('content', st.theme.canvas);
+        }
+        document.getElementById('deviceSub').textContent = `${st.deviceName || 'Android 设备'} · ${st.storageDir || ''}`;
+        document.getElementById('freeSpaceLabel').textContent = `剩余 ${formatBytes(st.freeSpaceBytes)}`;
+        const usbPill = document.getElementById('usbPill');
+        if (st.usbConnected) {
+          usbPill.style.display = 'inline-flex';
+          document.getElementById('usbLabel').textContent = `USB · ${st.usbDeviceName || 'DAC'}`;
+        } else {
+          usbPill.style.display = 'none';
+        }
+        document.getElementById('autoSkipDup').checked = st.autoSkipDuplicate !== false;
+
+        if (st.pinRequired && !st.authenticated) {
+          document.getElementById('pinOverlay').classList.add('open');
+        } else {
+          document.getElementById('pinOverlay').classList.remove('open');
+          loadHistory();
+        }
+      } catch (e) {
+        document.getElementById('deviceSub').textContent = '连接手机服务失败，请确认 App 保持开启';
+      }
+    }
+
+    async function submitPin() {
+      const pin = document.getElementById('pinInput').value.trim();
+      const errEl = document.getElementById('pinErr');
+      errEl.textContent = '';
+      if (pin.length < 4) { errEl.textContent = '请输入完整 4 位数字 PIN 码'; return; }
+      try {
+        const res = await fetch('/api/pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin })
+        });
+        const data = await res.json();
+        if (res.ok && data.token) {
+          authToken = data.token;
+          sessionStorage.setItem('sonify_wifi_token', authToken);
+          document.getElementById('pinOverlay').classList.remove('open');
+          showToast('验证通过，已连接 Sonify');
+          loadHistory();
+        } else {
+          errEl.textContent = data.error || 'PIN 码错误';
+        }
+      } catch (e) {
+        errEl.textContent = '网络异常，请重试';
+      }
+    }
+
+    document.getElementById('pinInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') submitPin();
+    });
+
+    // ==================== 拖拽 & 递归读取专辑文件夹 ====================
+    const dropzone = document.getElementById('dropzone');
+    ['dragenter', 'dragover'].forEach(ev => dropzone.addEventListener(ev, e => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    }));
+    ['dragleave', 'drop'].forEach(ev => dropzone.addEventListener(ev, e => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+    }));
+
+    dropzone.addEventListener('drop', async e => {
+      const items = e.dataTransfer?.items;
+      const collected = [];
+      if (items && items.length > 0 && items[0].webkitGetAsEntry) {
+        const entries = [];
+        for (const it of items) {
+          const entry = it.webkitGetAsEntry();
+          if (entry) entries.push(entry);
+        }
+        for (const entry of entries) {
+          await collectFromEntry(entry, '', collected);
+        }
+      } else if (e.dataTransfer?.files) {
+        for (const f of e.dataTransfer.files) {
+          collected.push({ file: f, relPath: f.webkitRelativePath || f.name });
+        }
+      }
+      if (collected.length > 0) handleSelectedFiles(collected);
+    });
+
+    function collectFromEntry(entry, prefix, out) {
+      return new Promise(resolve => {
+        if (entry.isFile) {
+          entry.file(f => {
+            out.push({ file: f, relPath: prefix ? `${prefix}/${f.name}` : f.name });
+            resolve();
+          }, () => resolve());
+        } else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          const all = [];
+          const readBatch = () => {
+            reader.readEntries(async batch => {
+              if (!batch.length) {
+                for (const child of all) {
+                  await collectFromEntry(child, prefix ? `${prefix}/${entry.name}` : entry.name, out);
+                }
+                resolve();
+              } else {
+                all.push(...batch);
+                readBatch();
+              }
+            }, () => resolve());
+          };
+          readBatch();
+        } else resolve();
+      });
+    }
+
+    document.getElementById('fileInput').addEventListener('change', e => {
+      const arr = Array.from(e.target.files || []).map(f => ({ file: f, relPath: f.name }));
+      e.target.value = '';
+      if (arr.length) handleSelectedFiles(arr);
+    });
+
+    document.getElementById('folderInput').addEventListener('change', e => {
+      const arr = Array.from(e.target.files || []).map(f => ({ file: f, relPath: f.webkitRelativePath || f.name }));
+      e.target.value = '';
+      if (arr.length) handleSelectedFiles(arr);
+    });
+
+    // ==================== 预检防重 & 队列流式上传 ====================
+    async function handleSelectedFiles(entries) {
+      const autoSkip = document.getElementById('autoSkipDup').checked;
+      const newTasks = entries.map(({ file, relPath }) => ({
+        id: nextTaskId++,
+        file,
+        name: file.name,
+        relPath: relPath || file.name,
+        size: file.size,
+        hash: '',
+        status: 'HASHING', // HASHING / QUEUED / UPLOADING / DONE / DUPLICATE / ERROR / UNSUPPORTED
+        progress: 0,
+        speedText: '',
+        note: '正在计算防重指纹…',
+        overwrite: !autoSkip,
+        xhr: null
+      }));
+
+      uploadQueue = [...newTasks, ...uploadQueue];
+      renderQueue();
+
+      // 1. 计算快速分段指纹
+      for (const task of newTasks) {
+        try {
+          task.hash = await computeFastFingerprint(task.file);
+        } catch (_) {
+          task.hash = '';
+        }
+      }
+
+      // 2. 批量防重预检（若开启自动跳过重复）
+      if (autoSkip) {
+        try {
+          const res = await fetch('/api/check', {
+            method: 'POST',
+            headers: apiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({
+              files: newTasks.map(t => ({
+                name: t.name,
+                relativePath: t.relPath,
+                size: t.size,
+                hash: t.hash
+              }))
+            })
+          });
+          if (res.status === 401) {
+            document.getElementById('pinOverlay').classList.add('open');
+            return;
+          }
+          const data = await res.json();
+          const map = new Map((data.results || []).map(r => [r.relativePath, r]));
+          let dupCount = 0;
+          for (const task of newTasks) {
+            const r = map.get(task.relPath);
+            if (!r || r.status === 'OK') {
+              task.status = 'QUEUED';
+              task.note = '等待上传…';
+            } else if (r.status === 'UNSUPPORTED') {
+              task.status = 'UNSUPPORTED';
+              task.note = r.reason || '不支持的文件格式';
+            } else {
+              dupCount++;
+              task.status = 'DUPLICATE';
+              task.note = `${r.reason || '重复文件已跳过'}${r.existingName ? `（${r.existingName}）` : ''}`;
+            }
+          }
+          if (dupCount > 0) {
+            showToast(`防重拦截 ${dupCount} 个重复文件，已自动跳过`);
+            loadHistory();
+          }
+        } catch (e) {
+          for (const task of newTasks) {
+            task.status = 'QUEUED';
+            task.note = '等待上传…';
+          }
+        }
+      } else {
+        for (const task of newTasks) {
+          task.status = 'QUEUED';
+          task.note = '等待上传（覆盖模式）…';
+        }
+      }
+
+      renderQueue();
+      drainUploadQueue();
+    }
+
+    async function drainUploadQueue() {
+      if (isUploading) return;
+      isUploading = true;
+      document.getElementById('vinylLogo').classList.add('spinning');
+
+      try {
+        while (true) {
+          const next = uploadQueue.slice().reverse().find(t => t.status === 'QUEUED');
+          if (!next) break;
+          await uploadSingleTask(next);
+          renderQueue();
+        }
+      } finally {
+        isUploading = false;
+        document.getElementById('vinylLogo').classList.remove('spinning');
+        renderQueue();
+        loadStatus();
+        loadHistory();
+      }
+    }
+
+    function uploadSingleTask(task) {
+      return new Promise(resolve => {
+        task.status = 'UPLOADING';
+        task.progress = 0;
+        task.note = '正在高速传输…';
+        renderQueue();
+
+        const qs = new URLSearchParams({
+          name: task.name,
+          relPath: task.relPath,
+          hash: task.hash,
+          overwrite: task.overwrite ? 'true' : 'false'
+        });
+
+        const xhr = new XMLHttpRequest();
+        task.xhr = xhr;
+        const startTs = Date.now();
+
+        xhr.open('POST', `/api/upload?${qs.toString()}`, true);
+        if (authToken) xhr.setRequestHeader('X-Sonify-Token', authToken);
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+
+        xhr.upload.onprogress = ev => {
+          if (ev.lengthComputable && ev.total > 0) {
+            task.progress = Math.min(100, Math.round((ev.loaded / ev.total) * 100));
+            const elapsedSec = Math.max(0.2, (Date.now() - startTs) / 1000);
+            task.speedText = `${formatBytes(ev.loaded / elapsedSec)}/s`;
+            task.note = `传输中 ${task.progress}% · ${task.speedText}`;
+            updateTaskDom(task);
+          }
+        };
+
+        xhr.onload = () => {
+          task.xhr = null;
+          let body = {};
+          try { body = JSON.parse(xhr.responseText || '{}'); } catch (_) {}
+          if (xhr.status === 200) {
+            task.status = 'DONE';
+            task.progress = 100;
+            task.note = '上传并自动解析入库成功';
+          } else if (xhr.status === 409) {
+            task.status = 'DUPLICATE';
+            task.note = body.message || '重复文件已自动跳过';
+          } else if (xhr.status === 401) {
+            task.status = 'ERROR';
+            task.note = '需要重新验证 4 位 PIN 码';
+            document.getElementById('pinOverlay').classList.add('open');
+          } else {
+            task.status = 'ERROR';
+            task.note = body.message || body.error || `上传失败 (HTTP ${xhr.status})`;
+          }
+          resolve();
+        };
+
+        xhr.onerror = () => {
+          task.xhr = null;
+          task.status = 'ERROR';
+          task.note = '网络连接中断，请检查手机 WiFi 状态';
+          resolve();
+        };
+
+        xhr.onabort = () => {
+          task.xhr = null;
+          task.status = 'ERROR';
+          task.note = '已手动取消';
+          resolve();
+        };
+
+        xhr.send(task.file);
+      });
+    }
+
+    function forceOverwriteTask(id) {
+      const t = uploadQueue.find(x => x.id === id);
+      if (!t) return;
+      t.overwrite = true;
+      t.status = 'QUEUED';
+      t.progress = 0;
+      t.note = '等待强制覆盖上传…';
+      renderQueue();
+      drainUploadQueue();
+    }
+
+    function cancelTask(id) {
+      const t = uploadQueue.find(x => x.id === id);
+      if (!t) return;
+      if (t.xhr) t.xhr.abort();
+      else if (t.status === 'QUEUED') { t.status = 'ERROR'; t.note = '已取消'; renderQueue(); }
+    }
+
+    function updateTaskDom(task) {
+      const bar = document.getElementById(`bar_${task.id}`);
+      const note = document.getElementById(`note_${task.id}`);
+      if (bar) bar.style.width = `${task.progress}%`;
+      if (note) note.textContent = task.note;
+    }
+
+    function renderQueue() {
+      const list = document.getElementById('queueList');
+      const summary = document.getElementById('queueSummary');
+      if (!uploadQueue.length) {
+        summary.textContent = '等待选择文件';
+        list.innerHTML = '';
+        return;
+      }
+      const done = uploadQueue.filter(t => t.status === 'DONE').length;
+      const dup = uploadQueue.filter(t => t.status === 'DUPLICATE').length;
+      const active = uploadQueue.filter(t => t.status === 'UPLOADING' || t.status === 'QUEUED' || t.status === 'HASHING').length;
+      summary.textContent = `本次共 ${uploadQueue.length} 项 · 成功 ${done} · 重复跳过 ${dup}${active > 0 ? ` · 进行中 ${active}` : ''}`;
+
+      list.innerHTML = uploadQueue.map(t => {
+        const badgeHtml =
+          t.status === 'DONE' ? `<span class="badge ok">已入库</span>` :
+          t.status === 'DUPLICATE' ? `<span class="badge dup">重复跳过</span>` :
+          t.status === 'UPLOADING' ? `<span class="badge ok">${t.progress}%</span>` :
+          t.status === 'QUEUED' || t.status === 'HASHING' ? `<span class="badge">队列中</span>` :
+          `<span class="badge err">${t.status === 'UNSUPPORTED' ? '不支持' : '失败'}</span>`;
+
+        const actionBtn =
+          t.status === 'DUPLICATE'
+            ? `<button class="btn btn-ghost" onclick="forceOverwriteTask(${t.id})">覆盖上传</button>`
+            : (t.status === 'UPLOADING' || t.status === 'QUEUED')
+              ? `<button class="btn btn-ghost" onclick="cancelTask(${t.id})">取消</button>`
+              : t.status === 'ERROR'
+                ? `<button class="btn btn-ghost" onclick="forceOverwriteTask(${t.id})">重试</button>`
+                : '';
+
+        const progressHtml = (t.status === 'UPLOADING' || t.status === 'DONE')
+          ? `<div class="progress-track"><div id="bar_${t.id}" class="progress-bar" style="width:${t.progress}%"></div></div>`
+          : '';
+
+        return `
+          <div class="card-item">
+            <div class="card-row">
+              <div class="item-main">
+                <div class="item-name" title="${esc(t.relPath)}">${esc(t.name)}</div>
+                <div class="item-meta">
+                  <span>${formatBytes(t.size)}</span>
+                  <span id="note_${t.id}">${esc(t.note)}</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;">
+                ${badgeHtml}
+                ${actionBtn}
+              </div>
+            </div>
+            ${progressHtml}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==================== 上传历史 ====================
+    function setHistoryFilter(filter, btn) {
+      historyFilter = filter;
+      document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c === btn));
+      loadHistory();
+    }
+
+    function debouncedLoadHistory() {
+      clearTimeout(historyTimer);
+      historyTimer = setTimeout(loadHistory, 220);
+    }
+
+    async function loadHistory() {
+      const q = document.getElementById('historySearch').value.trim();
+      const qs = new URLSearchParams({ q, status: historyFilter });
+      try {
+        const res = await fetch(`/api/history?${qs.toString()}`, { headers: apiHeaders() });
+        if (res.status === 401) {
+          document.getElementById('pinOverlay').classList.add('open');
+          return;
+        }
+        const data = await res.json();
+        const items = data.items || [];
+        document.getElementById('histTabCount').textContent = items.length;
+        document.getElementById('historySubtitle').textContent = `共 ${items.length} 条记录 · 与手机端实时同步`;
+
+        const container = document.getElementById('historyList');
+        if (!items.length) {
+          container.innerHTML = `<div class="empty">暂无匹配的上传记录</div>`;
+          return;
+        }
+        container.innerHTML = items.map(it => {
+          const spec = it.sampleRate > 0
+            ? `${it.format} ${(it.sampleRate % 1000 === 0 ? (it.sampleRate / 1000) : (it.sampleRate / 1000).toFixed(1))}k${it.bitDepth > 0 ? '/' + it.bitDepth + 'b' : ''}`
+            : (it.format || '');
+          const isHiRes = it.sampleRate > 48000 || it.bitDepth > 16;
+          const statusBadge =
+            it.status === 'SUCCESS' ? `<span class="badge ok">成功</span>` :
+            it.status === 'SKIPPED_DUPLICATE' ? `<span class="badge dup">重复跳过</span>` :
+            `<span class="badge err">失败</span>`;
+          const extra = it.status === 'SKIPPED_DUPLICATE' && it.duplicateOfName
+            ? `<span>与 ${esc(it.duplicateOfName)} 一致</span>` : '';
+
+          return `
+            <div class="card-item">
+              <div class="card-row">
+                <div class="item-main">
+                  <div class="item-name" title="${esc(it.relativePath)}">${esc(it.fileName)}</div>
+                  <div class="item-meta">
+                    ${spec ? `<span class="badge ${isHiRes ? 'hires' : ''}">${esc(spec)}</span>` : ''}
+                    <span>${formatBytes(it.fileSize)}</span>
+                    ${it.clientInfo ? `<span>${esc(it.clientInfo)}</span>` : ''}
+                    <span>${formatTime(it.uploadedAt)}</span>
+                    ${extra}
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  ${statusBadge}
+                  <button class="btn btn-ghost" title="删除记录" onclick="deleteHistoryRow(${it.id})">删除</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        // ignore transient refresh failure
+      }
+    }
+
+    async function deleteHistoryRow(id) {
+      try {
+        await fetch(`/api/history/${id}?deleteFile=false`, { method: 'DELETE', headers: apiHeaders() });
+        loadHistory();
+      } catch (_) {}
+    }
+
+    async function clearAllHistory() {
+      if (!confirm('仅清空上传历史记录（保留手机上已传好的无损音频文件），确认继续吗？')) return;
+      try {
+        await fetch('/api/history?deleteFiles=false', { method: 'DELETE', headers: apiHeaders() });
+        showToast('已清空上传历史记录');
+        loadHistory();
+      } catch (_) {}
+    }
+
+    loadStatus();
+    setInterval(loadStatus, 12000);
+  </script>
+</body>
+</html>

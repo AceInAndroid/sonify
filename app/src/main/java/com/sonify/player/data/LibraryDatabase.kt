@@ -432,6 +432,57 @@ interface DownloadedTrackDao {
     suspend fun deleteAll()
 }
 
+@Entity(
+    tableName = "wifi_upload_history",
+    indices = [
+        Index(value = ["contentHash"]),
+        Index(value = ["uploadedAt"]),
+    ],
+)
+data class WifiUploadHistoryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val fileName: String,
+    val relativePath: String,
+    val savedPath: String,
+    val fileSize: Long,
+    val contentHash: String,
+    val format: String = "AUDIO",
+    val sampleRate: Int = 0,
+    val bitDepth: Int = 0,
+    val status: String = "SUCCESS", // SUCCESS / SKIPPED_DUPLICATE / FAILED
+    val duplicateOfName: String = "",
+    val clientInfo: String = "",
+    val uploadedAt: Long = System.currentTimeMillis(),
+)
+
+@Dao
+interface WifiUploadHistoryDao {
+
+    @Query("SELECT * FROM wifi_upload_history ORDER BY uploadedAt DESC, id DESC")
+    fun observeAll(): Flow<List<WifiUploadHistoryEntity>>
+
+    @Query("SELECT * FROM wifi_upload_history ORDER BY uploadedAt DESC, id DESC LIMIT :limit")
+    suspend fun getRecent(limit: Int = 300): List<WifiUploadHistoryEntity>
+
+    @Query("SELECT * FROM wifi_upload_history WHERE id = :id LIMIT 1")
+    suspend fun findById(id: Long): WifiUploadHistoryEntity?
+
+    @Query("SELECT * FROM wifi_upload_history WHERE contentHash = :hash AND status = 'SUCCESS' ORDER BY uploadedAt DESC LIMIT 1")
+    suspend fun findSuccessByHash(hash: String): WifiUploadHistoryEntity?
+
+    @Query("SELECT * FROM wifi_upload_history WHERE fileName = :fileName AND fileSize = :fileSize AND status = 'SUCCESS' ORDER BY uploadedAt DESC LIMIT 1")
+    suspend fun findSuccessByNameAndSize(fileName: String, fileSize: Long): WifiUploadHistoryEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(entity: WifiUploadHistoryEntity): Long
+
+    @Query("DELETE FROM wifi_upload_history WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM wifi_upload_history")
+    suspend fun deleteAll()
+}
+
 @Database(
     entities = [
         TrackEntity::class,
@@ -441,8 +492,9 @@ interface DownloadedTrackDao {
         PlaylistEntity::class,
         PlaylistItemEntity::class,
         DownloadedTrackEntity::class,
+        WifiUploadHistoryEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class LibraryDatabase : RoomDatabase() {
@@ -452,6 +504,7 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun subsonicTrackCacheDao(): SubsonicTrackCacheDao
     abstract fun playlistDao(): PlaylistDao
     abstract fun downloadedTrackDao(): DownloadedTrackDao
+    abstract fun wifiUploadHistoryDao(): WifiUploadHistoryDao
 
     companion object {
         @Volatile
@@ -581,6 +634,36 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `wifi_upload_history` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `fileName` TEXT NOT NULL,
+                        `relativePath` TEXT NOT NULL,
+                        `savedPath` TEXT NOT NULL,
+                        `fileSize` INTEGER NOT NULL,
+                        `contentHash` TEXT NOT NULL,
+                        `format` TEXT NOT NULL,
+                        `sampleRate` INTEGER NOT NULL,
+                        `bitDepth` INTEGER NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `duplicateOfName` TEXT NOT NULL,
+                        `clientInfo` TEXT NOT NULL,
+                        `uploadedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_wifi_upload_history_contentHash` ON `wifi_upload_history` (`contentHash`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_wifi_upload_history_uploadedAt` ON `wifi_upload_history` (`uploadedAt`)"
+                )
+            }
+        }
+
         fun get(context: Context): LibraryDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -588,7 +671,7 @@ abstract class LibraryDatabase : RoomDatabase() {
                     LibraryDatabase::class.java,
                     "sonify_library.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { instance = it }

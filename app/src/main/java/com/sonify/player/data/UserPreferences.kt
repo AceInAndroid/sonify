@@ -199,6 +199,10 @@ data class AppSettings(
     val downloadWifiOnly: Boolean = true,
     val librarySongSortField: String = "RECENTLY_ADDED",
     val librarySongSortAscending: Boolean = false,
+    // WiFi 局域网传歌
+    val wifiTransferPort: Int = 8088,
+    val wifiTransferPinEnabled: Boolean = false,
+    val wifiTransferAutoSkipDuplicate: Boolean = true,
     val lastLibrarySource: String = "local",
     val lastTrackPath: String? = null,
     val lastPositionMs: Long = 0L,
@@ -260,6 +264,9 @@ class UserPreferences(private val context: Context) {
         val DOWNLOAD_WIFI_ONLY = booleanPreferencesKey("download_wifi_only")
         val LIBRARY_SONG_SORT_FIELD = stringPreferencesKey("library_song_sort_field")
         val LIBRARY_SONG_SORT_ASC = booleanPreferencesKey("library_song_sort_asc")
+        val WIFI_TRANSFER_PORT = intPreferencesKey("wifi_transfer_port")
+        val WIFI_TRANSFER_PIN_ENABLED = booleanPreferencesKey("wifi_transfer_pin_enabled")
+        val WIFI_TRANSFER_AUTO_SKIP_DUP = booleanPreferencesKey("wifi_transfer_auto_skip_dup")
         val LAST_LIBRARY_SOURCE = stringPreferencesKey("last_library_source")
         val LAST_TRACK_PATH = stringPreferencesKey("last_track_path")
         val LAST_POSITION_MS = longPreferencesKey("last_position_ms")
@@ -343,6 +350,9 @@ class UserPreferences(private val context: Context) {
                 downloadWifiOnly = p[Keys.DOWNLOAD_WIFI_ONLY] ?: true,
                 librarySongSortField = p[Keys.LIBRARY_SONG_SORT_FIELD] ?: "RECENTLY_ADDED",
                 librarySongSortAscending = p[Keys.LIBRARY_SONG_SORT_ASC] ?: false,
+                wifiTransferPort = (p[Keys.WIFI_TRANSFER_PORT] ?: 8088).coerceIn(1024, 65500),
+                wifiTransferPinEnabled = p[Keys.WIFI_TRANSFER_PIN_ENABLED] ?: false,
+                wifiTransferAutoSkipDuplicate = p[Keys.WIFI_TRANSFER_AUTO_SKIP_DUP] ?: true,
                 lastLibrarySource = p[Keys.LAST_LIBRARY_SOURCE] ?: "local",
                 lastTrackPath = p[Keys.LAST_TRACK_PATH],
                 lastPositionMs = p[Keys.LAST_POSITION_MS] ?: 0L,
@@ -534,6 +544,18 @@ class UserPreferences(private val context: Context) {
             it[Keys.LIBRARY_SONG_SORT_FIELD] = field
             it[Keys.LIBRARY_SONG_SORT_ASC] = ascending
         }
+    }
+
+    suspend fun setWifiTransferPort(port: Int) {
+        context.dataStore.edit { it[Keys.WIFI_TRANSFER_PORT] = port.coerceIn(1024, 65500) }
+    }
+
+    suspend fun setWifiTransferPinEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.WIFI_TRANSFER_PIN_ENABLED] = enabled }
+    }
+
+    suspend fun setWifiTransferAutoSkipDuplicate(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.WIFI_TRANSFER_AUTO_SKIP_DUP] = enabled }
     }
 
     suspend fun setLastLibrarySource(source: String) {

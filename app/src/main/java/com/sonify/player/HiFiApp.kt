@@ -14,6 +14,7 @@ import com.sonify.player.ui.theme.AmbientColorExtractor
 import com.sonify.player.ui.theme.SubsonicCoverFetcher
 import com.sonify.player.usb.UsbAudioManager
 import com.sonify.player.usb.UsbVolumeController
+import com.sonify.player.wifi.WifiTransferManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,6 +43,8 @@ class HiFiApp : Application(), ImageLoaderFactory {
         private set
     lateinit var downloadManager: SonifyDownloadManager
         private set
+    lateinit var wifiTransferManager: WifiTransferManager
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -53,6 +56,7 @@ class HiFiApp : Application(), ImageLoaderFactory {
         subsonicRepo = SubsonicRepository(this, db, prefs)
         playlistRepo = PlaylistRepository(this, db, subsonicRepo)
         downloadManager = SonifyDownloadManager(this, db, prefs, subsonicRepo)
+        wifiTransferManager = WifiTransferManager(this, db, prefs, usbManager)
         AmbientColorExtractor.init(this, subsonicRepo)
 
         appScope.launch {

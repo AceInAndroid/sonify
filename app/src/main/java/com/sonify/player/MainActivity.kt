@@ -88,6 +88,7 @@ import com.sonify.player.ui.components.PlaylistEditorDialog
 import com.sonify.player.ui.components.SubsonicAccountsSheet
 import com.sonify.player.ui.components.TrackActionSheet
 import com.sonify.player.ui.components.VolumeHudOverlay
+import com.sonify.player.ui.components.WifiTransferSheet
 import com.sonify.player.ui.screens.LibraryScreen
 import com.sonify.player.ui.screens.NowPlayingScreen
 import com.sonify.player.ui.screens.PlaylistDetailScreen
@@ -242,12 +243,16 @@ private fun HiFiRootScreen(
     val toastMessage by libraryVm.toastMessage.collectAsState()
     val wifiBlockedTracks by libraryVm.wifiOnlyBlockedTracks.collectAsState()
 
+    val wifiTransferState by app.wifiTransferManager.state.collectAsState()
+    val wifiUploadHistory by app.wifiTransferManager.history.collectAsState()
+
     var currentTab by remember { mutableStateOf(MainTab.LIBRARY) }
     var showNowPlaying by remember { mutableStateOf(false) }
     var showOutputSheet by remember { mutableStateOf(false) }
     var showSubsonicSheet by remember { mutableStateOf(false) }
     var subsonicSheetInitialAdd by remember { mutableStateOf(false) }
     var showDownloadSheet by remember { mutableStateOf(false) }
+    var showWifiTransferSheet by remember { mutableStateOf(false) }
     var hasStoragePermission by remember { mutableStateOf(checkStoragePermission(context)) }
 
     // 歌单 & 歌曲操作状态
@@ -556,6 +561,7 @@ private fun HiFiRootScreen(
                     activeSubsonicServer = activeSubsonicServer,
                     downloadedCount = downloadedList.size,
                     downloadedTotalBytes = downloadedList.sumOf { it.fileSize.coerceAtLeast(0L) },
+                    wifiTransferState = wifiTransferState,
                     nativeBuildTime = usbState.stats.buildTime,
                     onRebindRoute = vm::rebindAudioRoute,
                     onScanNow = {
@@ -567,6 +573,7 @@ private fun HiFiRootScreen(
                         showSubsonicSheet = true
                     },
                     onOpenDownloadManager = { showDownloadSheet = true },
+                    onOpenWifiTransfer = { showWifiTransferSheet = true },
                     bottomPadding = bottomClearance,
                 )
             }
@@ -946,6 +953,57 @@ private fun HiFiRootScreen(
             onClearFinished = libraryVm::clearFinishedDownloads,
             onDeleteAllDownloads = libraryVm::deleteAllDownloads,
             onDismiss = { showDownloadSheet = false },
+        )
+    }
+
+    // WiFi 局域网传歌控制台 Sheet（含扫码二维码与上传历史）
+    if (showWifiTransferSheet) {
+        WifiTransferSheet(
+            state = wifiTransferState,
+            history = wifiUploadHistory,
+            autoSkipDuplicate = settings.wifiTransferAutoSkipDuplicate,
+            onToggleServer = { enable ->
+                if (enable) app.wifiTransferManager.startServer()
+                else app.wifiTransferManager.stopServer()
+            },
+            onRefreshNetwork = { app.wifiTransferManager.refreshNetworkAndStorage() },
+            onTogglePinEnabled = { enabled ->
+                scope.launch {
+                    app.prefs.setWifiTransferPinEnabled(enabled)
+                    app.wifiTransferManager.refreshPinEnabled(enabled)
+                }
+            },
+            onRegeneratePin = { app.wifiTransferManager.regeneratePin() },
+            onToggleAutoSkipDuplicate = { enabled ->
+                scope.launch { app.prefs.setWifiTransferAutoSkipDuplicate(enabled) }
+            },
+            onPlayUploadedFile = { savedPath ->
+                scope.launch {
+                    val found = tracks.firstOrNull { it.path == savedPath }
+                        ?: app.db.trackDao().findByPath(savedPath)
+                    if (found != null) {
+                        vm.playTracks(listOf(found), 0, "WiFi 传歌")
+                        showWifiTransferSheet = false
+                        showNowPlaying = true
+                    } else {
+                        libraryVm.showToast("文件尚未索引，请稍后再试")
+                    }
+                }
+            },
+            onDeleteHistoryItem = { id, deleteFile ->
+                scope.launch {
+                    app.wifiTransferManager.deleteHistoryItem(id, deleteFile)
+                    libraryVm.showToast(if (deleteFile) "已删除记录与本地文件" else "已删除上传记录")
+                }
+            },
+            onClearHistory = { deleteFiles ->
+                scope.launch {
+                    app.wifiTransferManager.clearHistory(deleteFiles)
+                    libraryVm.showToast("已清空上传历史")
+                }
+            },
+            onShowToast = libraryVm::showToast,
+            onDismiss = { showWifiTransferSheet = false },
         )
     }
 
