@@ -1,0 +1,144 @@
+<div align="center">
+
+# Sonify
+
+**开源 Android Bit-Perfect USB 独占（UAC1/UAC2）HiFi 音乐播放器**
+
+[![Platform](https://img.shields.io/badge/Android-7.0%2B%20(API%2024%2B)-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
+[![ABI](https://img.shields.io/badge/ABI-arm64--v8a-blue)]()
+[![USB Audio](https://img.shields.io/badge/USB%20Audio-UAC1%20%2F%20UAC2%20Exclusive-1ED760)]()
+[![License](https://img.shields.io/badge/License-Apache--2.0-E5A93C)](LICENSE)
+
+[English](README.md) | **简体中文**
+
+</div>
+
+---
+
+**Sonify** 是一款专注于本地无损听音体验的开源 Android HiFi 播放器。内置基于 `libusb` 自研的用户态 **USB Audio Class（UAC1/UAC2）独占驱动**，彻底绕过 Android `AudioFlinger` 强制重采样，将 **PCM 最高 384 kHz / 32-bit** 无损音频以真正的 **Bit-Perfect** 方式直送外接 USB DAC；搭配 **Spotify 极简深色 × 旋转黑胶唱片** 视觉设计与硬件级 **耳朵安全音量保护**。
+
+## 界面预览
+
+<p align="center">
+  <img src="docs/screenshots/now_playing.png" width="18%" alt="黑胶全屏播放页" />
+  <img src="docs/screenshots/volume_hud.png" width="18%" alt="护耳悬浮音量 HUD" />
+  <img src="docs/screenshots/library.png" width="18%" alt="本地无损音乐库" />
+  <img src="docs/screenshots/usb_dac.png" width="18%" alt="USB DAC 实时链路仪表" />
+  <img src="docs/screenshots/settings.png" width="18%" alt="设置页" />
+</p>
+
+| 页面 | 核心特性 |
+|---|---|
+| **黑胶全屏播放页** | 纯 Canvas 绘制旋转黑胶唱片与静止 45° 高光、封面主色暗调氛围渐变、实时 **源格式 → 实际协商输出** 双徽章胶囊、常驻硬件音量控制条 |
+| **护耳悬浮音量 HUD** | USB 独占模式下接管手机物理音量键，实时显示百分比、衰减 dB 以及右侧红色护耳上限锁定区 |
+| **本地无损音乐库** | 毫秒级无损头解析（FLAC/WAV/MP3/M4A/OGG/OPUS）、专辑封面网格、艺术家/文件夹钻取、首页「继续上次播放」断点卡片 |
+| **USB 设备与诊断页** | 实时展示实际协商采样率、位深、异步 Feedback 实测晶振频率（`fbRate`）、缓冲水位与欠载计数，内置可折叠 440Hz/1kHz 工程测试音工具 |
+| **设置页** | Spotify 风格极简深色分组设置，覆盖 USB 独占策略、耳朵安全保护上限、无缝播放、黑胶/方形封面与深色主题切换 |
+
+---
+
+## 核心功能
+
+### 1. 自研 Bit-Perfect USB 独占音频引擎（C++17 + libusb）
+- **绕过 Android `AudioFlinger`**：通过 `UsbManager` 授权 + `claimInterface(force = true)` 剥离内核 `snd-usb-audio` 驱动，`dup(fd)` 后交由 `libusb_wrap_sys_device()` 在应用进程内直接发送等时传输（Isochronous OUT）。
+- **完整 UAC1 / UAC2 协议支持**：自动解析 Audio Control 与 Audio Streaming 描述符、运行时自动探测非标准 `wIndex` 字节序、查询采样率表（`GET_RANGE`）并动态切换 DAC 时钟（`SET_CUR`），按 High-Speed `125 µs` microframe 精准排包。
+- **异步 Feedback 闭环调速**：持续读取 DAC 16.16 定点反馈端点并平滑微调发包速率，实测在 水月雨 MOONRIVER 3 上精准锁定 `44099.6 Hz`（与晶振偏差 < 10 ppm，零欠载）。
+- **24-bit / 32-bit 无损通路**：自定义 Media3 `UacAudioSink` 与 `HiFiRenderersFactory` 显式保护 24-bit FLAC 不被系统解码器静默截断为 16-bit，经零拷贝 `DirectByteBuffer` 送入 2MB 无锁 SPSC 环形缓冲（`PcmRingBufferSource`），直通时走纯整数位深移位路径。
+- **无 DAC 优雅回退**：未连接 USB DAC 或关闭独占时自动回退至 `DefaultAudioSink` 本机扬声器/耳机输出。
+
+### 2. UAC 硬件音量与四重耳朵安全保护
+- **UAC1/UAC2 Feature Unit 硬件音量优先**：自动解析播放通路 Feature Unit（支持 Master 及独立左右声道），直接调节 DAC 内部硬件衰减器，**数字 PCM 保持 100% Bit-Perfect 直通**；无硬件音量能力的 DAC 自动无缝切换为 C++ 对数 dB（`-60 dB .. 0 dB`）32-bit 浮点软件衰减。
+- **全场景物理音量键接管**：USB 独占时前台（`dispatchKeyEvent`）与后台/息屏（`MediaSession` 远程音量代理）全面接管手机侧边物理音量 `+/-` 键，不干扰系统媒体音量；切回本机输出自动还原原生系统音量。
+- **四重防炸耳护耳机制**：
+  1. 可自定义最大音量硬上限（默认开启 **`60%` / -24 dB**），UI、物理按键与 C++ Native 底层三重硬钳位。
+  2. 连接 DAC 后、发送第一个音频包前强制压低至安全起步音量（默认 **`25%` / -45 dB**）。
+  3. 按 DAC `vid:pid` 独立记忆音量，且支持重新插拔自动回落至安全起步音量。
+  4. 调高上限超过 80%、关闭护耳保护或切换「固定直通 100%（0 dBFS）」时强制弹出红色高音量警告二次确认。
+
+### 3. 本地播放与媒体库体验
+- **真·无缝播放（Gapless）**：同采样率连续曲目保持 USB 流与时钟不断开直接续流。
+- **防爆音淡入淡出**：暂停、恢复、拖动进度与切率时施加 5 ms 平滑淡变。
+- **高速无损扫描与 Room 入库**：自研二进制头解析 FLAC（`STREAMINFO`/`VORBIS_COMMENT`/`PICTURE`）与 WAV（`fmt `/`data`/`LIST INFO`），支持内嵌与目录封面匹配、增量扫描去重与 SAF 导入。
+- **后台稳态播放**：`MediaSessionService` 前台服务、耳机/USB 拔出自动暂停、每曲断点记忆与播放期按需 `WakeLock`。
+
+---
+
+## 技术架构
+
+```mermaid
+flowchart TD
+    UI["Jetpack Compose UI\n(黑胶播放页 / 音乐库 / USB 仪表 / 设置)"]
+    SVC["HiFiPlaybackService\n(MediaSessionService + 后台远程音量 + 拔出暂停)"]
+    EXO["Media3 ExoPlayer\n(HiFiRenderersFactory — 24-bit FLAC 保护)"]
+    HYB["HybridAudioSink"]
+    SYS["DefaultAudioSink\n(本机扬声器 / 耳机 / 蓝牙)"]
+    UAC["UacAudioSink\n(背压流控 / 时钟对齐 / Gapless 快速路径)"]
+    JNI["jni_bridge.cpp\n(DirectByteBuffer 零拷贝 + gLock)"]
+    RING["PcmRingBufferSource : AudioSource\n(2MB 无锁 SPSC + 整数无损打包 + 防爆音淡变)"]
+    STRM["UacStream\n(125µs 等时 OUT + 16.16 Feedback 闭环)"]
+    DAC["外接 USB DAC\n(UAC1 / UAC2 + Feature Unit 硬件音量)"]
+
+    UI <--> SVC
+    SVC --> EXO --> HYB
+    HYB -->|"无 DAC / 关闭独占"| SYS
+    HYB -->|"USB 独占"| UAC --> JNI --> RING --> STRM --> DAC
+    DAC -.->|"异步 Feedback + 实时协商状态"| STRM
+```
+
+---
+
+## 已验证硬件
+
+| 设备 / DAC | 接口协议 | 实测验证结果 |
+|---|---|---|
+| **水月雨 MOONRIVER 3** (`VID 0x35D8 / PID 0x43DA`) | UAC2 High-Speed | 支持 44.1k–768kHz 时钟协商（自动探测 `wIndex=0x0102`）、32-bit/4B 等时 OUT（`125 µs` 微帧）、Feedback 闭环稳锁 `44099.6 Hz`（0 欠载）、Feature Unit `ID=10` 左右声道硬件音量（`-100..0 dB`，`0.5 dB` 步进） |
+
+---
+
+## 本地构建指南
+
+### 环境要求
+- **Android Studio** / Gradle 8.14+
+- **JDK 17**
+- **Android SDK**：`compileSdk = 35`、`minSdk = 24`
+- **NDK**：`28.2.13676358`、**CMake**：`3.22.1`
+- 目标架构：`arm64-v8a`（`third_party/libusb/` 内置 `libusb 1.0.27` 源码，自动静态编入）
+
+### 构建与测试命令
+
+```bash
+export ANDROID_HOME=$HOME/Library/Android/sdk
+
+# 运行单元测试并构建 Debug APK
+./gradlew :app:testDebugUnitTest :app:assembleDebug
+
+# 提示：修改 C++ 原生代码后，建议彻底清理原生缓存避免旧 .so 残留
+rm -rf app/build app/.cxx build
+./gradlew :app:assembleDebug --no-daemon --no-build-cache
+```
+
+产物路径：`app/build/outputs/apk/debug/app-debug.apk`
+
+### 调试日志
+
+```bash
+adb logcat -s HiFiAudio:* HiFiVolume:* HiFiAudioSink:* HiFiCodecRenderer:*
+```
+
+---
+
+## 路线图
+
+- [x] **M1**：自研 UAC1/UAC2 驱动、`libusb_wrap_sys_device`、时钟协商、125 µs 等时 OUT 与异步反馈
+- [x] **M2**：Media3 接入、无锁 SPSC 环形缓冲、Feedback 闭环调速、无损扫描 + Room 入库、Spotify 深色黑胶 UI、UAC 硬件音量与四重护耳保护
+- [ ] **M3**：10 段参数均衡器 PEQ（C++ biquad + 实时幅频曲线）、LRC 歌词与桌面悬浮歌词、WiFi 传歌、播放列表与 FTS4 拼音搜索
+- [ ] **M4**：多套深色皮肤预设、电池保活与厂商指引、更多 DAC 兼容微调
+
+*（明确不做范围：在线流媒体、网盘/NAS、DSD 与黑盒私有音效。）*
+
+---
+
+## 开源许可
+
+本项目代码基于 [Apache License 2.0](LICENSE) 开源。
+`third_party/libusb/` 遵循其原始 **LGPL-2.1** 许可协议。

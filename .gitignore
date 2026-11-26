@@ -1,0 +1,16 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+app/.cxx/
+.DS_Store
+*.apk
+*.aab
+*.keystore
+*.jks
+docs/screenshots/tmp_*.png

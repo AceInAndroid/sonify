@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Audio class = 0x01，插上 USB DAC 时系统会直接拉起本 App -->
+    <usb-device class="1" />
+</resources>
