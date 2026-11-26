@@ -79,6 +79,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
@@ -90,8 +91,7 @@ import androidx.media3.common.Player
 import com.sonify.player.audio.ActiveOutputRoute
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.CoverStyle
-import com.sonify.player.data.LyricsAlignment
-import com.sonify.player.data.LyricsFontSize
+import com.sonify.player.data.LyricsBackdropStyle
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.data.VolumeMode
 import com.sonify.player.lyrics.LrcParser
@@ -100,9 +100,13 @@ import com.sonify.player.playback.AudioFocusState
 import com.sonify.player.subsonic.SubsonicUri
 import com.sonify.player.ui.LyricsUiState
 import com.sonify.player.ui.PlaybackUiState
+import com.sonify.player.ui.components.ImmersiveLyricsBackdrop
 import com.sonify.player.ui.components.LyricsOverlayView
+import com.sonify.player.ui.components.LyricsStyleActions
 import com.sonify.player.ui.components.VinylDisc
+import com.sonify.player.ui.components.toComposeFontFamily
 import com.sonify.player.ui.theme.AmbientColorExtractor
+import com.sonify.player.ui.theme.AmbientPalette
 import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.ui.theme.SystemBarsSpec
 import com.sonify.player.ui.theme.formatDuration
@@ -148,8 +152,7 @@ fun NowPlayingScreen(
     lyricsState: LyricsUiState = LyricsUiState(),
     onAdjustLyricsOffset: (TrackEntity, Long) -> Unit = { _, _ -> },
     onResetLyricsOffset: (TrackEntity) -> Unit = {},
-    onChangeLyricsFontSize: (LyricsFontSize) -> Unit = {},
-    onChangeLyricsAlignment: (LyricsAlignment) -> Unit = {},
+    lyricsStyleActions: LyricsStyleActions = LyricsStyleActions(),
     onSearchOnlineLyrics: (String) -> Unit = {},
     onApplyOnlineLyric: (TrackEntity, OnlineLyricCandidate) -> Unit = { _, _ -> },
     onImportLocalLrc: (TrackEntity, Uri) -> Unit = { _, _ -> },
@@ -170,14 +173,17 @@ fun NowPlayingScreen(
         if (idx in doc.lines.indices) doc.lines[idx].text else doc.lines.firstOrNull()?.text
     }
 
-    var rawAmbient by remember(track.coverPath) { mutableStateOf(AmbientColorExtractor.DefaultAmbient) }
+    var ambientPalette by remember(track.coverPath) { mutableStateOf(AmbientColorExtractor.DefaultPalette) }
+    var blurredCover by remember(track.coverPath) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(track.coverPath, settings.ambientBackground) {
-        rawAmbient = if (settings.ambientBackground) {
-            AmbientColorExtractor.extract(track.coverPath)
-        } else {
-            colors.canvas
+        ambientPalette = AmbientColorExtractor.extractPalette(track.coverPath)
+    }
+    LaunchedEffect(track.coverPath, settings.lyricsBackdropStyle, showLyrics) {
+        if (showLyrics && settings.lyricsBackdropStyle == LyricsBackdropStyle.COVER_BLUR) {
+            blurredCover = AmbientColorExtractor.extractBlurredCover(track.coverPath)
         }
     }
+    val rawAmbient = if (settings.ambientBackground) ambientPalette.primary else colors.canvas
     val topColor by animateColorAsState(
         targetValue = rawAmbient,
         animationSpec = tween(550),
@@ -255,9 +261,25 @@ fun NowPlayingScreen(
                 )
             }
     ) {
+        // 边到边沉浸式歌词动态背景层（切入歌词页时柔和浮现覆盖整屏，与歌词零接缝融合）
+        AnimatedVisibility(
+            visible = showLyrics,
+            enter = fadeIn(tween(340)),
+            exit = fadeOut(tween(260)),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            ImmersiveLyricsBackdrop(
+                style = settings.lyricsBackdropStyle,
+                palette = ambientPalette,
+                blurredCover = blurredCover,
+                isPlaying = playback.isPlaying,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
         Crossfade(
             targetState = showLyrics,
-            animationSpec = tween(220),
+            animationSpec = tween(260),
             label = "vinyl_lyrics_crossfade",
         ) { inLyrics ->
             if (inLyrics) {
@@ -266,7 +288,7 @@ fun NowPlayingScreen(
                     playback = playback,
                     lyricsState = lyricsState,
                     settings = settings,
-                    topAmbientColor = topColor,
+                    ambientPalette = ambientPalette,
                     onBackToVinyl = { showLyrics = false },
                     onSeekTo = onSeekTo,
                     onTogglePlayPause = onTogglePlayPause,
@@ -274,8 +296,7 @@ fun NowPlayingScreen(
                     onSkipNext = onSkipNext,
                     onAdjustOffset = { delta -> onAdjustLyricsOffset(track, delta) },
                     onResetOffset = { onResetLyricsOffset(track) },
-                    onChangeFontSize = onChangeLyricsFontSize,
-                    onChangeAlignment = onChangeLyricsAlignment,
+                    styleActions = lyricsStyleActions,
                     onSearchOnline = onSearchOnlineLyrics,
                     onApplyCandidate = { cand -> onApplyOnlineLyric(track, cand) },
                     onImportLocalLrc = { uri -> onImportLocalLrc(track, uri) },
@@ -481,8 +502,9 @@ fun NowPlayingScreen(
                     Text(
                         text = lineText,
                         fontSize = 13.sp,
+                        fontFamily = settings.lyricsFontFamily.toComposeFontFamily(),
                         fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.78f),
+                        color = Color.White.copy(alpha = 0.82f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier

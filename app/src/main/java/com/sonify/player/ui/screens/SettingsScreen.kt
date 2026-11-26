@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Cloud
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.FormatSize
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
@@ -42,15 +44,19 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.SignalCellularAlt
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Usb
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -84,13 +90,17 @@ import com.sonify.player.data.DownloadStorageMode
 import com.sonify.player.data.ImmersiveScope
 import com.sonify.player.data.ImportMode
 import com.sonify.player.data.LyricsAlignment
-import com.sonify.player.data.LyricsFontSize
+import com.sonify.player.data.LyricsBackdropStyle
+import com.sonify.player.data.LyricsFontFamily
+import com.sonify.player.data.LyricsHighlightStyle
+import com.sonify.player.data.LyricsLineSpacing
 import com.sonify.player.data.MinDurationFilter
 import com.sonify.player.data.SampleRatePolicy
 import com.sonify.player.data.StreamQuality
 import com.sonify.player.data.SubsonicServerEntity
 import com.sonify.player.data.UserPreferences
 import com.sonify.player.data.VolumeMode
+import com.sonify.player.ui.components.LyricsSettingsPreviewCard
 import com.sonify.player.ui.components.SheetOption
 import com.sonify.player.ui.components.SpotifyOptionSheet
 import com.sonify.player.ui.theme.CoverArtSupport
@@ -99,6 +109,7 @@ import com.sonify.player.usb.UsbVolumeController
 import com.sonify.player.usb.VolumeMath
 import com.sonify.player.wifi.WifiTransferState
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private enum class ActiveSheet {
     NONE,
@@ -120,7 +131,10 @@ private enum class ActiveSheet {
     SUBSONIC_CELLULAR_QUALITY,
     DOWNLOAD_STORAGE_MODE,
     DOWNLOAD_QUALITY,
-    LYRICS_FONT_SIZE,
+    LYRICS_BACKDROP_STYLE,
+    LYRICS_HIGHLIGHT_STYLE,
+    LYRICS_FONT_FAMILY,
+    LYRICS_LINE_SPACING,
     LYRICS_ALIGNMENT,
 }
 
@@ -513,10 +527,126 @@ fun SettingsScreen(
                 onCheckedChange = { scope.launch { prefs.setImmersiveKeepScreenOn(it) } },
             )
         }
+        // ==================== 分组 4.5：歌词与沉浸样式 ====================
+        SettingsGroupHeader("歌词与沉浸样式")
+
+        LyricsSettingsPreviewCard(
+            settings = settings,
+            onResetDefaults = { scope.launch { prefs.resetLyricsStyleDefaults() } },
+        )
+
+        SettingsSelectItem(
+            icon = Icons.Rounded.Palette,
+            title = "沉浸背景风格",
+            subtitle = settings.lyricsBackdropStyle.label,
+            onClick = { activeSheet = ActiveSheet.LYRICS_BACKDROP_STYLE },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.AutoAwesome,
+            title = "当前句高亮动效",
+            subtitle = settings.lyricsHighlightStyle.label,
+            onClick = { activeSheet = ActiveSheet.LYRICS_HIGHLIGHT_STYLE },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.FormatSize,
+            title = "歌词字体风格",
+            subtitle = "${settings.lyricsFontFamily.label} · ${settings.lyricsFontFamily.sample}",
+            onClick = { activeSheet = ActiveSheet.LYRICS_FONT_FAMILY },
+        )
+        // 内联连续字号微调滑块（拖动时上方预览卡片即时放大/缩小）
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.FormatSize,
+                    contentDescription = null,
+                    tint = colors.textSecondary,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(Modifier.width(16.dp))
+                Text(
+                    text = "歌词字号",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "${settings.lyricsFontSizeSp} sp",
+                    fontSize = 13.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.accent,
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 38.dp, top = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("小", fontSize = 11.sp, color = colors.textMuted)
+                Slider(
+                    value = settings.lyricsFontSizeSp.toFloat(),
+                    onValueChange = { v -> scope.launch { prefs.setLyricsFontSizeSp(v.roundToInt()) } },
+                    valueRange = 16f..32f,
+                    steps = 15,
+                    colors = SliderDefaults.colors(
+                        thumbColor = colors.accent,
+                        activeTrackColor = colors.accent,
+                        inactiveTrackColor = colors.surface3,
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
+                )
+                Text("大", fontSize = 13.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
+            }
+        }
+        SettingsSelectItem(
+            icon = Icons.Rounded.Tune,
+            title = "行距与留白",
+            subtitle = settings.lyricsLineSpacing.label,
+            onClick = { activeSheet = ActiveSheet.LYRICS_LINE_SPACING },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Lyrics,
+            title = "歌词排版对齐",
+            subtitle = settings.lyricsAlignment.label,
+            onClick = { activeSheet = ActiveSheet.LYRICS_ALIGNMENT },
+        )
+        SettingsSwitchItem(
+            icon = Icons.Rounded.FormatSize,
+            title = "当前演唱句加粗强调",
+            subtitle = "开启时高亮句使用粗体聚焦；关闭时采用柔和字重更显诗意",
+            checked = settings.lyricsBoldActive,
+            onCheckedChange = { scope.launch { prefs.setLyricsBoldActive(it) } },
+        )
+        SettingsSwitchItem(
+            icon = Icons.Rounded.Subtitles,
+            title = "显示双语歌词译文",
+            subtitle = "检测到同时间戳双语 LRC 时在原文下方呈现译文",
+            checked = settings.lyricsShowTranslation,
+            onCheckedChange = { scope.launch { prefs.setLyricsShowTranslation(it) } },
+        )
+        SettingsSwitchItem(
+            icon = Icons.Rounded.VisibilityOff,
+            title = "沉浸纯享态（自动隐藏控件）",
+            subtitle = "全屏歌词播放 5 秒无操作自动淡出顶/底栏，仅留流光与歌词，轻点即唤醒",
+            checked = settings.lyricsAutoHideControls,
+            accentChecked = colors.accent,
+            onCheckedChange = { scope.launch { prefs.setLyricsAutoHideControls(it) } },
+        )
         SettingsSwitchItem(
             icon = Icons.Rounded.Lyrics,
             title = "播放页单行歌词预览",
-            subtitle = "在黑胶唱片下方轻盈显示当前演唱句，点击可展开全屏歌词",
+            subtitle = "在黑胶唱片下方轻盈显示当前演唱句，点击可展开全屏沉浸歌词",
             checked = settings.lyricsShowMiniPreview,
             onCheckedChange = { scope.launch { prefs.setLyricsShowMiniPreview(it) } },
         )
@@ -526,18 +656,6 @@ fun SettingsScreen(
             subtitle = "本地与 Subsonic 无歌词时自动向开源免费库匹配并缓存离线",
             checked = settings.lyricsAutoOnlineSearch,
             onCheckedChange = { scope.launch { prefs.setLyricsAutoOnlineSearch(it) } },
-        )
-        SettingsSelectItem(
-            icon = Icons.Rounded.Lyrics,
-            title = "歌词字号",
-            subtitle = settings.lyricsFontSize.label,
-            onClick = { activeSheet = ActiveSheet.LYRICS_FONT_SIZE },
-        )
-        SettingsSelectItem(
-            icon = Icons.Rounded.Lyrics,
-            title = "歌词排版对齐",
-            subtitle = settings.lyricsAlignment.label,
-            onClick = { activeSheet = ActiveSheet.LYRICS_ALIGNMENT },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Delete,
@@ -836,11 +954,35 @@ fun SettingsScreen(
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
-        ActiveSheet.LYRICS_FONT_SIZE -> SpotifyOptionSheet(
-            title = "歌词字号",
-            options = LyricsFontSize.entries.map { SheetOption(it, it.label) },
-            selected = settings.lyricsFontSize,
-            onSelect = { scope.launch { prefs.setLyricsFontSize(it) } },
+        ActiveSheet.LYRICS_BACKDROP_STYLE -> SpotifyOptionSheet(
+            title = "歌词沉浸背景风格",
+            options = LyricsBackdropStyle.entries.map { SheetOption(it, it.label, it.subtitle) },
+            selected = settings.lyricsBackdropStyle,
+            onSelect = { scope.launch { prefs.setLyricsBackdropStyle(it) } },
+            onDismiss = { activeSheet = ActiveSheet.NONE },
+        )
+
+        ActiveSheet.LYRICS_HIGHLIGHT_STYLE -> SpotifyOptionSheet(
+            title = "歌词当前句高亮动效",
+            options = LyricsHighlightStyle.entries.map { SheetOption(it, it.label, it.subtitle) },
+            selected = settings.lyricsHighlightStyle,
+            onSelect = { scope.launch { prefs.setLyricsHighlightStyle(it) } },
+            onDismiss = { activeSheet = ActiveSheet.NONE },
+        )
+
+        ActiveSheet.LYRICS_FONT_FAMILY -> SpotifyOptionSheet(
+            title = "歌词字体风格",
+            options = LyricsFontFamily.entries.map { SheetOption(it, it.label, "${it.subtitle} · ${it.sample}") },
+            selected = settings.lyricsFontFamily,
+            onSelect = { scope.launch { prefs.setLyricsFontFamily(it) } },
+            onDismiss = { activeSheet = ActiveSheet.NONE },
+        )
+
+        ActiveSheet.LYRICS_LINE_SPACING -> SpotifyOptionSheet(
+            title = "歌词行距与留白",
+            options = LyricsLineSpacing.entries.map { SheetOption(it, it.label, "句间距 ${it.itemGapDp}dp · ${"%.2f".format(it.lineHeightMultiplier)}x 行高") },
+            selected = settings.lyricsLineSpacing,
+            onSelect = { scope.launch { prefs.setLyricsLineSpacing(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 

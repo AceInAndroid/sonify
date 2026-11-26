@@ -11,10 +11,17 @@ enum class LyricsSource(val label: String) {
     NONE("无歌词"),
 }
 
+data class LyricWord(
+    val startMs: Long,
+    val endMs: Long,
+    val text: String,
+)
+
 data class LyricLine(
     val timeMs: Long,
     val text: String,
     val translation: String? = null,
+    val words: List<LyricWord> = emptyList(),
 )
 
 data class LyricsDocument(

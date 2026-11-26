@@ -695,8 +695,18 @@ private fun HiFiRootScreen(
                 lyricsState = lyricsState,
                 onAdjustLyricsOffset = vm::adjustLyricsOffset,
                 onResetLyricsOffset = vm::resetLyricsOffset,
-                onChangeLyricsFontSize = { sz -> scope.launch { app.prefs.setLyricsFontSize(sz) } },
-                onChangeLyricsAlignment = { align -> scope.launch { app.prefs.setLyricsAlignment(align) } },
+                lyricsStyleActions = com.sonify.player.ui.components.LyricsStyleActions(
+                    onChangeFontSizeSp = { sp -> scope.launch { app.prefs.setLyricsFontSizeSp(sp) } },
+                    onChangeFontFamily = { ff -> scope.launch { app.prefs.setLyricsFontFamily(ff) } },
+                    onChangeHighlightStyle = { hl -> scope.launch { app.prefs.setLyricsHighlightStyle(hl) } },
+                    onChangeBackdropStyle = { bg -> scope.launch { app.prefs.setLyricsBackdropStyle(bg) } },
+                    onChangeLineSpacing = { sp -> scope.launch { app.prefs.setLyricsLineSpacing(sp) } },
+                    onChangeAlignment = { align -> scope.launch { app.prefs.setLyricsAlignment(align) } },
+                    onToggleBoldActive = { bold -> scope.launch { app.prefs.setLyricsBoldActive(bold) } },
+                    onToggleShowTranslation = { show -> scope.launch { app.prefs.setLyricsShowTranslation(show) } },
+                    onToggleAutoHideControls = { hide -> scope.launch { app.prefs.setLyricsAutoHideControls(hide) } },
+                    onResetDefaults = { scope.launch { app.prefs.resetLyricsStyleDefaults() } },
+                ),
                 onSearchOnlineLyrics = vm::searchOnlineLyrics,
                 onApplyOnlineLyric = { track, cand ->
                     vm.applyOnlineLyric(track, cand) { msg -> libraryVm.showToast(msg) }

@@ -18,7 +18,13 @@ object LrcParser {
     private val TIME_TAG_REGEX = Regex("""\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?]""")
     private val OFFSET_TAG_REGEX = Regex("""\[offset:\s*([+-]?\d+)\s*]""", RegexOption.IGNORE_CASE)
     private val META_TAG_REGEX = Regex("""^\[[a-zA-Z]{2,12}:.*]$""")
-    private val ENHANCED_INLINE_REGEX = Regex("""<\d{1,3}:\d{2}(?:[.:]\d{1,3})?>""")
+    private val ENHANCED_INLINE_REGEX = Regex("""<(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?>""")
+
+    private data class ParsedEntry(
+        val timeMs: Long,
+        val text: String,
+        val words: List<LyricWord> = emptyList(),
+    )
 
     /** 自动识别字节编码，避免老旧 GBK/UTF-16 编码 .lrc 出现中文乱码 */
     fun decodeBytes(bytes: ByteArray): String {
@@ -73,7 +79,7 @@ object LrcParser {
             tagOffsetMs = m.groupValues[1].toLongOrNull() ?: 0L
         }
 
-        val timedEntries = mutableListOf<Pair<Long, String>>()
+        val timedEntries = mutableListOf<ParsedEntry>()
         val plainLines = mutableListOf<String>()
 
         for (rawLine in normalized.lineSequence()) {
@@ -82,24 +88,29 @@ object LrcParser {
 
             val matches = TIME_TAG_REGEX.findAll(line).toList()
             if (matches.isNotEmpty()) {
-                val stripped = line
-                    .replace(TIME_TAG_REGEX, "")
+                val contentWithEnhanced = line.replace(TIME_TAG_REGEX, "")
+                val stripped = contentWithEnhanced
                     .replace(ENHANCED_INLINE_REGEX, "")
                     .trim()
                 if (stripped.isEmpty()) continue
+
+                val enhancedMatches = ENHANCED_INLINE_REGEX.findAll(contentWithEnhanced).toList()
+                val parsedWords = if (matches.size == 1 && enhancedMatches.isNotEmpty()) {
+                    parseEnhancedWords(
+                        content = contentWithEnhanced,
+                        lineStartMs = parseTagMs(matches.first(), tagOffsetMs),
+                        tagOffsetMs = tagOffsetMs,
+                        enhancedMatches = enhancedMatches,
+                    )
+                } else emptyList()
+
                 for (m in matches) {
-                    val min = m.groupValues[1].toLongOrNull() ?: continue
-                    val sec = m.groupValues[2].toLongOrNull() ?: continue
-                    val fracStr = m.groupValues[3]
-                    val fracMs = when (fracStr.length) {
-                        0 -> 0L
-                        1 -> (fracStr.toLongOrNull() ?: 0L) * 100L
-                        2 -> (fracStr.toLongOrNull() ?: 0L) * 10L
-                        else -> fracStr.take(3).toLongOrNull() ?: 0L
-                    }
-                    // LRC [offset:+500] 表示歌词提前 500ms，因此显示时间点应减去 offset
-                    val ts = (min * 60_000L + sec * 1000L + fracMs - tagOffsetMs).coerceAtLeast(0L)
-                    timedEntries += ts to stripped
+                    val ts = parseTagMs(m, tagOffsetMs)
+                    timedEntries += ParsedEntry(
+                        timeMs = ts,
+                        text = stripped,
+                        words = if (matches.size == 1) parsedWords else emptyList(),
+                    )
                 }
             } else if (!META_TAG_REGEX.matches(line)) {
                 plainLines += line.replace(ENHANCED_INLINE_REGEX, "").trim()
@@ -107,7 +118,7 @@ object LrcParser {
         }
 
         if (timedEntries.isNotEmpty()) {
-            val sorted = timedEntries.sortedBy { it.first }
+            val sorted = timedEntries.sortedBy { it.timeMs }
             val merged = mergeBilingualLines(sorted)
             return LyricsDocument(
                 lines = merged,
@@ -129,19 +140,71 @@ object LrcParser {
         )
     }
 
+    private fun parseTagMs(match: MatchResult, tagOffsetMs: Long): Long {
+        val min = match.groupValues[1].toLongOrNull() ?: 0L
+        val sec = match.groupValues[2].toLongOrNull() ?: 0L
+        val fracStr = match.groupValues[3]
+        val fracMs = when (fracStr.length) {
+            0 -> 0L
+            1 -> (fracStr.toLongOrNull() ?: 0L) * 100L
+            2 -> (fracStr.toLongOrNull() ?: 0L) * 10L
+            else -> fracStr.take(3).toLongOrNull() ?: 0L
+        }
+        // LRC [offset:+500] 表示歌词提前 500ms，因此显示时间点应减去 offset
+        return (min * 60_000L + sec * 1000L + fracMs - tagOffsetMs).coerceAtLeast(0L)
+    }
+
+    /** 解析增强型 LRC `<mm:ss.xx>` 逐字时间节点，返回按时间递增的 LyricWord 列表 */
+    private fun parseEnhancedWords(
+        content: String,
+        lineStartMs: Long,
+        tagOffsetMs: Long,
+        enhancedMatches: List<MatchResult>,
+    ): List<LyricWord> {
+        val out = ArrayList<LyricWord>(enhancedMatches.size + 1)
+        val firstStart = enhancedMatches.first().range.first
+        if (firstStart > 0) {
+            val prefix = content.substring(0, firstStart).trimStart()
+            if (prefix.isNotEmpty()) {
+                val firstTagMs = parseTagMs(enhancedMatches.first(), tagOffsetMs)
+                out.add(LyricWord(startMs = lineStartMs, endMs = firstTagMs.coerceAtLeast(lineStartMs), text = prefix))
+            }
+        }
+        for (i in enhancedMatches.indices) {
+            val curMatch = enhancedMatches[i]
+            val startMs = parseTagMs(curMatch, tagOffsetMs)
+            val textStart = curMatch.range.last + 1
+            val textEnd = if (i + 1 < enhancedMatches.size) enhancedMatches[i + 1].range.first else content.length
+            val nextStartMs = if (i + 1 < enhancedMatches.size) parseTagMs(enhancedMatches[i + 1], tagOffsetMs) else 0L
+            var segText = if (textStart <= textEnd) content.substring(textStart, textEnd) else ""
+            if (i == enhancedMatches.lastIndex) segText = segText.trimEnd()
+            if (out.isEmpty()) segText = segText.trimStart()
+            if (segText.isNotEmpty()) {
+                out.add(
+                    LyricWord(
+                        startMs = startMs,
+                        endMs = if (nextStartMs > startMs) nextStartMs else 0L,
+                        text = segText,
+                    )
+                )
+            }
+        }
+        return out
+    }
+
     /** 合并同一时间戳（或间隔 <= 20ms）的双语原文与译文 */
-    private fun mergeBilingualLines(sorted: List<Pair<Long, String>>): List<LyricLine> {
+    private fun mergeBilingualLines(sorted: List<ParsedEntry>): List<LyricLine> {
         val out = ArrayList<LyricLine>(sorted.size)
-        for ((ts, text) in sorted) {
+        for (entry in sorted) {
             val prev = out.lastOrNull()
             if (prev != null &&
                 prev.translation == null &&
-                kotlin.math.abs(ts - prev.timeMs) <= 20L &&
-                !prev.text.equals(text, ignoreCase = true)
+                kotlin.math.abs(entry.timeMs - prev.timeMs) <= 20L &&
+                !prev.text.equals(entry.text, ignoreCase = true)
             ) {
-                out[out.lastIndex] = prev.copy(translation = text)
+                out[out.lastIndex] = prev.copy(translation = entry.text)
             } else {
-                out.add(LyricLine(timeMs = ts, text = text))
+                out.add(LyricLine(timeMs = entry.timeMs, text = entry.text, words = entry.words))
             }
         }
         return out

@@ -103,6 +103,57 @@ enum class LyricsAlignment(val label: String) {
     CENTER("经典居中"),
 }
 
+enum class LyricsBackdropStyle(val label: String, val subtitle: String) {
+    FLUID_AURORA(
+        "流体多色氛围光晕（推荐）",
+        "提取封面三色动态漂移光斑，随播放呼吸律动，全机型 60fps 丝滑渲染"
+    ),
+    COVER_BLUR(
+        "封面暗调虚化底图",
+        "柔化专辑封面与暗角渐晕融合，呈现黑胶唱片内页质感"
+    ),
+    MINIMAL_DARK(
+        "极简深黑",
+        "纯净暗调基底叠加微弱主色晕染，夜间零干扰阅读"
+    ),
+}
+
+enum class LyricsHighlightStyle(val label: String, val subtitle: String) {
+    PROGRESSIVE_SWEEP(
+        "逐句流光扫色（推荐）",
+        "高光随演唱节奏从左向右丝滑扫过，支持增强型 LRC 逐字时间戳"
+    ),
+    GLOW_PURE(
+        "柔光纯白",
+        "纯净高亮白字叠加专辑主色柔和外发光"
+    ),
+    ACCENT_TINT(
+        "主题强调色",
+        "使用当前黑胶暖金或 Spotify 翠绿点亮演唱句"
+    ),
+    CAPSULE_FOCUS(
+        "暗调玻璃聚焦条",
+        "为当前演唱句叠加半透明磨砂聚焦胶囊，焦点醒目"
+    ),
+}
+
+enum class LyricsFontFamily(val label: String, val subtitle: String, val sample: String) {
+    SANS_MODERN("现代无衬线（推荐）", "Spotify 编辑风清晰利落", "流光岁月 · Modern Sans"),
+    SERIF_EDITORIAL("文艺黑胶衬线", "黑胶内页与古典杂志叙事质感", "流光岁月 · Editorial Serif"),
+    ROUNDED_SOFT("温润舒展体", "舒展字距与柔和呼吸感", "流光岁月 · Soft Wide"),
+    MONO_STUDIO("母带录音室等宽", "专业录音室提词与时间码美学", "流光岁月 · Studio Mono"),
+}
+
+enum class LyricsLineSpacing(
+    val label: String,
+    val itemGapDp: Int,
+    val lineHeightMultiplier: Float,
+) {
+    COMPACT("紧凑", 14, 1.30f),
+    COMFORTABLE("舒展（推荐）", 22, 1.42f),
+    RELAXED("宽松", 30, 1.56f),
+}
+
 enum class StreamQuality(
     val label: String,
     val subtitle: String,
@@ -197,11 +248,19 @@ data class AppSettings(
     val immersiveHideStatusBar: Boolean = true,
     val immersiveHideNavBar: Boolean = true,
     val immersiveKeepScreenOn: Boolean = false,
-    // 歌词显示与在线匹配
+    // 歌词显示、沉浸样式与在线匹配
     val lyricsShowMiniPreview: Boolean = true,
     val lyricsAutoOnlineSearch: Boolean = true,
     val lyricsFontSize: LyricsFontSize = LyricsFontSize.MEDIUM,
+    val lyricsFontSizeSp: Int = 24,
+    val lyricsFontFamily: LyricsFontFamily = LyricsFontFamily.SANS_MODERN,
+    val lyricsHighlightStyle: LyricsHighlightStyle = LyricsHighlightStyle.PROGRESSIVE_SWEEP,
+    val lyricsBackdropStyle: LyricsBackdropStyle = LyricsBackdropStyle.FLUID_AURORA,
+    val lyricsLineSpacing: LyricsLineSpacing = LyricsLineSpacing.COMFORTABLE,
     val lyricsAlignment: LyricsAlignment = LyricsAlignment.LEFT,
+    val lyricsBoldActive: Boolean = true,
+    val lyricsShowTranslation: Boolean = true,
+    val lyricsAutoHideControls: Boolean = true,
     // 通知、锁屏与后台
     val lockScreenVinylEnabled: Boolean = true,
     val notifShowAudioSpec: Boolean = true,
@@ -272,7 +331,15 @@ class UserPreferences(private val context: Context) {
         val LYRICS_MINI_PREVIEW = booleanPreferencesKey("lyrics_mini_preview")
         val LYRICS_AUTO_ONLINE = booleanPreferencesKey("lyrics_auto_online")
         val LYRICS_FONT_SIZE = stringPreferencesKey("lyrics_font_size")
+        val LYRICS_FONT_SIZE_SP = intPreferencesKey("lyrics_font_size_sp")
+        val LYRICS_FONT_FAMILY = stringPreferencesKey("lyrics_font_family")
+        val LYRICS_HIGHLIGHT_STYLE = stringPreferencesKey("lyrics_highlight_style")
+        val LYRICS_BACKDROP_STYLE = stringPreferencesKey("lyrics_backdrop_style")
+        val LYRICS_LINE_SPACING = stringPreferencesKey("lyrics_line_spacing")
         val LYRICS_ALIGNMENT = stringPreferencesKey("lyrics_alignment")
+        val LYRICS_BOLD_ACTIVE = booleanPreferencesKey("lyrics_bold_active")
+        val LYRICS_SHOW_TRANSLATION = booleanPreferencesKey("lyrics_show_translation")
+        val LYRICS_AUTO_HIDE_CONTROLS = booleanPreferencesKey("lyrics_auto_hide_controls")
         val LOCKSCREEN_VINYL = booleanPreferencesKey("lockscreen_vinyl")
         val NOTIF_SHOW_SPEC = booleanPreferencesKey("notif_show_spec")
         val WAKELOCK = booleanPreferencesKey("wakelock")
@@ -356,9 +423,31 @@ class UserPreferences(private val context: Context) {
                 lyricsFontSize = p[Keys.LYRICS_FONT_SIZE]?.let {
                     runCatching { LyricsFontSize.valueOf(it) }.getOrNull()
                 } ?: LyricsFontSize.MEDIUM,
+                lyricsFontSizeSp = (p[Keys.LYRICS_FONT_SIZE_SP] ?: run {
+                    when (p[Keys.LYRICS_FONT_SIZE]?.let { runCatching { LyricsFontSize.valueOf(it) }.getOrNull() }) {
+                        LyricsFontSize.SMALL -> 19
+                        LyricsFontSize.LARGE -> 28
+                        else -> 24
+                    }
+                }).coerceIn(16, 32),
+                lyricsFontFamily = p[Keys.LYRICS_FONT_FAMILY]?.let {
+                    runCatching { LyricsFontFamily.valueOf(it) }.getOrNull()
+                } ?: LyricsFontFamily.SANS_MODERN,
+                lyricsHighlightStyle = p[Keys.LYRICS_HIGHLIGHT_STYLE]?.let {
+                    runCatching { LyricsHighlightStyle.valueOf(it) }.getOrNull()
+                } ?: LyricsHighlightStyle.PROGRESSIVE_SWEEP,
+                lyricsBackdropStyle = p[Keys.LYRICS_BACKDROP_STYLE]?.let {
+                    runCatching { LyricsBackdropStyle.valueOf(it) }.getOrNull()
+                } ?: LyricsBackdropStyle.FLUID_AURORA,
+                lyricsLineSpacing = p[Keys.LYRICS_LINE_SPACING]?.let {
+                    runCatching { LyricsLineSpacing.valueOf(it) }.getOrNull()
+                } ?: LyricsLineSpacing.COMFORTABLE,
                 lyricsAlignment = p[Keys.LYRICS_ALIGNMENT]?.let {
                     runCatching { LyricsAlignment.valueOf(it) }.getOrNull()
                 } ?: LyricsAlignment.LEFT,
+                lyricsBoldActive = p[Keys.LYRICS_BOLD_ACTIVE] ?: true,
+                lyricsShowTranslation = p[Keys.LYRICS_SHOW_TRANSLATION] ?: true,
+                lyricsAutoHideControls = p[Keys.LYRICS_AUTO_HIDE_CONTROLS] ?: true,
                 lockScreenVinylEnabled = p[Keys.LOCKSCREEN_VINYL] ?: true,
                 notifShowAudioSpec = p[Keys.NOTIF_SHOW_SPEC] ?: true,
                 wakeLockEnabled = p[Keys.WAKELOCK] ?: true,
@@ -540,11 +629,70 @@ class UserPreferences(private val context: Context) {
     }
 
     suspend fun setLyricsFontSize(size: LyricsFontSize) {
-        context.dataStore.edit { it[Keys.LYRICS_FONT_SIZE] = size.name }
+        context.dataStore.edit {
+            it[Keys.LYRICS_FONT_SIZE] = size.name
+            it[Keys.LYRICS_FONT_SIZE_SP] = size.activeSp.toInt().coerceIn(16, 32)
+        }
+    }
+
+    suspend fun setLyricsFontSizeSp(sizeSp: Int) {
+        val clamped = sizeSp.coerceIn(16, 32)
+        val bucket = when {
+            clamped <= 20 -> LyricsFontSize.SMALL
+            clamped >= 27 -> LyricsFontSize.LARGE
+            else -> LyricsFontSize.MEDIUM
+        }
+        context.dataStore.edit {
+            it[Keys.LYRICS_FONT_SIZE_SP] = clamped
+            it[Keys.LYRICS_FONT_SIZE] = bucket.name
+        }
+    }
+
+    suspend fun setLyricsFontFamily(family: LyricsFontFamily) {
+        context.dataStore.edit { it[Keys.LYRICS_FONT_FAMILY] = family.name }
+    }
+
+    suspend fun setLyricsHighlightStyle(style: LyricsHighlightStyle) {
+        context.dataStore.edit { it[Keys.LYRICS_HIGHLIGHT_STYLE] = style.name }
+    }
+
+    suspend fun setLyricsBackdropStyle(style: LyricsBackdropStyle) {
+        context.dataStore.edit { it[Keys.LYRICS_BACKDROP_STYLE] = style.name }
+    }
+
+    suspend fun setLyricsLineSpacing(spacing: LyricsLineSpacing) {
+        context.dataStore.edit { it[Keys.LYRICS_LINE_SPACING] = spacing.name }
     }
 
     suspend fun setLyricsAlignment(alignment: LyricsAlignment) {
         context.dataStore.edit { it[Keys.LYRICS_ALIGNMENT] = alignment.name }
+    }
+
+    suspend fun setLyricsBoldActive(bold: Boolean) {
+        context.dataStore.edit { it[Keys.LYRICS_BOLD_ACTIVE] = bold }
+    }
+
+    suspend fun setLyricsShowTranslation(show: Boolean) {
+        context.dataStore.edit { it[Keys.LYRICS_SHOW_TRANSLATION] = show }
+    }
+
+    suspend fun setLyricsAutoHideControls(autoHide: Boolean) {
+        context.dataStore.edit { it[Keys.LYRICS_AUTO_HIDE_CONTROLS] = autoHide }
+    }
+
+    suspend fun resetLyricsStyleDefaults() {
+        context.dataStore.edit {
+            it[Keys.LYRICS_FONT_SIZE] = LyricsFontSize.MEDIUM.name
+            it[Keys.LYRICS_FONT_SIZE_SP] = 24
+            it[Keys.LYRICS_FONT_FAMILY] = LyricsFontFamily.SANS_MODERN.name
+            it[Keys.LYRICS_HIGHLIGHT_STYLE] = LyricsHighlightStyle.PROGRESSIVE_SWEEP.name
+            it[Keys.LYRICS_BACKDROP_STYLE] = LyricsBackdropStyle.FLUID_AURORA.name
+            it[Keys.LYRICS_LINE_SPACING] = LyricsLineSpacing.COMFORTABLE.name
+            it[Keys.LYRICS_ALIGNMENT] = LyricsAlignment.LEFT.name
+            it[Keys.LYRICS_BOLD_ACTIVE] = true
+            it[Keys.LYRICS_SHOW_TRANSLATION] = true
+            it[Keys.LYRICS_AUTO_HIDE_CONTROLS] = true
+        }
     }
 
     suspend fun setLockScreenVinyl(enabled: Boolean) {
