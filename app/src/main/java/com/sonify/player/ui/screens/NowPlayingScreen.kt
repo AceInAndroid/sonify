@@ -31,9 +31,12 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Fullscreen
@@ -84,6 +87,7 @@ import com.sonify.player.data.CoverStyle
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.data.VolumeMode
 import com.sonify.player.playback.AudioFocusState
+import com.sonify.player.subsonic.SubsonicUri
 import com.sonify.player.ui.PlaybackUiState
 import com.sonify.player.ui.components.VinylDisc
 import com.sonify.player.ui.theme.AmbientColorExtractor
@@ -126,6 +130,9 @@ fun NowPlayingScreen(
     onUsbVolumeChange: (Int) -> Unit,
     onToggleMute: (Boolean) -> Unit,
     onToggleImmersiveMode: (Boolean) -> Unit = {},
+    isCurrentTrackDownloaded: Boolean = false,
+    onAddCurrentToPlaylist: (TrackEntity) -> Unit = {},
+    onDownloadCurrentTrack: (TrackEntity) -> Unit = {},
 ) {
     val track = playback.currentTrack ?: return
     val colors = LocalHiFiColors.current
@@ -689,13 +696,35 @@ fun NowPlayingScreen(
                         )
                     }
 
-                    IconButton(onClick = { showQueue = true }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
-                            contentDescription = "播放队列",
-                            tint = colors.textSecondary,
-                            modifier = Modifier.size(24.dp),
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (SubsonicUri.isTrackUri(track.path)) {
+                            IconButton(
+                                onClick = { if (!isCurrentTrackDownloaded) onDownloadCurrentTrack(track) }
+                            ) {
+                                Icon(
+                                    imageVector = if (isCurrentTrackDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
+                                    contentDescription = if (isCurrentTrackDownloaded) "已离线下载" else "下载歌曲",
+                                    tint = if (isCurrentTrackDownloaded) colors.exclusiveGreen else colors.textSecondary,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                        }
+                        IconButton(onClick = { onAddCurrentToPlaylist(track) }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                                contentDescription = "加入歌单",
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(23.dp),
+                            )
+                        }
+                        IconButton(onClick = { showQueue = true }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
+                                contentDescription = "播放队列",
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
                     }
                 }
             }

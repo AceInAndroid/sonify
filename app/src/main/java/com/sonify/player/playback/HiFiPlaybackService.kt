@@ -133,7 +133,7 @@ class HiFiPlaybackService : MediaSessionService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
-        val dataSourceFactory = SubsonicDataSourceFactory(this, app.subsonicRepo, app.prefs)
+        val dataSourceFactory = SubsonicDataSourceFactory(this, app.subsonicRepo, app.prefs, app.downloadManager)
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 20_000,

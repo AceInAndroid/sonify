@@ -6,7 +6,9 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.sonify.player.data.LibraryDatabase
 import com.sonify.player.data.UserPreferences
+import com.sonify.player.download.SonifyDownloadManager
 import com.sonify.player.library.MediaScanner
+import com.sonify.player.library.PlaylistRepository
 import com.sonify.player.subsonic.SubsonicRepository
 import com.sonify.player.ui.theme.AmbientColorExtractor
 import com.sonify.player.ui.theme.SubsonicCoverFetcher
@@ -36,6 +38,10 @@ class HiFiApp : Application(), ImageLoaderFactory {
         private set
     lateinit var subsonicRepo: SubsonicRepository
         private set
+    lateinit var playlistRepo: PlaylistRepository
+        private set
+    lateinit var downloadManager: SonifyDownloadManager
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -45,6 +51,8 @@ class HiFiApp : Application(), ImageLoaderFactory {
         usbManager = UsbAudioManager(this, volumeController)
         scanner = MediaScanner(this, db, prefs)
         subsonicRepo = SubsonicRepository(this, db, prefs)
+        playlistRepo = PlaylistRepository(this, db, subsonicRepo)
+        downloadManager = SonifyDownloadManager(this, db, prefs, subsonicRepo)
         AmbientColorExtractor.init(this, subsonicRepo)
 
         appScope.launch {

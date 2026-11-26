@@ -133,6 +133,51 @@ class SubsonicClient {
         )
     }
 
+    /** 在 Subsonic 服务器上新建歌单（可选同时添加初始歌曲） */
+    suspend fun createPlaylist(
+        creds: SubsonicCredentials,
+        name: String,
+        songIds: List<String> = emptyList(),
+    ): SubsonicPlaylist? {
+        val params = mutableListOf("name" to name.trim())
+        songIds.forEach { params += "songId" to it }
+        val raw = executeJsonMulti(creds, "createPlaylist", params)
+        val resp = SubsonicParser.unwrapResponse(raw)
+        val pl = resp.optJSONObject("playlist") ?: return null
+        val id = pl.optString("id", "").ifBlank { return null }
+        return SubsonicPlaylist(
+            id = id,
+            name = pl.optString("name", name),
+            songCount = pl.optInt("songCount", songIds.size),
+            durationSec = pl.optInt("duration", 0),
+            coverArtId = pl.optString("coverArt", "").takeIf { it.isNotBlank() },
+            owner = pl.optString("owner", creds.username),
+            comment = pl.optString("comment", ""),
+        )
+    }
+
+    /** 更新 Subsonic 服务端歌单（改名、改简介、批量加歌、批量按索引移除） */
+    suspend fun updatePlaylist(
+        creds: SubsonicCredentials,
+        playlistId: String,
+        name: String? = null,
+        comment: String? = null,
+        songIdsToAdd: List<String> = emptyList(),
+        songIndexesToRemove: List<Int> = emptyList(),
+    ) {
+        val params = mutableListOf("playlistId" to playlistId)
+        if (name != null) params += "name" to name.trim()
+        if (comment != null) params += "comment" to comment.trim()
+        songIdsToAdd.forEach { params += "songIdToAdd" to it }
+        songIndexesToRemove.sortedDescending().forEach { params += "songIndexToRemove" to it.toString() }
+        SubsonicParser.unwrapResponse(executeJsonMulti(creds, "updatePlaylist", params))
+    }
+
+    /** 删除 Subsonic 服务端歌单 */
+    suspend fun deletePlaylist(creds: SubsonicCredentials, playlistId: String) {
+        SubsonicParser.unwrapResponse(executeJson(creds, "deletePlaylist", mapOf("id" to playlistId)))
+    }
+
     fun fetchBinarySync(url: HttpUrl, allowSelfSignedTls: Boolean): ByteArray? {
         val req = Request.Builder()
             .url(url)
@@ -154,8 +199,18 @@ class SubsonicClient {
         creds: SubsonicCredentials,
         endpoint: String,
         params: Map<String, String> = emptyMap(),
+    ): String = executeJsonMulti(
+        creds = creds,
+        endpoint = endpoint,
+        params = params.entries.map { it.key to it.value },
+    )
+
+    private suspend fun executeJsonMulti(
+        creds: SubsonicCredentials,
+        endpoint: String,
+        params: List<Pair<String, String>> = emptyList(),
     ): String = withContext(Dispatchers.IO) {
-        val url = SubsonicAuth.buildEndpointUrl(creds, endpoint, params)
+        val url = SubsonicAuth.buildEndpointUrlMulti(creds, endpoint, params)
         val req = Request.Builder()
             .url(url)
             .header("User-Agent", "Sonify-Android/0.2")

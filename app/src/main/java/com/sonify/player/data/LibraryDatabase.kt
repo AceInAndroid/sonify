@@ -263,14 +263,186 @@ interface SubsonicTrackCacheDao {
     suspend fun deleteByServer(serverId: Long)
 }
 
+@Entity(tableName = "playlists")
+data class PlaylistEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val description: String = "",
+    val customCoverPath: String? = null,
+    val sortField: String = "CUSTOM",
+    val sortAscending: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(
+    tableName = "playlist_items",
+    indices = [
+        Index(value = ["playlistId"]),
+        Index(value = ["playlistId", "trackPath"], unique = true),
+    ],
+)
+data class PlaylistItemEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val playlistId: Long,
+    val trackPath: String,
+    val position: Int = 0,
+    val addedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(
+    tableName = "downloaded_tracks",
+    indices = [
+        Index(value = ["serverId"]),
+        Index(value = ["localFilePath"]),
+    ],
+)
+data class DownloadedTrackEntity(
+    @PrimaryKey val remotePath: String,
+    val serverId: Long,
+    val remoteId: String,
+    val localFilePath: String,
+    val localCoverPath: String? = null,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val albumArtist: String = "",
+    val trackNumber: Int = 0,
+    val discNumber: Int = 0,
+    val durationMs: Long = 0L,
+    val sampleRate: Int = 0,
+    val bitDepth: Int = 0,
+    val channels: Int = 2,
+    val bitrateKbps: Int = 0,
+    val format: String = "AUDIO",
+    val fileSize: Long = 0L,
+    val quality: String = "RAW",
+    val downloadedAt: Long = System.currentTimeMillis(),
+) {
+    fun toTrackEntity(): TrackEntity = TrackEntity(
+        id = 0,
+        path = remotePath,
+        title = title,
+        artist = artist,
+        album = album,
+        albumArtist = albumArtist,
+        trackNumber = trackNumber,
+        discNumber = discNumber,
+        durationMs = durationMs,
+        sampleRate = sampleRate,
+        bitDepth = bitDepth,
+        channels = channels,
+        bitrateKbps = bitrateKbps,
+        format = format,
+        fileSize = fileSize,
+        lastModified = downloadedAt,
+        coverPath = localCoverPath,
+        lrcPath = null,
+        folderPath = localFilePath.substringBeforeLast('/', ""),
+        addedAt = downloadedAt,
+        isFavorite = false,
+    )
+}
+
+@Dao
+interface PlaylistDao {
+
+    @Query("SELECT * FROM playlists ORDER BY updatedAt DESC, id DESC")
+    fun observeAllPlaylists(): Flow<List<PlaylistEntity>>
+
+    @Query("SELECT * FROM playlists WHERE id = :playlistId LIMIT 1")
+    fun observePlaylist(playlistId: Long): Flow<PlaylistEntity?>
+
+    @Query("SELECT * FROM playlists WHERE id = :playlistId LIMIT 1")
+    suspend fun findPlaylistById(playlistId: Long): PlaylistEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPlaylist(playlist: PlaylistEntity): Long
+
+    @Query("UPDATE playlists SET name = :name, description = :description, customCoverPath = :coverPath, updatedAt = :updatedAt WHERE id = :playlistId")
+    suspend fun updatePlaylistMeta(
+        playlistId: Long,
+        name: String,
+        description: String,
+        coverPath: String?,
+        updatedAt: Long,
+    )
+
+    @Query("UPDATE playlists SET sortField = :sortField, sortAscending = :ascending, updatedAt = :updatedAt WHERE id = :playlistId")
+    suspend fun updatePlaylistSort(
+        playlistId: Long,
+        sortField: String,
+        ascending: Boolean,
+        updatedAt: Long,
+    )
+
+    @Query("UPDATE playlists SET updatedAt = :updatedAt WHERE id = :playlistId")
+    suspend fun touchPlaylist(playlistId: Long, updatedAt: Long)
+
+    @Query("DELETE FROM playlists WHERE id = :playlistId")
+    suspend fun deletePlaylistById(playlistId: Long)
+
+    @Query("SELECT * FROM playlist_items ORDER BY playlistId ASC, position ASC, addedAt ASC")
+    fun observeAllItems(): Flow<List<PlaylistItemEntity>>
+
+    @Query("SELECT * FROM playlist_items WHERE playlistId = :playlistId ORDER BY position ASC, addedAt ASC")
+    fun observeItems(playlistId: Long): Flow<List<PlaylistItemEntity>>
+
+    @Query("SELECT * FROM playlist_items WHERE playlistId = :playlistId ORDER BY position ASC, addedAt ASC")
+    suspend fun getItems(playlistId: Long): List<PlaylistItemEntity>
+
+    @Query("SELECT COALESCE(MAX(position), -1) FROM playlist_items WHERE playlistId = :playlistId")
+    suspend fun getMaxPosition(playlistId: Long): Int
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertItemsIgnore(items: List<PlaylistItemEntity>): List<Long>
+
+    @Query("UPDATE playlist_items SET position = :position WHERE id = :itemId")
+    suspend fun updateItemPosition(itemId: Long, position: Int)
+
+    @Query("DELETE FROM playlist_items WHERE playlistId = :playlistId AND trackPath IN (:trackPaths)")
+    suspend fun deleteItemsByPaths(playlistId: Long, trackPaths: List<String>)
+
+    @Query("DELETE FROM playlist_items WHERE playlistId = :playlistId")
+    suspend fun deleteAllItemsForPlaylist(playlistId: Long)
+}
+
+@Dao
+interface DownloadedTrackDao {
+
+    @Query("SELECT * FROM downloaded_tracks ORDER BY downloadedAt DESC")
+    fun observeAll(): Flow<List<DownloadedTrackEntity>>
+
+    @Query("SELECT * FROM downloaded_tracks ORDER BY downloadedAt DESC")
+    suspend fun getAll(): List<DownloadedTrackEntity>
+
+    @Query("SELECT * FROM downloaded_tracks WHERE remotePath = :remotePath LIMIT 1")
+    suspend fun findByRemotePath(remotePath: String): DownloadedTrackEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: DownloadedTrackEntity)
+
+    @Query("DELETE FROM downloaded_tracks WHERE remotePath = :remotePath")
+    suspend fun deleteByRemotePath(remotePath: String)
+
+    @Query("DELETE FROM downloaded_tracks WHERE serverId = :serverId")
+    suspend fun deleteByServer(serverId: Long)
+
+    @Query("DELETE FROM downloaded_tracks")
+    suspend fun deleteAll()
+}
+
 @Database(
     entities = [
         TrackEntity::class,
         PlaybackPositionEntity::class,
         SubsonicServerEntity::class,
         SubsonicTrackCacheEntity::class,
+        PlaylistEntity::class,
+        PlaylistItemEntity::class,
+        DownloadedTrackEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class LibraryDatabase : RoomDatabase() {
@@ -278,6 +450,8 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun playbackPositionDao(): PlaybackPositionDao
     abstract fun subsonicServerDao(): SubsonicServerDao
     abstract fun subsonicTrackCacheDao(): SubsonicTrackCacheDao
+    abstract fun playlistDao(): PlaylistDao
+    abstract fun downloadedTrackDao(): DownloadedTrackDao
 
     companion object {
         @Volatile
@@ -338,6 +512,75 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `playlists` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `description` TEXT NOT NULL,
+                        `customCoverPath` TEXT,
+                        `sortField` TEXT NOT NULL,
+                        `sortAscending` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `playlist_items` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `playlistId` INTEGER NOT NULL,
+                        `trackPath` TEXT NOT NULL,
+                        `position` INTEGER NOT NULL,
+                        `addedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_playlist_items_playlistId` ON `playlist_items` (`playlistId`)"
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_playlist_items_playlistId_trackPath` ON `playlist_items` (`playlistId`, `trackPath`)"
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `downloaded_tracks` (
+                        `remotePath` TEXT NOT NULL,
+                        `serverId` INTEGER NOT NULL,
+                        `remoteId` TEXT NOT NULL,
+                        `localFilePath` TEXT NOT NULL,
+                        `localCoverPath` TEXT,
+                        `title` TEXT NOT NULL,
+                        `artist` TEXT NOT NULL,
+                        `album` TEXT NOT NULL,
+                        `albumArtist` TEXT NOT NULL,
+                        `trackNumber` INTEGER NOT NULL,
+                        `discNumber` INTEGER NOT NULL,
+                        `durationMs` INTEGER NOT NULL,
+                        `sampleRate` INTEGER NOT NULL,
+                        `bitDepth` INTEGER NOT NULL,
+                        `channels` INTEGER NOT NULL,
+                        `bitrateKbps` INTEGER NOT NULL,
+                        `format` TEXT NOT NULL,
+                        `fileSize` INTEGER NOT NULL,
+                        `quality` TEXT NOT NULL,
+                        `downloadedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`remotePath`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_downloaded_tracks_serverId` ON `downloaded_tracks` (`serverId`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_downloaded_tracks_localFilePath` ON `downloaded_tracks` (`localFilePath`)"
+                )
+            }
+        }
+
         fun get(context: Context): LibraryDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -345,7 +588,7 @@ abstract class LibraryDatabase : RoomDatabase() {
                     LibraryDatabase::class.java,
                     "sonify_library.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { instance = it }

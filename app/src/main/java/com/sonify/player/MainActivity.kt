@@ -16,9 +16,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,13 +37,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Usb
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -61,16 +67,30 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.sonify.player.data.PlaylistEntity
+import com.sonify.player.data.TrackEntity
+import com.sonify.player.library.PlaylistSorter
+import com.sonify.player.library.TrackSortField
 import com.sonify.player.playback.HiFiPlaybackService
+import com.sonify.player.subsonic.SubsonicPlaylist
 import com.sonify.player.subsonic.SubsonicRepository
+import com.sonify.player.subsonic.SubsonicUri
+import com.sonify.player.ui.LibraryViewModel
 import com.sonify.player.ui.PlayerViewModel
+import com.sonify.player.ui.SubsonicDrillState
 import com.sonify.player.ui.SubsonicViewModel
+import com.sonify.player.ui.components.AddToPlaylistSheet
+import com.sonify.player.ui.components.AddTracksPickerSheet
+import com.sonify.player.ui.components.DownloadQueueSheet
 import com.sonify.player.ui.components.MiniPlayerBar
 import com.sonify.player.ui.components.OutputDeviceSheet
+import com.sonify.player.ui.components.PlaylistEditorDialog
 import com.sonify.player.ui.components.SubsonicAccountsSheet
+import com.sonify.player.ui.components.TrackActionSheet
 import com.sonify.player.ui.components.VolumeHudOverlay
 import com.sonify.player.ui.screens.LibraryScreen
 import com.sonify.player.ui.screens.NowPlayingScreen
+import com.sonify.player.ui.screens.PlaylistDetailScreen
 import com.sonify.player.ui.screens.SettingsScreen
 import com.sonify.player.ui.screens.UsbDeviceScreen
 import com.sonify.player.ui.theme.HiFiPlayerTheme
@@ -78,6 +98,7 @@ import com.sonify.player.ui.theme.ImmersiveBarRule
 import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.ui.theme.SystemBarsController
 import com.sonify.player.ui.theme.SystemBarsSpec
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private enum class MainTab(val label: String, val icon: ImageVector) {
@@ -86,10 +107,39 @@ private enum class MainTab(val label: String, val icon: ImageVector) {
     SETTINGS("设置", Icons.Rounded.Settings),
 }
 
+private sealed interface PlaylistEditorMode {
+    data class Create(
+        val defaultRemote: Boolean,
+        val initialTracks: List<TrackEntity> = emptyList(),
+    ) : PlaylistEditorMode
+
+    data class EditLocal(
+        val playlist: PlaylistEntity,
+        val autoCovers: List<String>,
+    ) : PlaylistEditorMode
+
+    data class EditRemote(
+        val serverId: Long,
+        val playlist: SubsonicPlaylist,
+    ) : PlaylistEditorMode
+}
+
+private sealed interface AddPickerTarget {
+    data class Local(val playlist: PlaylistEntity, val existingPaths: Set<String>) : AddPickerTarget
+    data class Remote(val serverId: Long, val playlist: SubsonicPlaylist, val existingPaths: Set<String>) : AddPickerTarget
+}
+
+private data class TrackMenuContext(
+    val track: TrackEntity,
+    val localPlaylistId: Long? = null,
+    val remotePlaylistRemove: (() -> Unit)? = null,
+)
+
 class MainActivity : ComponentActivity() {
 
     private val vm: PlayerViewModel by viewModels()
     private val subsonicVm: SubsonicViewModel by viewModels()
+    private val libraryVm: LibraryViewModel by viewModels()
     private val openPlayerTrigger = mutableStateOf(0L)
     private var latestBarsSpec = SystemBarsSpec()
 
@@ -112,6 +162,7 @@ class MainActivity : ComponentActivity() {
                     HiFiRootScreen(
                         vm = vm,
                         subsonicVm = subsonicVm,
+                        libraryVm = libraryVm,
                         openPlayerTrigger = openPlayerTrigger.value,
                         onApplySystemBars = { spec ->
                             latestBarsSpec = spec
@@ -125,7 +176,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        // Android 10+ 弹出权限框或关闭 BottomSheet 后可能复位系统栏，重获焦点时自动重申沉浸态
         if (hasFocus) {
             SystemBarsController.apply(window, latestBarsSpec)
         }
@@ -138,11 +188,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * 前台物理音量 +/- 键抢占：
-     * USB 独占已连接且开启时，拦截系统音量键并交由 UsbVolumeController 精细护耳控音；
-     * 未连接 USB DAC 或退出独占时完全放行，恢复 Android 原生系统音量。
-     */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val code = event.keyCode
         if (code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN) {
@@ -166,6 +211,7 @@ class MainActivity : ComponentActivity() {
 private fun HiFiRootScreen(
     vm: PlayerViewModel,
     subsonicVm: SubsonicViewModel,
+    libraryVm: LibraryViewModel,
     openPlayerTrigger: Long,
     onApplySystemBars: (SystemBarsSpec) -> Unit,
 ) {
@@ -179,6 +225,7 @@ private fun HiFiRootScreen(
     val volumeState by vm.volumeState.collectAsState()
     val scanState by vm.scanState.collectAsState()
     val tracks by vm.tracks.collectAsState()
+    val remoteCachedTracks by vm.remoteCachedTracks.collectAsState()
     val playback by vm.playback.collectAsState()
     val activeRoute by vm.activeRoute.collectAsState()
     val audioFocusState by vm.audioFocusState.collectAsState()
@@ -188,14 +235,29 @@ private fun HiFiRootScreen(
     val subsonicBrowse by subsonicVm.browse.collectAsState()
     val subsonicAction by subsonicVm.accountAction.collectAsState()
 
+    val localPlaylists by libraryVm.playlists.collectAsState()
+    val downloadedList by libraryVm.downloadedList.collectAsState()
+    val downloadsByPath by libraryVm.downloadsByPath.collectAsState()
+    val downloadQueue by libraryVm.downloadQueue.collectAsState()
+    val toastMessage by libraryVm.toastMessage.collectAsState()
+    val wifiBlockedTracks by libraryVm.wifiOnlyBlockedTracks.collectAsState()
+
     var currentTab by remember { mutableStateOf(MainTab.LIBRARY) }
     var showNowPlaying by remember { mutableStateOf(false) }
     var showOutputSheet by remember { mutableStateOf(false) }
     var showSubsonicSheet by remember { mutableStateOf(false) }
     var subsonicSheetInitialAdd by remember { mutableStateOf(false) }
+    var showDownloadSheet by remember { mutableStateOf(false) }
     var hasStoragePermission by remember { mutableStateOf(checkStoragePermission(context)) }
 
-    // 音乐库当前数据源：根据上次偏好在本地与已保存的 Subsonic 服务器之间无缝切换
+    // 歌单 & 歌曲操作状态
+    var openLocalPlaylistId by remember { mutableStateOf<Long?>(null) }
+    var playlistEditorMode by remember { mutableStateOf<PlaylistEditorMode?>(null) }
+    var pendingAddTracks by remember { mutableStateOf<List<TrackEntity>?>(null) }
+    var trackMenuCtx by remember { mutableStateOf<TrackMenuContext?>(null) }
+    var addPickerTarget by remember { mutableStateOf<AddPickerTarget?>(null) }
+
+    // 音乐库当前数据源
     val selectedServerId = SubsonicRepository.parseServerIdFromSourceKey(settings.lastLibrarySource)
     val selectedSubsonicServer = remember(selectedServerId, subsonicServers) {
         selectedServerId?.let { id -> subsonicServers.firstOrNull { it.id == id } }
@@ -216,7 +278,6 @@ private fun HiFiRootScreen(
         onApplySystemBars(barsSpec)
     }
 
-    // 点击通知栏或从黑胶锁屏页解锁进入时自动展开全屏黑胶播放页
     LaunchedEffect(openPlayerTrigger) {
         if (openPlayerTrigger > 0L) {
             showNowPlaying = true
@@ -245,15 +306,12 @@ private fun HiFiRootScreen(
                 Uri.parse("package:${context.packageName}")
             )
             runCatching { context.startActivity(intent) }
-                .onFailure {
-                    permLauncher.launch(requiredRuntimePermissions())
-                }
+                .onFailure { permLauncher.launch(requiredRuntimePermissions()) }
         } else {
             permLauncher.launch(requiredRuntimePermissions())
         }
     }
 
-    // 回到前台时刷新存储权限与 USB 设备列表
     LifecycleResumeEffect(Unit) {
         val grantedNow = checkStoragePermission(context)
         hasStoragePermission = grantedNow
@@ -264,7 +322,6 @@ private fun HiFiRootScreen(
         onPauseOrDispose { }
     }
 
-    // 首次有权限且库为空时自动触发一次扫描
     LaunchedEffect(hasStoragePermission) {
         if (hasStoragePermission && tracks.isEmpty() && !scanState.isScanning) {
             vm.startScan()
@@ -273,6 +330,9 @@ private fun HiFiRootScreen(
 
     BackHandler(enabled = showNowPlaying) {
         showNowPlaying = false
+    }
+    BackHandler(enabled = !showNowPlaying && currentTab == MainTab.LIBRARY && openLocalPlaylistId != null) {
+        openLocalPlaylistId = null
     }
 
     val hasMiniPlayer = playback.currentTrack != null
@@ -292,46 +352,181 @@ private fun HiFiRootScreen(
                 .then(topSafeModifier)
         ) {
             when (currentTab) {
-                MainTab.LIBRARY -> LibraryScreen(
-                    tracks = tracks,
-                    playback = playback,
-                    settings = settings,
-                    scanState = scanState,
-                    hasStoragePermission = hasStoragePermission,
-                    subsonicServers = subsonicServers,
-                    selectedSubsonicServer = selectedSubsonicServer,
-                    subsonicState = subsonicBrowse,
-                    onSelectLocalSource = {
-                        scope.launch { app.prefs.setLastLibrarySource(SubsonicRepository.LOCAL_SOURCE_KEY) }
-                    },
-                    onSelectSubsonicServer = { srv ->
-                        subsonicVm.switchActiveServer(srv)
-                    },
-                    onOpenSubsonicAccounts = { openAdd ->
-                        subsonicVm.clearAccountMessage()
-                        subsonicSheetInitialAdd = openAdd
-                        showSubsonicSheet = true
-                    },
-                    onSubsonicSelectTab = subsonicVm::selectTab,
-                    onSubsonicSelectFolder = subsonicVm::selectMusicFolder,
-                    onSubsonicRefresh = subsonicVm::refresh,
-                    onSubsonicLoadMoreAlbums = subsonicVm::loadMoreAlbums,
-                    onSubsonicOpenAlbum = subsonicVm::openAlbum,
-                    onSubsonicOpenArtist = subsonicVm::openArtist,
-                    onSubsonicOpenPlaylist = subsonicVm::openPlaylist,
-                    onSubsonicCloseDrill = subsonicVm::closeDrill,
-                    onSubsonicToggleSearch = subsonicVm::setSearchActive,
-                    onSubsonicSearchQuery = subsonicVm::updateSearchQuery,
-                    onRequestPermission = ::requestStorageAccess,
-                    onScan = vm::startScan,
-                    onCancelScan = vm::cancelScan,
-                    onImportFiles = { importLauncher.launch(arrayOf("audio/*")) },
-                    onPlayTracks = { list, idx, ctxLabel ->
-                        vm.playTracks(list, idx, ctxLabel)
-                    },
-                    onResumeLast = { vm.resumeLastPlayback(tracks) },
-                    bottomPadding = bottomClearance,
-                )
+                MainTab.LIBRARY -> {
+                    val activeLocalPlId = openLocalPlaylistId
+                    if (activeLocalPlId != null && selectedSubsonicServer == null) {
+                        val plEntity by remember(activeLocalPlId) {
+                            libraryVm.observeLocalPlaylist(activeLocalPlId)
+                        }.collectAsState(initial = null)
+                        val plItems by remember(activeLocalPlId) {
+                            libraryVm.observeLocalPlaylistTracks(activeLocalPlId)
+                        }.collectAsState(initial = emptyList())
+
+                        val currentPl = plEntity
+                        if (currentPl != null) {
+                            val autoCovers = remember(plItems) {
+                                plItems.mapNotNull { it.track.coverPath?.takeIf { c -> c.isNotBlank() } }
+                                    .distinct()
+                                    .take(4)
+                            }
+                            val sortField = TrackSortField.fromNameOrDefault(currentPl.sortField, TrackSortField.CUSTOM)
+                            PlaylistDetailScreen(
+                                title = currentPl.name,
+                                description = currentPl.description,
+                                isRemotePlaylist = false,
+                                customCoverPath = currentPl.customCoverPath,
+                                autoCovers = autoCovers,
+                                items = plItems,
+                                sortField = sortField,
+                                sortAscending = currentPl.sortAscending,
+                                currentTrackPath = playback.currentTrack?.path,
+                                downloadsByPath = downloadsByPath,
+                                onBack = { openLocalPlaylistId = null },
+                                onPlayTracks = { list, idx, label -> vm.playTracks(list, idx, label) },
+                                onShufflePlay = { list, label ->
+                                    if (list.isNotEmpty()) vm.playTracks(list.shuffled(), 0, "$label · 随机")
+                                },
+                                onChangeSort = { field, asc ->
+                                    libraryVm.setLocalPlaylistSort(currentPl.id, field, asc)
+                                },
+                                onEditPlaylist = {
+                                    playlistEditorMode = PlaylistEditorMode.EditLocal(currentPl, autoCovers)
+                                },
+                                onDeletePlaylist = {
+                                    libraryVm.deleteLocalPlaylist(currentPl.id, currentPl.name) {
+                                        openLocalPlaylistId = null
+                                    }
+                                },
+                                onOpenAddTracks = {
+                                    addPickerTarget = AddPickerTarget.Local(
+                                        playlist = currentPl,
+                                        existingPaths = plItems.map { it.track.path }.toSet(),
+                                    )
+                                },
+                                onDownloadPlaylist = { remoteList -> libraryVm.enqueueDownload(remoteList) },
+                                onMoveTrack = { trackPath, up ->
+                                    libraryVm.moveTrackInLocalPlaylist(currentPl.id, trackPath, up)
+                                },
+                                onTrackMenu = { track ->
+                                    trackMenuCtx = TrackMenuContext(track = track, localPlaylistId = currentPl.id)
+                                },
+                                onBatchAddToPlaylist = { list -> pendingAddTracks = list },
+                                onBatchDownload = { list -> libraryVm.enqueueDownload(list) },
+                                onBatchRemoveFromPlaylist = { items ->
+                                    libraryVm.removeTracksFromLocalPlaylist(currentPl.id, items.map { it.track.path })
+                                },
+                                bottomPadding = bottomClearance,
+                            )
+                        } else {
+                            LaunchedEffect(Unit) { openLocalPlaylistId = null }
+                        }
+                    } else {
+                        LibraryScreen(
+                            tracks = tracks,
+                            localPlaylists = localPlaylists,
+                            downloadedList = downloadedList,
+                            downloadsByPath = downloadsByPath,
+                            downloadQueue = downloadQueue,
+                            playback = playback,
+                            settings = settings,
+                            scanState = scanState,
+                            hasStoragePermission = hasStoragePermission,
+                            subsonicServers = subsonicServers,
+                            selectedSubsonicServer = selectedSubsonicServer,
+                            subsonicState = subsonicBrowse,
+                            onSelectLocalSource = {
+                                scope.launch { app.prefs.setLastLibrarySource(SubsonicRepository.LOCAL_SOURCE_KEY) }
+                            },
+                            onSelectSubsonicServer = { srv ->
+                                openLocalPlaylistId = null
+                                subsonicVm.switchActiveServer(srv)
+                            },
+                            onOpenSubsonicAccounts = { openAdd ->
+                                subsonicVm.clearAccountMessage()
+                                subsonicSheetInitialAdd = openAdd
+                                showSubsonicSheet = true
+                            },
+                            onSubsonicSelectTab = subsonicVm::selectTab,
+                            onSubsonicSelectFolder = subsonicVm::selectMusicFolder,
+                            onSubsonicRefresh = subsonicVm::refresh,
+                            onSubsonicLoadMoreAlbums = subsonicVm::loadMoreAlbums,
+                            onSubsonicOpenAlbum = subsonicVm::openAlbum,
+                            onSubsonicOpenArtist = subsonicVm::openArtist,
+                            onSubsonicOpenPlaylist = subsonicVm::openPlaylist,
+                            onSubsonicCloseDrill = subsonicVm::closeDrill,
+                            onSubsonicToggleSearch = subsonicVm::setSearchActive,
+                            onSubsonicSearchQuery = subsonicVm::updateSearchQuery,
+                            onRequestPermission = ::requestStorageAccess,
+                            onScan = vm::startScan,
+                            onCancelScan = vm::cancelScan,
+                            onImportFiles = { importLauncher.launch(arrayOf("audio/*")) },
+                            onPlayTracks = { list, idx, ctxLabel -> vm.playTracks(list, idx, ctxLabel) },
+                            onShufflePlay = { list, ctxLabel ->
+                                if (list.isNotEmpty()) vm.playTracks(list.shuffled(), 0, ctxLabel)
+                            },
+                            onResumeLast = { vm.resumeLastPlayback(tracks) },
+                            onChangeLocalSongSort = libraryVm::setLibrarySongSort,
+                            onOpenCreatePlaylist = { defaultRemote ->
+                                playlistEditorMode = PlaylistEditorMode.Create(defaultRemote = defaultRemote)
+                            },
+                            onOpenLocalPlaylist = { summary -> openLocalPlaylistId = summary.playlist.id },
+                            onQuickPlayLocalPlaylist = { summary ->
+                                scope.launch {
+                                    val items = libraryVm.observeLocalPlaylistTracks(summary.playlist.id).first()
+                                    val field = TrackSortField.fromNameOrDefault(summary.playlist.sortField, TrackSortField.CUSTOM)
+                                    val sorted = PlaylistSorter.sortTracks(items, field, summary.playlist.sortAscending).map { it.track }
+                                    if (sorted.isNotEmpty()) vm.playTracks(sorted, 0, summary.playlist.name)
+                                }
+                            },
+                            onTrackMenu = { track ->
+                                val remoteDrill = subsonicBrowse.drill as? SubsonicDrillState.PlaylistDetail
+                                val srv = selectedSubsonicServer
+                                val remoteRemover: (() -> Unit)? = if (remoteDrill != null && srv != null) {
+                                    val idx = remoteDrill.tracks.indexOfFirst { it.path == track.path }
+                                    if (idx >= 0) {
+                                        {
+                                            libraryVm.removeIndexesFromRemotePlaylist(
+                                                serverId = srv.id,
+                                                playlistId = remoteDrill.playlist.id,
+                                                indexes = listOf(idx),
+                                            ) { subsonicVm.openPlaylist(remoteDrill.playlist) }
+                                        }
+                                    } else null
+                                } else null
+                                trackMenuCtx = TrackMenuContext(
+                                    track = track,
+                                    localPlaylistId = null,
+                                    remotePlaylistRemove = remoteRemover,
+                                )
+                            },
+                            onBatchAddToPlaylist = { list -> pendingAddTracks = list },
+                            onDownloadTracks = { list -> libraryVm.enqueueDownload(list) },
+                            onOpenDownloadManager = { showDownloadSheet = true },
+                            onEditRemotePlaylist = { pl ->
+                                val srv = selectedSubsonicServer ?: return@LibraryScreen
+                                playlistEditorMode = PlaylistEditorMode.EditRemote(srv.id, pl)
+                            },
+                            onDeleteRemotePlaylist = { pl ->
+                                val srv = selectedSubsonicServer ?: return@LibraryScreen
+                                libraryVm.deleteRemotePlaylist(srv.id, pl.id, pl.name) {
+                                    subsonicVm.closeDrill()
+                                    subsonicVm.refresh()
+                                }
+                            },
+                            onAddTracksToRemotePlaylist = { pl, existing ->
+                                val srv = selectedSubsonicServer ?: return@LibraryScreen
+                                addPickerTarget = AddPickerTarget.Remote(srv.id, pl, existing)
+                            },
+                            onRemoveRemotePlaylistIndexes = { pl, indexes ->
+                                val srv = selectedSubsonicServer ?: return@LibraryScreen
+                                libraryVm.removeIndexesFromRemotePlaylist(srv.id, pl.id, indexes) {
+                                    subsonicVm.openPlaylist(pl)
+                                }
+                            },
+                            bottomPadding = bottomClearance,
+                        )
+                    }
+                }
 
                 MainTab.USB -> UsbDeviceScreen(
                     usbState = usbState,
@@ -359,6 +554,8 @@ private fun HiFiRootScreen(
                     volumeController = app.volumeController,
                     subsonicServers = subsonicServers,
                     activeSubsonicServer = activeSubsonicServer,
+                    downloadedCount = downloadedList.size,
+                    downloadedTotalBytes = downloadedList.sumOf { it.fileSize.coerceAtLeast(0L) },
                     nativeBuildTime = usbState.stats.buildTime,
                     onRebindRoute = vm::rebindAudioRoute,
                     onScanNow = {
@@ -369,6 +566,7 @@ private fun HiFiRootScreen(
                         subsonicSheetInitialAdd = subsonicServers.isEmpty()
                         showSubsonicSheet = true
                     },
+                    onOpenDownloadManager = { showDownloadSheet = true },
                     bottomPadding = bottomClearance,
                 )
             }
@@ -449,12 +647,13 @@ private fun HiFiRootScreen(
             }
         }
 
-        // 全屏黑胶播放页（从底部滑入）
+        // 全屏黑胶播放页
         AnimatedVisibility(
             visible = showNowPlaying && playback.currentTrack != null,
             enter = slideInVertically(initialOffsetY = { it }),
             exit = slideOutVertically(targetOffsetY = { it }),
         ) {
+            val curPath = playback.currentTrack?.path
             NowPlayingScreen(
                 playback = playback,
                 settings = settings,
@@ -482,19 +681,51 @@ private fun HiFiRootScreen(
                 onToggleImmersiveMode = { enabled ->
                     scope.launch { app.prefs.setImmersiveMusicMode(enabled) }
                 },
+                isCurrentTrackDownloaded = curPath != null && downloadsByPath.containsKey(curPath),
+                onAddCurrentToPlaylist = { track -> pendingAddTracks = listOf(track) },
+                onDownloadCurrentTrack = { track -> libraryVm.enqueueDownload(listOf(track)) },
             )
         }
 
-        // 顶层全局护耳音量悬浮 HUD（物理音量键触发）
+        // 顶层全局护耳音量悬浮 HUD
         VolumeHudOverlay(
             volumeState = volumeState,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .then(topSafeModifier),
         )
+
+        // 轻量操作反馈 Toast 胶囊（歌单加歌 / 排序 / 下载反馈）
+        AnimatedVisibility(
+            visible = toastMessage != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .then(topSafeModifier)
+                .padding(top = 56.dp, start = 20.dp, end = 20.dp),
+        ) {
+            toastMessage?.let { msg ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(colors.surface2.copy(alpha = 0.96f))
+                        .border(1.dp, colors.accent.copy(alpha = 0.5f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 16.dp, vertical = 9.dp),
+                ) {
+                    Text(
+                        text = msg,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.textPrimary,
+                    )
+                }
+            }
+        }
     }
 
-    // Spotify Connect 风格音频输出与信号链路 Sheet
+    // ==================== 各类全局 Sheet & Dialog ====================
+
     if (showOutputSheet) {
         OutputDeviceSheet(
             currentTrack = playback.currentTrack,
@@ -526,7 +757,6 @@ private fun HiFiRootScreen(
         )
     }
 
-    // Subsonic 多账号加密登录与管理 Sheet
     if (showSubsonicSheet) {
         SubsonicAccountsSheet(
             servers = subsonicServers,
@@ -535,6 +765,7 @@ private fun HiFiRootScreen(
             onDismiss = { showSubsonicSheet = false },
             onClearMessage = subsonicVm::clearAccountMessage,
             onSelectServer = { srv ->
+                openLocalPlaylistId = null
                 subsonicVm.switchActiveServer(srv)
                 currentTab = MainTab.LIBRARY
             },
@@ -550,8 +781,195 @@ private fun HiFiRootScreen(
                     useLegacyAuth = legacy,
                     allowSelfSignedTls = selfSigned,
                 ) { _, _ ->
+                    openLocalPlaylistId = null
                     currentTab = MainTab.LIBRARY
                     onDone()
+                }
+            },
+        )
+    }
+
+    // 新建 / 编辑歌单弹窗
+    playlistEditorMode?.let { mode ->
+        when (mode) {
+            is PlaylistEditorMode.Create -> PlaylistEditorDialog(
+                isEdit = false,
+                activeRemoteServer = activeSubsonicServer,
+                defaultToRemote = mode.defaultRemote,
+                onDismiss = { playlistEditorMode = null },
+                onConfirm = { name, desc, coverUri, _, createRemote ->
+                    playlistEditorMode = null
+                    if (createRemote && activeSubsonicServer != null) {
+                        libraryVm.createRemotePlaylist(
+                            serverId = activeSubsonicServer!!.id,
+                            name = name,
+                            initialTracks = mode.initialTracks,
+                        ) {
+                            subsonicVm.refresh()
+                        }
+                    } else {
+                        libraryVm.createLocalPlaylist(
+                            name = name,
+                            description = desc,
+                            coverUri = coverUri,
+                            initialTracks = mode.initialTracks,
+                        )
+                    }
+                },
+            )
+
+            is PlaylistEditorMode.EditLocal -> PlaylistEditorDialog(
+                isEdit = true,
+                isRemotePlaylist = false,
+                initialName = mode.playlist.name,
+                initialDescription = mode.playlist.description,
+                initialCustomCoverPath = mode.playlist.customCoverPath,
+                autoCovers = mode.autoCovers,
+                onDismiss = { playlistEditorMode = null },
+                onConfirm = { name, desc, coverUri, clearCover, _ ->
+                    playlistEditorMode = null
+                    libraryVm.updateLocalPlaylist(mode.playlist.id, name, desc, coverUri, clearCover)
+                },
+            )
+
+            is PlaylistEditorMode.EditRemote -> PlaylistEditorDialog(
+                isEdit = true,
+                isRemotePlaylist = true,
+                initialName = mode.playlist.name,
+                initialDescription = mode.playlist.comment,
+                onDismiss = { playlistEditorMode = null },
+                onConfirm = { name, desc, _, _, _ ->
+                    playlistEditorMode = null
+                    libraryVm.updateRemotePlaylistMeta(mode.serverId, mode.playlist.id, name, desc) {
+                        subsonicVm.openPlaylist(mode.playlist.copy(name = name, comment = desc))
+                    }
+                },
+            )
+        }
+    }
+
+    // 加入歌单弹窗（单曲与批量共用）
+    pendingAddTracks?.let { toAdd ->
+        AddToPlaylistSheet(
+            tracksToAdd = toAdd,
+            localPlaylists = localPlaylists,
+            remoteServer = activeSubsonicServer,
+            remotePlaylists = subsonicBrowse.playlists,
+            onDismiss = { pendingAddTracks = null },
+            onCreateNewAndAdd = {
+                val targetRemote = activeSubsonicServer != null &&
+                    toAdd.all { SubsonicUri.parseTrackUri(it.path)?.serverId == activeSubsonicServer!!.id }
+                playlistEditorMode = PlaylistEditorMode.Create(
+                    defaultRemote = targetRemote,
+                    initialTracks = toAdd,
+                )
+            },
+            onPickLocalPlaylist = { summary ->
+                libraryVm.addTracksToLocalPlaylist(summary.playlist.id, summary.playlist.name, toAdd)
+            },
+            onPickRemotePlaylist = { srv, rpl ->
+                libraryVm.addTracksToRemotePlaylist(srv.id, rpl.id, rpl.name, toAdd) {
+                    subsonicVm.refresh()
+                }
+            },
+        )
+    }
+
+    // 单曲「⋮」快捷操作菜单
+    trackMenuCtx?.let { ctx ->
+        val t = ctx.track
+        TrackActionSheet(
+            track = t,
+            isDownloaded = downloadsByPath.containsKey(t.path),
+            showRemoveFromPlaylist = ctx.localPlaylistId != null || ctx.remotePlaylistRemove != null,
+            onDismiss = { trackMenuCtx = null },
+            onPlayNow = { vm.playTracks(listOf(t), 0, t.album.ifBlank { "立即播放" }) },
+            onAddToPlaylist = { pendingAddTracks = listOf(t) },
+            onToggleFavorite = { vm.toggleFavorite(t) },
+            onDownload = { libraryVm.enqueueDownload(listOf(t)) },
+            onDeleteDownload = { libraryVm.deleteDownloadedTrack(t.path, t.title) },
+            onRemoveFromPlaylist = {
+                ctx.localPlaylistId?.let { plId ->
+                    libraryVm.removeTracksFromLocalPlaylist(plId, listOf(t.path))
+                }
+                ctx.remotePlaylistRemove?.invoke()
+            },
+        )
+    }
+
+    // 歌单内「+ 添加歌曲」选歌器
+    addPickerTarget?.let { target ->
+        val candidates = when (target) {
+            is AddPickerTarget.Local -> remember(tracks, remoteCachedTracks) {
+                (tracks + remoteCachedTracks).distinctBy { it.path }
+            }
+
+            is AddPickerTarget.Remote -> remember(remoteCachedTracks, target.serverId) {
+                remoteCachedTracks.filter { SubsonicUri.parseTrackUri(it.path)?.serverId == target.serverId }
+            }
+        }
+        val plName = when (target) {
+            is AddPickerTarget.Local -> target.playlist.name
+            is AddPickerTarget.Remote -> target.playlist.name
+        }
+        val existing = when (target) {
+            is AddPickerTarget.Local -> target.existingPaths
+            is AddPickerTarget.Remote -> target.existingPaths
+        }
+        AddTracksPickerSheet(
+            playlistName = plName,
+            existingPaths = existing,
+            candidateTracks = candidates,
+            onDismiss = { addPickerTarget = null },
+            onConfirmAdd = { chosen ->
+                when (target) {
+                    is AddPickerTarget.Local ->
+                        libraryVm.addTracksToLocalPlaylist(target.playlist.id, target.playlist.name, chosen)
+
+                    is AddPickerTarget.Remote ->
+                        libraryVm.addTracksToRemotePlaylist(target.serverId, target.playlist.id, target.playlist.name, chosen) {
+                            subsonicVm.openPlaylist(target.playlist)
+                        }
+                }
+            },
+        )
+    }
+
+    // 离线下载队列与空间管理 Sheet
+    if (showDownloadSheet) {
+        DownloadQueueSheet(
+            queueState = downloadQueue,
+            downloadedList = downloadedList,
+            onRetry = libraryVm::retryDownload,
+            onCancelTask = libraryVm::cancelDownload,
+            onCancelAll = libraryVm::cancelAllDownloads,
+            onClearFinished = libraryVm::clearFinishedDownloads,
+            onDeleteAllDownloads = libraryVm::deleteAllDownloads,
+            onDismiss = { showDownloadSheet = false },
+        )
+    }
+
+    // 仅 Wi-Fi 下载提示弹窗（允许本次一键放行流量下载）
+    wifiBlockedTracks?.let { pending ->
+        AlertDialog(
+            onDismissRequest = libraryVm::dismissCellularDownload,
+            containerColor = colors.surface1,
+            title = { Text("当前为移动网络", color = colors.textPrimary) },
+            text = {
+                Text(
+                    "您已开启「仅 Wi-Fi 下载」，本次待下载 ${pending.size} 首无损/音频曲目。是否允许本次使用移动流量继续下载？",
+                    color = colors.textSecondary,
+                    fontSize = 13.sp,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = libraryVm::confirmCellularDownload) {
+                    Text("继续下载", color = colors.accent, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = libraryVm::dismissCellularDownload) {
+                    Text("取消", color = colors.textSecondary)
                 }
             },
         )

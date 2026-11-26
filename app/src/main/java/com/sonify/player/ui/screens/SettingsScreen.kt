@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -78,6 +79,7 @@ import com.sonify.player.data.BitDepthPref
 import com.sonify.player.data.BufferSizePref
 import com.sonify.player.data.CoverStyle
 import com.sonify.player.data.DarkCanvasStyle
+import com.sonify.player.data.DownloadStorageMode
 import com.sonify.player.data.ImmersiveScope
 import com.sonify.player.data.ImportMode
 import com.sonify.player.data.MinDurationFilter
@@ -112,6 +114,8 @@ private enum class ActiveSheet {
     IMMERSIVE_SCOPE,
     SUBSONIC_WIFI_QUALITY,
     SUBSONIC_CELLULAR_QUALITY,
+    DOWNLOAD_STORAGE_MODE,
+    DOWNLOAD_QUALITY,
 }
 
 private sealed interface HighVolumeConfirm {
@@ -131,10 +135,13 @@ fun SettingsScreen(
     volumeController: UsbVolumeController,
     subsonicServers: List<SubsonicServerEntity>,
     activeSubsonicServer: SubsonicServerEntity?,
+    downloadedCount: Int,
+    downloadedTotalBytes: Long,
     nativeBuildTime: String,
     onRebindRoute: () -> Unit,
     onScanNow: () -> Unit,
     onOpenSubsonicAccounts: () -> Unit,
+    onOpenDownloadManager: () -> Unit,
     bottomPadding: Dp,
 ) {
     val colors = LocalHiFiColors.current
@@ -377,6 +384,35 @@ fun SettingsScreen(
             subtitle = "向 Subsonic 服务器上报正在播放与听完计数",
             checked = settings.subsonicScrobbleEnabled,
             onCheckedChange = { scope.launch { prefs.setSubsonicScrobble(it) } },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Folder,
+            title = "歌曲/歌单下载存储位置",
+            subtitle = settings.downloadStorageMode.label,
+            onClick = { activeSheet = ActiveSheet.DOWNLOAD_STORAGE_MODE },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Download,
+            title = "离线下载音质",
+            subtitle = settings.downloadQuality.label,
+            onClick = { activeSheet = ActiveSheet.DOWNLOAD_QUALITY },
+        )
+        SettingsSwitchItem(
+            icon = Icons.Rounded.Wifi,
+            title = "仅 Wi-Fi 下载歌曲与歌单",
+            subtitle = "移动网络点击下载时先弹窗确认，防止意外消耗流量",
+            checked = settings.downloadWifiOnly,
+            onCheckedChange = { scope.launch { prefs.setDownloadWifiOnly(it) } },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Download,
+            title = "离线下载文件管理",
+            subtitle = if (downloadedCount <= 0) "尚未下载任何远程歌曲" else {
+                val mb = downloadedTotalBytes / (1024.0 * 1024.0)
+                val sizeStr = if (mb >= 1.0) "${"%.1f".format(mb)} MB" else "${(downloadedTotalBytes / 1024L).coerceAtLeast(1L)} KB"
+                "已离线 $downloadedCount 首（共 $sizeStr）· 查看队列与清理"
+            },
+            onClick = onOpenDownloadManager,
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Delete,
@@ -723,6 +759,22 @@ fun SettingsScreen(
             options = StreamQuality.entries.map { SheetOption(it, it.label, it.subtitle) },
             selected = settings.subsonicCellularQuality,
             onSelect = { scope.launch { prefs.setSubsonicCellularQuality(it) } },
+            onDismiss = { activeSheet = ActiveSheet.NONE },
+        )
+
+        ActiveSheet.DOWNLOAD_STORAGE_MODE -> SpotifyOptionSheet(
+            title = "离线下载存储位置",
+            options = DownloadStorageMode.entries.map { SheetOption(it, it.label, it.subtitle) },
+            selected = settings.downloadStorageMode,
+            onSelect = { scope.launch { prefs.setDownloadStorageMode(it) } },
+            onDismiss = { activeSheet = ActiveSheet.NONE },
+        )
+
+        ActiveSheet.DOWNLOAD_QUALITY -> SpotifyOptionSheet(
+            title = "离线下载音质",
+            options = StreamQuality.entries.map { SheetOption(it, it.label, it.subtitle) },
+            selected = settings.downloadQuality,
+            onSelect = { scope.launch { prefs.setDownloadQuality(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 

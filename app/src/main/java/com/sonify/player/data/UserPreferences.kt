@@ -124,6 +124,17 @@ enum class StreamQuality(
     ),
 }
 
+enum class DownloadStorageMode(val label: String, val subtitle: String) {
+    PUBLIC_MUSIC(
+        "公开目录（/sdcard/Music/SonifyDownloads）",
+        "文件按艺人/专辑归档，文件管理器可见并自动纳入本地库（无写权限时自动回落私有目录）"
+    ),
+    APP_PRIVATE(
+        "App 私有离线目录",
+        "仅限 Sonify 内部离线播放与管理，不写入手机公共 Music 目录"
+    ),
+}
+
 enum class AudioFocusPolicy(val label: String, val subtitle: String) {
     STANDARD_DUCK(
         "标准模式 · 压低避让（推荐）",
@@ -179,10 +190,15 @@ data class AppSettings(
     val lockScreenVinylEnabled: Boolean = true,
     val notifShowAudioSpec: Boolean = true,
     val wakeLockEnabled: Boolean = true,
-    // Subsonic 远程媒体服务器
+    // Subsonic 远程媒体服务器与离线下载
     val subsonicWifiQuality: StreamQuality = StreamQuality.RAW,
     val subsonicCellularQuality: StreamQuality = StreamQuality.MP3_320,
     val subsonicScrobbleEnabled: Boolean = true,
+    val downloadStorageMode: DownloadStorageMode = DownloadStorageMode.PUBLIC_MUSIC,
+    val downloadQuality: StreamQuality = StreamQuality.RAW,
+    val downloadWifiOnly: Boolean = true,
+    val librarySongSortField: String = "RECENTLY_ADDED",
+    val librarySongSortAscending: Boolean = false,
     val lastLibrarySource: String = "local",
     val lastTrackPath: String? = null,
     val lastPositionMs: Long = 0L,
@@ -239,6 +255,11 @@ class UserPreferences(private val context: Context) {
         val SUBSONIC_WIFI_QUALITY = stringPreferencesKey("subsonic_wifi_quality")
         val SUBSONIC_CELLULAR_QUALITY = stringPreferencesKey("subsonic_cellular_quality")
         val SUBSONIC_SCROBBLE = booleanPreferencesKey("subsonic_scrobble")
+        val DOWNLOAD_STORAGE_MODE = stringPreferencesKey("download_storage_mode")
+        val DOWNLOAD_QUALITY = stringPreferencesKey("download_quality")
+        val DOWNLOAD_WIFI_ONLY = booleanPreferencesKey("download_wifi_only")
+        val LIBRARY_SONG_SORT_FIELD = stringPreferencesKey("library_song_sort_field")
+        val LIBRARY_SONG_SORT_ASC = booleanPreferencesKey("library_song_sort_asc")
         val LAST_LIBRARY_SOURCE = stringPreferencesKey("last_library_source")
         val LAST_TRACK_PATH = stringPreferencesKey("last_track_path")
         val LAST_POSITION_MS = longPreferencesKey("last_position_ms")
@@ -313,6 +334,15 @@ class UserPreferences(private val context: Context) {
                     runCatching { StreamQuality.valueOf(it) }.getOrNull()
                 } ?: StreamQuality.MP3_320,
                 subsonicScrobbleEnabled = p[Keys.SUBSONIC_SCROBBLE] ?: true,
+                downloadStorageMode = p[Keys.DOWNLOAD_STORAGE_MODE]?.let {
+                    runCatching { DownloadStorageMode.valueOf(it) }.getOrNull()
+                } ?: DownloadStorageMode.PUBLIC_MUSIC,
+                downloadQuality = p[Keys.DOWNLOAD_QUALITY]?.let {
+                    runCatching { StreamQuality.valueOf(it) }.getOrNull()
+                } ?: StreamQuality.RAW,
+                downloadWifiOnly = p[Keys.DOWNLOAD_WIFI_ONLY] ?: true,
+                librarySongSortField = p[Keys.LIBRARY_SONG_SORT_FIELD] ?: "RECENTLY_ADDED",
+                librarySongSortAscending = p[Keys.LIBRARY_SONG_SORT_ASC] ?: false,
                 lastLibrarySource = p[Keys.LAST_LIBRARY_SOURCE] ?: "local",
                 lastTrackPath = p[Keys.LAST_TRACK_PATH],
                 lastPositionMs = p[Keys.LAST_POSITION_MS] ?: 0L,
@@ -485,6 +515,25 @@ class UserPreferences(private val context: Context) {
 
     suspend fun setSubsonicScrobble(enabled: Boolean) {
         context.dataStore.edit { it[Keys.SUBSONIC_SCROBBLE] = enabled }
+    }
+
+    suspend fun setDownloadStorageMode(mode: DownloadStorageMode) {
+        context.dataStore.edit { it[Keys.DOWNLOAD_STORAGE_MODE] = mode.name }
+    }
+
+    suspend fun setDownloadQuality(quality: StreamQuality) {
+        context.dataStore.edit { it[Keys.DOWNLOAD_QUALITY] = quality.name }
+    }
+
+    suspend fun setDownloadWifiOnly(wifiOnly: Boolean) {
+        context.dataStore.edit { it[Keys.DOWNLOAD_WIFI_ONLY] = wifiOnly }
+    }
+
+    suspend fun setLibrarySongSort(field: String, ascending: Boolean) {
+        context.dataStore.edit {
+            it[Keys.LIBRARY_SONG_SORT_FIELD] = field
+            it[Keys.LIBRARY_SONG_SORT_ASC] = ascending
+        }
     }
 
     suspend fun setLastLibrarySource(source: String) {

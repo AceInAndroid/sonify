@@ -84,6 +84,18 @@ object SubsonicAuth {
         endpoint: String,
         params: Map<String, String> = emptyMap(),
         saltOverride: String? = null,
+    ): HttpUrl = buildEndpointUrlMulti(
+        creds = creds,
+        endpoint = endpoint,
+        params = params.entries.map { it.key to it.value },
+        saltOverride = saltOverride,
+    )
+
+    fun buildEndpointUrlMulti(
+        creds: SubsonicCredentials,
+        endpoint: String,
+        params: List<Pair<String, String>> = emptyList(),
+        saltOverride: String? = null,
     ): HttpUrl {
         val base = normalizeBaseUrl(creds.baseUrl)
         val cleanEndpoint = endpoint.trimStart('/').removeSuffix(".view")
@@ -122,6 +134,22 @@ object SubsonicAuth {
             if (quality.maxBitRate > 0) params["maxBitRate"] = quality.maxBitRate.toString()
         }
         return buildEndpointUrl(creds, "stream", params, saltOverride)
+    }
+
+    /**
+     * 构造离线下载 URL：
+     * - RAW（原盘无损）默认使用 rest/download.view 获取服务端未修改原文件；
+     * - 转码档位走 rest/stream.view 携带 format + maxBitRate。
+     */
+    fun buildDownloadUrl(
+        creds: SubsonicCredentials,
+        songId: String,
+        quality: StreamQuality = StreamQuality.RAW,
+        saltOverride: String? = null,
+    ): HttpUrl = if (quality == StreamQuality.RAW) {
+        buildEndpointUrl(creds, "download", mapOf("id" to songId), saltOverride)
+    } else {
+        buildStreamUrl(creds, songId, quality, saltOverride)
     }
 
     fun buildCoverArtUrl(
