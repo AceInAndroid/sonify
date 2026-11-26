@@ -178,6 +178,27 @@ class SubsonicClient {
         SubsonicParser.unwrapResponse(executeJson(creds, "deletePlaylist", mapOf("id" to playlistId)))
     }
 
+    /** 获取 Subsonic / OpenSubsonic 歌词（优先同步结构化歌词，失败回退经典 getLyrics） */
+    suspend fun getLyricsForSong(
+        creds: SubsonicCredentials,
+        songId: String,
+        artist: String,
+        title: String,
+    ): com.sonify.player.lyrics.LyricsDocument? {
+        val structured = runCatching {
+            SubsonicParser.parseLyricsBySongId(executeJson(creds, "getLyricsBySongId", mapOf("id" to songId)))
+        }.getOrNull()
+        if (structured != null && !structured.isEmpty) return structured
+
+        val params = linkedMapOf<String, String>()
+        if (artist.isNotBlank() && artist != "未知艺术家") params["artist"] = artist
+        if (title.isNotBlank()) params["title"] = title
+        if (params.isEmpty()) return null
+        return runCatching {
+            SubsonicParser.parseClassicLyrics(executeJson(creds, "getLyrics", params))
+        }.getOrNull()
+    }
+
     fun fetchBinarySync(url: HttpUrl, allowSelfSignedTls: Boolean): ByteArray? {
         val req = Request.Builder()
             .url(url)

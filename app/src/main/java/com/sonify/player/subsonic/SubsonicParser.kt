@@ -1,5 +1,9 @@
 package com.sonify.player.subsonic
 
+import com.sonify.player.lyrics.LrcParser
+import com.sonify.player.lyrics.LyricLine
+import com.sonify.player.lyrics.LyricsDocument
+import com.sonify.player.lyrics.LyricsSource
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -122,6 +126,47 @@ object SubsonicParser {
             albums = optObjects(container, "album").mapNotNull { parseAlbumObj(it) },
             artists = optObjects(container, "artist").mapNotNull { parseArtistObj(it) },
         )
+    }
+
+    /** 解析 OpenSubsonic getLyricsBySongId.view 结构化同步/纯文本歌词 */
+    fun parseLyricsBySongId(rawJson: String): LyricsDocument? {
+        val resp = unwrapResponse(rawJson)
+        val lyricsList = resp.optJSONObject("lyricsList") ?: return null
+        val structured = optObjects(lyricsList, "structuredLyrics")
+        if (structured.isEmpty()) return null
+
+        // 优先选择 synced = true 的歌词轨道
+        val chosen = structured.firstOrNull { it.optBoolean("synced", false) } ?: structured.first()
+        val synced = chosen.optBoolean("synced", false)
+        val offsetMs = chosen.optLong("offset", 0L)
+        val lineObjs = optObjects(chosen, "line")
+        if (lineObjs.isEmpty()) return null
+
+        val lines = lineObjs.mapNotNull { obj ->
+            val value = obj.optString("value", "").trim()
+            if (value.isEmpty()) return@mapNotNull null
+            val start = (obj.optLong("start", 0L) - offsetMs).coerceAtLeast(0L)
+            LyricLine(timeMs = start, text = value)
+        }
+        if (lines.isEmpty()) return null
+
+        val finalLines = if (synced) lines.sortedBy { it.timeMs } else lines
+        val raw = if (synced) LrcParser.formatToLrc(finalLines) else finalLines.joinToString("\n") { it.text }
+        return LyricsDocument(
+            lines = finalLines,
+            isSynced = synced,
+            source = LyricsSource.SUBSONIC,
+            rawLrc = raw,
+        )
+    }
+
+    /** 解析经典 Subsonic getLyrics.view 纯文本歌词 */
+    fun parseClassicLyrics(rawJson: String): LyricsDocument? {
+        val resp = unwrapResponse(rawJson)
+        val obj = resp.optJSONObject("lyrics") ?: return null
+        val text = obj.optString("value", "").trim()
+        if (text.isEmpty()) return null
+        return LrcParser.parse(text, LyricsSource.SUBSONIC)
     }
 
     private fun parseAlbumObj(obj: JSONObject): SubsonicAlbum? {

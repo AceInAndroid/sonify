@@ -9,6 +9,7 @@ import com.sonify.player.data.UserPreferences
 import com.sonify.player.download.SonifyDownloadManager
 import com.sonify.player.library.MediaScanner
 import com.sonify.player.library.PlaylistRepository
+import com.sonify.player.lyrics.LyricsRepository
 import com.sonify.player.subsonic.SubsonicRepository
 import com.sonify.player.ui.theme.AmbientColorExtractor
 import com.sonify.player.ui.theme.SubsonicCoverFetcher
@@ -45,6 +46,8 @@ class HiFiApp : Application(), ImageLoaderFactory {
         private set
     lateinit var wifiTransferManager: WifiTransferManager
         private set
+    lateinit var lyricsRepo: LyricsRepository
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -57,6 +60,7 @@ class HiFiApp : Application(), ImageLoaderFactory {
         playlistRepo = PlaylistRepository(this, db, subsonicRepo)
         downloadManager = SonifyDownloadManager(this, db, prefs, subsonicRepo)
         wifiTransferManager = WifiTransferManager(this, db, prefs, usbManager)
+        lyricsRepo = LyricsRepository(this, prefs, subsonicRepo)
         AmbientColorExtractor.init(this, subsonicRepo)
 
         appScope.launch {

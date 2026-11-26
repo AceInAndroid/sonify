@@ -92,6 +92,17 @@ enum class ImmersiveScope(val label: String, val subtitle: String) {
     ),
 }
 
+enum class LyricsFontSize(val label: String, val activeSp: Float, val inactiveSp: Float) {
+    SMALL("紧凑", 19f, 16f),
+    MEDIUM("标准（推荐）", 23f, 18f),
+    LARGE("大字号", 27f, 21f),
+}
+
+enum class LyricsAlignment(val label: String) {
+    LEFT("Spotify 左对齐"),
+    CENTER("经典居中"),
+}
+
 enum class StreamQuality(
     val label: String,
     val subtitle: String,
@@ -186,6 +197,11 @@ data class AppSettings(
     val immersiveHideStatusBar: Boolean = true,
     val immersiveHideNavBar: Boolean = true,
     val immersiveKeepScreenOn: Boolean = false,
+    // 歌词显示与在线匹配
+    val lyricsShowMiniPreview: Boolean = true,
+    val lyricsAutoOnlineSearch: Boolean = true,
+    val lyricsFontSize: LyricsFontSize = LyricsFontSize.MEDIUM,
+    val lyricsAlignment: LyricsAlignment = LyricsAlignment.LEFT,
     // 通知、锁屏与后台
     val lockScreenVinylEnabled: Boolean = true,
     val notifShowAudioSpec: Boolean = true,
@@ -253,6 +269,10 @@ class UserPreferences(private val context: Context) {
         val IMMERSIVE_HIDE_STATUS = booleanPreferencesKey("immersive_hide_status_bar")
         val IMMERSIVE_HIDE_NAV = booleanPreferencesKey("immersive_hide_nav_bar")
         val IMMERSIVE_KEEP_SCREEN_ON = booleanPreferencesKey("immersive_keep_screen_on")
+        val LYRICS_MINI_PREVIEW = booleanPreferencesKey("lyrics_mini_preview")
+        val LYRICS_AUTO_ONLINE = booleanPreferencesKey("lyrics_auto_online")
+        val LYRICS_FONT_SIZE = stringPreferencesKey("lyrics_font_size")
+        val LYRICS_ALIGNMENT = stringPreferencesKey("lyrics_alignment")
         val LOCKSCREEN_VINYL = booleanPreferencesKey("lockscreen_vinyl")
         val NOTIF_SHOW_SPEC = booleanPreferencesKey("notif_show_spec")
         val WAKELOCK = booleanPreferencesKey("wakelock")
@@ -331,6 +351,14 @@ class UserPreferences(private val context: Context) {
                 immersiveHideStatusBar = p[Keys.IMMERSIVE_HIDE_STATUS] ?: true,
                 immersiveHideNavBar = p[Keys.IMMERSIVE_HIDE_NAV] ?: true,
                 immersiveKeepScreenOn = p[Keys.IMMERSIVE_KEEP_SCREEN_ON] ?: false,
+                lyricsShowMiniPreview = p[Keys.LYRICS_MINI_PREVIEW] ?: true,
+                lyricsAutoOnlineSearch = p[Keys.LYRICS_AUTO_ONLINE] ?: true,
+                lyricsFontSize = p[Keys.LYRICS_FONT_SIZE]?.let {
+                    runCatching { LyricsFontSize.valueOf(it) }.getOrNull()
+                } ?: LyricsFontSize.MEDIUM,
+                lyricsAlignment = p[Keys.LYRICS_ALIGNMENT]?.let {
+                    runCatching { LyricsAlignment.valueOf(it) }.getOrNull()
+                } ?: LyricsAlignment.LEFT,
                 lockScreenVinylEnabled = p[Keys.LOCKSCREEN_VINYL] ?: true,
                 notifShowAudioSpec = p[Keys.NOTIF_SHOW_SPEC] ?: true,
                 wakeLockEnabled = p[Keys.WAKELOCK] ?: true,
@@ -501,6 +529,22 @@ class UserPreferences(private val context: Context) {
 
     suspend fun setImmersiveKeepScreenOn(keep: Boolean) {
         context.dataStore.edit { it[Keys.IMMERSIVE_KEEP_SCREEN_ON] = keep }
+    }
+
+    suspend fun setLyricsShowMiniPreview(show: Boolean) {
+        context.dataStore.edit { it[Keys.LYRICS_MINI_PREVIEW] = show }
+    }
+
+    suspend fun setLyricsAutoOnlineSearch(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.LYRICS_AUTO_ONLINE] = enabled }
+    }
+
+    suspend fun setLyricsFontSize(size: LyricsFontSize) {
+        context.dataStore.edit { it[Keys.LYRICS_FONT_SIZE] = size.name }
+    }
+
+    suspend fun setLyricsAlignment(alignment: LyricsAlignment) {
+        context.dataStore.edit { it[Keys.LYRICS_ALIGNMENT] = alignment.name }
     }
 
     suspend fun setLockScreenVinyl(enabled: Boolean) {

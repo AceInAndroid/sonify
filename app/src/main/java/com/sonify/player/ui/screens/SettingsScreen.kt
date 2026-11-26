@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
@@ -82,6 +83,8 @@ import com.sonify.player.data.DarkCanvasStyle
 import com.sonify.player.data.DownloadStorageMode
 import com.sonify.player.data.ImmersiveScope
 import com.sonify.player.data.ImportMode
+import com.sonify.player.data.LyricsAlignment
+import com.sonify.player.data.LyricsFontSize
 import com.sonify.player.data.MinDurationFilter
 import com.sonify.player.data.SampleRatePolicy
 import com.sonify.player.data.StreamQuality
@@ -117,6 +120,8 @@ private enum class ActiveSheet {
     SUBSONIC_CELLULAR_QUALITY,
     DOWNLOAD_STORAGE_MODE,
     DOWNLOAD_QUALITY,
+    LYRICS_FONT_SIZE,
+    LYRICS_ALIGNMENT,
 }
 
 private sealed interface HighVolumeConfirm {
@@ -156,6 +161,8 @@ fun SettingsScreen(
     var showKeepAliveDialog by remember { mutableStateOf(false) }
     var highVolConfirm by remember { mutableStateOf<HighVolumeConfirm?>(null) }
     var coverCacheBytes by remember { mutableStateOf(CoverArtSupport.getCoverCacheSizeBytes(context)) }
+    val appRef = remember { com.sonify.player.HiFiApp.from(context) }
+    var lyricsCacheBytes by remember { mutableStateOf(appRef.lyricsRepo.getCacheSizeBytes()) }
 
     val pm = remember { context.getSystemService(PowerManager::class.java) }
     val ignoringBattery = remember(settings) {
@@ -506,6 +513,44 @@ fun SettingsScreen(
                 onCheckedChange = { scope.launch { prefs.setImmersiveKeepScreenOn(it) } },
             )
         }
+        SettingsSwitchItem(
+            icon = Icons.Rounded.Lyrics,
+            title = "播放页单行歌词预览",
+            subtitle = "在黑胶唱片下方轻盈显示当前演唱句，点击可展开全屏歌词",
+            checked = settings.lyricsShowMiniPreview,
+            onCheckedChange = { scope.launch { prefs.setLyricsShowMiniPreview(it) } },
+        )
+        SettingsSwitchItem(
+            icon = Icons.Rounded.Lyrics,
+            title = "自动在线匹配歌词（LRCLIB）",
+            subtitle = "本地与 Subsonic 无歌词时自动向开源免费库匹配并缓存离线",
+            checked = settings.lyricsAutoOnlineSearch,
+            onCheckedChange = { scope.launch { prefs.setLyricsAutoOnlineSearch(it) } },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Lyrics,
+            title = "歌词字号",
+            subtitle = settings.lyricsFontSize.label,
+            onClick = { activeSheet = ActiveSheet.LYRICS_FONT_SIZE },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Lyrics,
+            title = "歌词排版对齐",
+            subtitle = settings.lyricsAlignment.label,
+            onClick = { activeSheet = ActiveSheet.LYRICS_ALIGNMENT },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Delete,
+            title = "清除歌词缓存",
+            subtitle = if (lyricsCacheBytes <= 0L) "当前无缓存" else {
+                val kb = (lyricsCacheBytes / 1024L).coerceAtLeast(1L)
+                "已占用 $kb KB · 点击清空已下载与缓存的歌词"
+            },
+            onClick = {
+                appRef.lyricsRepo.clearAllCache()
+                lyricsCacheBytes = appRef.lyricsRepo.getCacheSizeBytes()
+            },
+        )
 
         // ==================== 分组 5：通知、锁屏与后台保活 ====================
         SettingsGroupHeader("通知、锁屏与后台保活")
@@ -788,6 +833,22 @@ fun SettingsScreen(
             options = StreamQuality.entries.map { SheetOption(it, it.label, it.subtitle) },
             selected = settings.downloadQuality,
             onSelect = { scope.launch { prefs.setDownloadQuality(it) } },
+            onDismiss = { activeSheet = ActiveSheet.NONE },
+        )
+
+        ActiveSheet.LYRICS_FONT_SIZE -> SpotifyOptionSheet(
+            title = "歌词字号",
+            options = LyricsFontSize.entries.map { SheetOption(it, it.label) },
+            selected = settings.lyricsFontSize,
+            onSelect = { scope.launch { prefs.setLyricsFontSize(it) } },
+            onDismiss = { activeSheet = ActiveSheet.NONE },
+        )
+
+        ActiveSheet.LYRICS_ALIGNMENT -> SpotifyOptionSheet(
+            title = "歌词排版对齐",
+            options = LyricsAlignment.entries.map { SheetOption(it, it.label) },
+            selected = settings.lyricsAlignment,
+            onSelect = { scope.launch { prefs.setLyricsAlignment(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 

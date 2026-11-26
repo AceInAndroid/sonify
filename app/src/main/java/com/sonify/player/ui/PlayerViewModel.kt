@@ -2,6 +2,7 @@ package com.sonify.player.ui
 
 import android.app.Application
 import android.content.ComponentName
+import android.net.Uri
 import android.os.Bundle
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,6 +18,8 @@ import com.sonify.player.audio.ActiveOutputRoute
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.library.ScanState
+import com.sonify.player.lyrics.LyricsDocument
+import com.sonify.player.lyrics.OnlineLyricCandidate
 import com.sonify.player.playback.AudioFocusState
 import com.sonify.player.playback.HiFiPlaybackService
 import com.sonify.player.subsonic.SubsonicUri
@@ -47,6 +50,15 @@ data class PlaybackUiState(
     val contextLabel: String = "音乐库",
 )
 
+data class LyricsUiState(
+    val trackPath: String? = null,
+    val document: LyricsDocument? = null,
+    val isLoading: Boolean = false,
+    val isSearchingOnline: Boolean = false,
+    val searchResults: List<OnlineLyricCandidate> = emptyList(),
+    val searchError: String? = null,
+)
+
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = HiFiApp.from(application)
@@ -69,9 +81,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _playback = MutableStateFlow(PlaybackUiState())
     val playback: StateFlow<PlaybackUiState> = _playback.asStateFlow()
 
+    private val _lyrics = MutableStateFlow(LyricsUiState())
+    val lyrics: StateFlow<LyricsUiState> = _lyrics.asStateFlow()
+
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
     private var progressJob: Job? = null
+    private var lyricsLoadJob: Job? = null
+    private var lyricsSearchJob: Job? = null
 
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -112,7 +129,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         )
                     }
                 }
-                delay(250)
+                delay(150)
             }
         }
     }
@@ -158,6 +175,109 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 shuffleEnabled = player.shuffleModeEnabled,
                 repeatMode = player.repeatMode,
             )
+        }
+
+        if (current != null && _lyrics.value.trackPath != current.path) {
+            loadLyricsForTrack(current, forceOnline = false)
+        } else if (current == null && _lyrics.value.trackPath != null) {
+            _lyrics.value = LyricsUiState()
+        }
+    }
+
+    fun loadLyricsForTrack(track: TrackEntity, forceOnline: Boolean = false) {
+        lyricsLoadJob?.cancel()
+        _lyrics.update {
+            it.copy(
+                trackPath = track.path,
+                document = if (it.trackPath == track.path && !forceOnline) it.document else null,
+                isLoading = true,
+            )
+        }
+        lyricsLoadJob = viewModelScope.launch {
+            val doc = runCatching { app.lyricsRepo.loadLyrics(track, forceOnline) }.getOrNull()
+            if (_lyrics.value.trackPath == track.path) {
+                _lyrics.update { it.copy(document = doc, isLoading = false) }
+            }
+        }
+    }
+
+    fun searchOnlineLyrics(query: String) {
+        lyricsSearchJob?.cancel()
+        val q = query.trim()
+        if (q.isEmpty()) {
+            _lyrics.update { it.copy(isSearchingOnline = false, searchResults = emptyList(), searchError = null) }
+            return
+        }
+        lyricsSearchJob = viewModelScope.launch {
+            _lyrics.update { it.copy(isSearchingOnline = true, searchError = null) }
+            runCatching { app.lyricsRepo.searchOnlineCandidates(q) }
+                .onSuccess { list ->
+                    _lyrics.update { it.copy(isSearchingOnline = false, searchResults = list) }
+                }
+                .onFailure { err ->
+                    _lyrics.update {
+                        it.copy(
+                            isSearchingOnline = false,
+                            searchResults = emptyList(),
+                            searchError = err.message ?: "在线搜词失败，请检查网络连接",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun applyOnlineLyric(track: TrackEntity, candidate: OnlineLyricCandidate, onDone: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            val doc = app.lyricsRepo.applyOnlineCandidate(track, candidate)
+            if (doc != null && _lyrics.value.trackPath == track.path) {
+                _lyrics.update { it.copy(document = doc, isLoading = false) }
+                onDone("已应用在线歌词（${if (doc.isSynced) "同步" else "纯文本"}）")
+            }
+        }
+    }
+
+    fun importLocalLrc(track: TrackEntity, uri: Uri, onDone: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            val doc = app.lyricsRepo.importLocalLrc(track, uri)
+            if (doc != null && _lyrics.value.trackPath == track.path) {
+                _lyrics.update { it.copy(document = doc, isLoading = false) }
+                onDone("已导入本地歌词（${doc.lines.size} 句）")
+            } else {
+                onDone("无法解析所选歌词文件")
+            }
+        }
+    }
+
+    fun adjustLyricsOffset(track: TrackEntity, deltaMs: Long) {
+        viewModelScope.launch {
+            val curOffset = _lyrics.value.document?.offsetMs ?: 0L
+            val next = app.lyricsRepo.setOffset(track.path, curOffset + deltaMs)
+            _lyrics.update { st ->
+                val doc = st.document ?: return@update st
+                if (st.trackPath == track.path) st.copy(document = doc.copy(offsetMs = next)) else st
+            }
+        }
+    }
+
+    fun resetLyricsOffset(track: TrackEntity) {
+        viewModelScope.launch {
+            val next = app.lyricsRepo.setOffset(track.path, 0L)
+            _lyrics.update { st ->
+                val doc = st.document ?: return@update st
+                if (st.trackPath == track.path) st.copy(document = doc.copy(offsetMs = next)) else st
+            }
+        }
+    }
+
+    fun clearLyricsOverride(track: TrackEntity, onDone: (String) -> Unit = {}) {
+        lyricsLoadJob?.cancel()
+        lyricsLoadJob = viewModelScope.launch {
+            _lyrics.update { it.copy(isLoading = true) }
+            val doc = app.lyricsRepo.clearTrackOverride(track)
+            if (_lyrics.value.trackPath == track.path) {
+                _lyrics.update { it.copy(document = doc, isLoading = false) }
+            }
+            onDone("已恢复自动匹配歌词")
         }
     }
 

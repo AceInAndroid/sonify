@@ -228,6 +228,7 @@ private fun HiFiRootScreen(
     val tracks by vm.tracks.collectAsState()
     val remoteCachedTracks by vm.remoteCachedTracks.collectAsState()
     val playback by vm.playback.collectAsState()
+    val lyricsState by vm.lyrics.collectAsState()
     val activeRoute by vm.activeRoute.collectAsState()
     val audioFocusState by vm.audioFocusState.collectAsState()
 
@@ -691,6 +692,21 @@ private fun HiFiRootScreen(
                 isCurrentTrackDownloaded = curPath != null && downloadsByPath.containsKey(curPath),
                 onAddCurrentToPlaylist = { track -> pendingAddTracks = listOf(track) },
                 onDownloadCurrentTrack = { track -> libraryVm.enqueueDownload(listOf(track)) },
+                lyricsState = lyricsState,
+                onAdjustLyricsOffset = vm::adjustLyricsOffset,
+                onResetLyricsOffset = vm::resetLyricsOffset,
+                onChangeLyricsFontSize = { sz -> scope.launch { app.prefs.setLyricsFontSize(sz) } },
+                onChangeLyricsAlignment = { align -> scope.launch { app.prefs.setLyricsAlignment(align) } },
+                onSearchOnlineLyrics = vm::searchOnlineLyrics,
+                onApplyOnlineLyric = { track, cand ->
+                    vm.applyOnlineLyric(track, cand) { msg -> libraryVm.showToast(msg) }
+                },
+                onImportLocalLrc = { track, uri ->
+                    vm.importLocalLrc(track, uri) { msg -> libraryVm.showToast(msg) }
+                },
+                onClearLyricsOverride = { track ->
+                    vm.clearLyricsOverride(track) { msg -> libraryVm.showToast(msg) }
+                },
             )
         }
 

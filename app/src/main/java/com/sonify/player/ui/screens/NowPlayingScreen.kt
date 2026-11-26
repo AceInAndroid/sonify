@@ -1,11 +1,16 @@
 package com.sonify.player.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,6 +48,7 @@ import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.FullscreenExit
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
@@ -84,11 +90,17 @@ import androidx.media3.common.Player
 import com.sonify.player.audio.ActiveOutputRoute
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.CoverStyle
+import com.sonify.player.data.LyricsAlignment
+import com.sonify.player.data.LyricsFontSize
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.data.VolumeMode
+import com.sonify.player.lyrics.LrcParser
+import com.sonify.player.lyrics.OnlineLyricCandidate
 import com.sonify.player.playback.AudioFocusState
 import com.sonify.player.subsonic.SubsonicUri
+import com.sonify.player.ui.LyricsUiState
 import com.sonify.player.ui.PlaybackUiState
+import com.sonify.player.ui.components.LyricsOverlayView
 import com.sonify.player.ui.components.VinylDisc
 import com.sonify.player.ui.theme.AmbientColorExtractor
 import com.sonify.player.ui.theme.LocalHiFiColors
@@ -133,9 +145,30 @@ fun NowPlayingScreen(
     isCurrentTrackDownloaded: Boolean = false,
     onAddCurrentToPlaylist: (TrackEntity) -> Unit = {},
     onDownloadCurrentTrack: (TrackEntity) -> Unit = {},
+    lyricsState: LyricsUiState = LyricsUiState(),
+    onAdjustLyricsOffset: (TrackEntity, Long) -> Unit = { _, _ -> },
+    onResetLyricsOffset: (TrackEntity) -> Unit = {},
+    onChangeLyricsFontSize: (LyricsFontSize) -> Unit = {},
+    onChangeLyricsAlignment: (LyricsAlignment) -> Unit = {},
+    onSearchOnlineLyrics: (String) -> Unit = {},
+    onApplyOnlineLyric: (TrackEntity, OnlineLyricCandidate) -> Unit = { _, _ -> },
+    onImportLocalLrc: (TrackEntity, Uri) -> Unit = { _, _ -> },
+    onClearLyricsOverride: (TrackEntity) -> Unit = {},
 ) {
     val track = playback.currentTrack ?: return
     val colors = LocalHiFiColors.current
+    var showLyrics by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = showLyrics) {
+        showLyrics = false
+    }
+
+    val liveMiniLyric = remember(lyricsState.document, playback.positionMs) {
+        val doc = lyricsState.document ?: return@remember null
+        if (!doc.isSynced || doc.lines.isEmpty()) return@remember null
+        val idx = LrcParser.findActiveIndex(doc.lines, playback.positionMs, doc.offsetMs)
+        if (idx in doc.lines.indices) doc.lines[idx].text else doc.lines.firstOrNull()?.text
+    }
 
     var rawAmbient by remember(track.coverPath) { mutableStateOf(AmbientColorExtractor.DefaultAmbient) }
     LaunchedEffect(track.coverPath, settings.ambientBackground) {
@@ -208,7 +241,8 @@ fun NowPlayingScreen(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
             ) { zenVinylMode = false }
-            .pointerInput(Unit) {
+            .pointerInput(showLyrics) {
+                if (showLyrics) return@pointerInput
                 detectVerticalDragGestures(
                     onDragStart = { verticalDrag = 0f },
                     onVerticalDrag = { _, drag -> verticalDrag += drag },
@@ -221,6 +255,37 @@ fun NowPlayingScreen(
                 )
             }
     ) {
+        Crossfade(
+            targetState = showLyrics,
+            animationSpec = tween(220),
+            label = "vinyl_lyrics_crossfade",
+        ) { inLyrics ->
+            if (inLyrics) {
+                LyricsOverlayView(
+                    track = track,
+                    playback = playback,
+                    lyricsState = lyricsState,
+                    settings = settings,
+                    topAmbientColor = topColor,
+                    onBackToVinyl = { showLyrics = false },
+                    onSeekTo = onSeekTo,
+                    onTogglePlayPause = onTogglePlayPause,
+                    onSkipPrev = onSkipPrev,
+                    onSkipNext = onSkipNext,
+                    onAdjustOffset = { delta -> onAdjustLyricsOffset(track, delta) },
+                    onResetOffset = { onResetLyricsOffset(track) },
+                    onChangeFontSize = onChangeLyricsFontSize,
+                    onChangeAlignment = onChangeLyricsAlignment,
+                    onSearchOnline = onSearchOnlineLyrics,
+                    onApplyCandidate = { cand -> onApplyOnlineLyric(track, cand) },
+                    onImportLocalLrc = { uri -> onImportLocalLrc(track, uri) },
+                    onClearOverride = { onClearLyricsOverride(track) },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(topSafeMod)
+                        .then(bottomSafeMod),
+                )
+            } else {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -403,6 +468,29 @@ fun NowPlayingScreen(
                         }
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                 )
+            }
+
+            // 单行实时歌词预览（开启且有同步歌词时显示，轻点直接切入全屏歌词页）
+            if (settings.lyricsShowMiniPreview && !zenVinylMode && !liveMiniLyric.isNullOrBlank()) {
+                Spacer(Modifier.height(10.dp))
+                AnimatedContent(
+                    targetState = liveMiniLyric,
+                    transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(180)) },
+                    label = "mini_lyric_line",
+                ) { lineText ->
+                    Text(
+                        text = lineText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.78f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .clickable { showLyrics = true }
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
+                }
             }
 
             Spacer(Modifier.weight(if (zenVinylMode) 0.4f else 0.6f))
@@ -697,6 +785,15 @@ fun NowPlayingScreen(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        val hasLyrics = lyricsState.document != null && !lyricsState.document.isEmpty
+                        IconButton(onClick = { showLyrics = true }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Lyrics,
+                                contentDescription = "歌词",
+                                tint = if (hasLyrics) colors.accent else colors.textSecondary,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
                         if (SubsonicUri.isTrackUri(track.path)) {
                             IconButton(
                                 onClick = { if (!isCurrentTrackDownloaded) onDownloadCurrentTrack(track) }
@@ -729,9 +826,11 @@ fun NowPlayingScreen(
                 }
             }
         }
+            }
+        }
 
         // 纯享黑胶态底缘 2dp 极细进度线
-        if (zenVinylMode) {
+        if (zenVinylMode && !showLyrics) {
             LinearProgressIndicator(
                 progress = { progressFrac },
                 color = colors.accent,
