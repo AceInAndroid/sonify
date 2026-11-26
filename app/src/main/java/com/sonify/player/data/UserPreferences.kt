@@ -111,7 +111,9 @@ data class AppSettings(
     val darkCanvasStyle: DarkCanvasStyle = DarkCanvasStyle.SPOTIFY_CHARCOAL,
     val accentStyle: AccentStyle = AccentStyle.VINYL_GOLD,
     val ambientBackground: Boolean = true,
-    // 系统与断点
+    // 通知、锁屏与后台
+    val lockScreenVinylEnabled: Boolean = true,
+    val notifShowAudioSpec: Boolean = true,
     val wakeLockEnabled: Boolean = true,
     val lastTrackPath: String? = null,
     val lastPositionMs: Long = 0L,
@@ -156,6 +158,8 @@ class UserPreferences(private val context: Context) {
         val DARK_CANVAS = stringPreferencesKey("dark_canvas")
         val ACCENT_STYLE = stringPreferencesKey("accent_style")
         val AMBIENT_BG = booleanPreferencesKey("ambient_bg")
+        val LOCKSCREEN_VINYL = booleanPreferencesKey("lockscreen_vinyl")
+        val NOTIF_SHOW_SPEC = booleanPreferencesKey("notif_show_spec")
         val WAKELOCK = booleanPreferencesKey("wakelock")
         val LAST_TRACK_PATH = stringPreferencesKey("last_track_path")
         val LAST_POSITION_MS = longPreferencesKey("last_position_ms")
@@ -210,6 +214,8 @@ class UserPreferences(private val context: Context) {
                     runCatching { AccentStyle.valueOf(it) }.getOrNull()
                 } ?: AccentStyle.VINYL_GOLD,
                 ambientBackground = p[Keys.AMBIENT_BG] ?: true,
+                lockScreenVinylEnabled = p[Keys.LOCKSCREEN_VINYL] ?: true,
+                notifShowAudioSpec = p[Keys.NOTIF_SHOW_SPEC] ?: true,
                 wakeLockEnabled = p[Keys.WAKELOCK] ?: true,
                 lastTrackPath = p[Keys.LAST_TRACK_PATH],
                 lastPositionMs = p[Keys.LAST_POSITION_MS] ?: 0L,
@@ -334,6 +340,14 @@ class UserPreferences(private val context: Context) {
 
     suspend fun setAmbientBackground(enabled: Boolean) {
         context.dataStore.edit { it[Keys.AMBIENT_BG] = enabled }
+    }
+
+    suspend fun setLockScreenVinyl(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.LOCKSCREEN_VINYL] = enabled }
+    }
+
+    suspend fun setNotifShowAudioSpec(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.NOTIF_SHOW_SPEC] = enabled }
     }
 
     suspend fun setWakeLock(enabled: Boolean) {

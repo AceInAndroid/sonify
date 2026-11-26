@@ -240,6 +240,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.IO) {
             val next = !track.isFavorite
             app.db.trackDao().setFavorite(track.path, next)
+            HiFiPlaybackService.instance?.notifyFavoriteChanged(track.path, next)
             _playback.update { st ->
                 if (st.currentTrack?.path == track.path) {
                     st.copy(currentTrack = st.currentTrack.copy(isFavorite = next))

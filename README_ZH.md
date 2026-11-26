@@ -59,7 +59,7 @@
 - **真·无缝播放（Gapless）**：同采样率连续曲目保持 USB 流与时钟不断开直接续流。
 - **防爆音淡入淡出**：暂停、恢复、拖动进度与切率时施加 5 ms 平滑淡变。
 - **高速无损扫描与 Room 入库**：自研二进制头解析 FLAC（`STREAMINFO`/`VORBIS_COMMENT`/`PICTURE`）与 WAV（`fmt `/`data`/`LIST INFO`），支持内嵌与目录封面匹配、增量扫描去重与 SAF 导入。
-- **后台稳态播放**：`MediaSessionService` 前台服务、耳机/USB 拔出自动暂停、每曲断点记忆与播放期按需 `WakeLock`。
+- **后台、锁屏与通知栏体验**：`MediaSessionService` 前台服务、Spotify 风格 5 键通知栏（`♡ 收藏 · ⏮ · ⏯ · ⏭ · 🔁 循环`）+ 实时 HiFi 协商规格副标题 + 跨进程 `512×512` 高清封面加载、专属 **黑胶锁屏界面**（基于 `USE_FULL_SCREEN_INTENT` 零悬浮窗权限）、USB 事件线程 `nice = -16` 音频高优先级防息屏爆音、耳机/USB 拔出自动暂停、线控一键断点续播与按需 `WakeLock`。
 
 ---
 

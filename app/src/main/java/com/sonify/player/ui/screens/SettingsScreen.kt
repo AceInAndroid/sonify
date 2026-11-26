@@ -31,7 +31,9 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Speed
@@ -125,6 +127,7 @@ fun SettingsScreen(
 
     var activeSheet by remember { mutableStateOf(ActiveSheet.NONE) }
     var showDirsDialog by remember { mutableStateOf(false) }
+    var showKeepAliveDialog by remember { mutableStateOf(false) }
     var highVolConfirm by remember { mutableStateOf<HighVolumeConfirm?>(null) }
 
     val pm = remember { context.getSystemService(PowerManager::class.java) }
@@ -348,9 +351,34 @@ fun SettingsScreen(
             onCheckedChange = { scope.launch { prefs.setAmbientBackground(it) } },
         )
 
-        // ==================== 分组 5：系统与后台 ====================
-        SettingsGroupHeader("系统与后台保活")
+        // ==================== 分组 5：通知、锁屏与后台保活 ====================
+        SettingsGroupHeader("通知、锁屏与后台保活")
 
+        SettingsSwitchItem(
+            icon = Icons.Rounded.Lock,
+            title = "启用黑胶锁屏界面",
+            subtitle = "播放时熄屏再亮屏呈现 Sonify 黑胶锁屏页，上滑即可退出",
+            checked = settings.lockScreenVinylEnabled,
+            onCheckedChange = { scope.launch { prefs.setLockScreenVinyl(it) } },
+        )
+        SettingsSwitchItem(
+            icon = Icons.Rounded.Notifications,
+            title = "通知栏显示 HiFi 音频规格",
+            subtitle = "在通知栏与原生锁屏实时显示 USB 独占采样率/位深",
+            checked = settings.notifShowAudioSpec,
+            onCheckedChange = { scope.launch { prefs.setNotifShowAudioSpec(it) } },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Notifications,
+            title = "系统通知栏权限设置",
+            subtitle = "确保锁屏与通知栏媒体控制常驻不被系统隐藏",
+            onClick = {
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                }
+                runCatching { context.startActivity(intent) }
+            },
+        )
         SettingsSelectItem(
             icon = Icons.Rounded.BatteryChargingFull,
             title = "后台电池优化白名单",
@@ -370,10 +398,16 @@ fun SettingsScreen(
                 }
             },
         )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Info,
+            title = "息屏防杀后台保活指引",
+            subtitle = "查看各品牌手机后台不中断设置建议",
+            onClick = { showKeepAliveDialog = true },
+        )
         SettingsSwitchItem(
             icon = Icons.Rounded.BatteryChargingFull,
             title = "播放时保持 CPU 唤醒（WakeLock）",
-            subtitle = "息屏持续发包不卡顿，暂停立即释放省电",
+            subtitle = "配合音频高优先级调度，息屏持续发包零欠载，暂停自动释放",
             checked = settings.wakeLockEnabled,
             onCheckedChange = { scope.launch { prefs.setWakeLock(it) } },
         )
@@ -607,6 +641,31 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { highVolConfirm = null }) {
                     Text("取消", color = colors.textPrimary)
+                }
+            },
+        )
+    }
+
+    if (showKeepAliveDialog) {
+        AlertDialog(
+            onDismissRequest = { showKeepAliveDialog = false },
+            containerColor = colors.surface1,
+            titleContentColor = colors.textPrimary,
+            textContentColor = colors.textSecondary,
+            title = { Text("后台息屏保活建议", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = "为了保证息屏连续播放 USB 独占无损音频不断流，建议完成以下 3 步：\n\n" +
+                        "1. 开启本页「后台电池优化白名单」（设为无限制）。\n" +
+                        "2. 在系统应用管理中允许 Sonify「后台高耗电 / 自启动」。\n" +
+                        "3. 在最近任务列表中下拉或长按锁定 Sonify 卡片，防止一键清理误杀。\n\n" +
+                        "（注：Sonify 已自动为 USB 音频线程启用高优先级调度与播放期 WakeLock。）",
+                    fontSize = 13.sp,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showKeepAliveDialog = false }) {
+                    Text("知道了", color = colors.accent)
                 }
             },
         )

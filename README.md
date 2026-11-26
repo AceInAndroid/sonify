@@ -59,7 +59,7 @@
 - **Gapless Playback**: Reuses the active USB isochronous stream without tearing down alt settings or clocks between same-sample-rate tracks.
 - **Click-Free Transitions**: 5 ms smooth fade-in / fade-out on pause, resume, seek, and sample-rate switching.
 - **Ultra-Fast Lossless Metadata Scanner**: Custom binary header parser for FLAC (`STREAMINFO`, `VORBIS_COMMENT`, embedded `PICTURE`) and WAV (`fmt`, `data`, `LIST/INFO`) with local folder cover fallback and incremental fingerprinting via Room.
-- **Background Playback Reliability**: `MediaSessionService` foreground service, headphone/USB unplug auto-pause, per-track resume position memory, and smart `WakeLock`.
+- **Background Playback Reliability**: `MediaSessionService` foreground service, Spotify-style 5-button notification (`♡ Favorite · ⏮ · ⏯ · ⏭ · 🔁 Repeat`) with live HiFi output spec subtitle and in-process `512×512` artwork loader, dedicated **Vinyl Lockscreen** (`LockScreenActivity` via `USE_FULL_SCREEN_INTENT`), `nice = -16` audio-priority USB event loop for glitch-free screen-off playback, headphone/USB unplug auto-pause, headset button resumption (`onPlaybackResumption`), and smart `WakeLock`.
 
 ---
 

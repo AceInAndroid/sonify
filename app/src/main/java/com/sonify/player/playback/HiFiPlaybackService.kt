@@ -1,15 +1,20 @@
 package com.sonify.player.playback
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.util.Log
 import androidx.annotation.OptIn
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -20,19 +25,26 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaSession.MediaItemsWithStartPosition
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
+import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 import com.sonify.player.HiFiApp
+import com.sonify.player.MainActivity
+import com.sonify.player.R
 import com.sonify.player.audio.ActiveOutputRoute
 import com.sonify.player.audio.HiFiRenderersFactory
 import com.sonify.player.audio.HybridAudioSink
 import com.sonify.player.data.PlaybackPositionEntity
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.data.VolumeMode
+import com.sonify.player.ui.lockscreen.LockScreenActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,17 +54,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * 前台后台播放核心服务（MediaSessionService）：
- * - 持有自定义 RenderersFactory + HybridAudioSink 的 ExoPlayer
- * - 监听耳机拔出（ACTION_AUDIO_BECOMING_NOISY）与 USB DAC 拔出，自动暂停
- * - 播放时每 5 秒 + 暂停/切歌时保存断点记忆
- * - 仅在播放时按设置持 PARTIAL_WAKE_LOCK，暂停立即释放
- * - 支持运行时无缝重绑输出路由（USB 独占 <-> 本机输出 / 修改采样率与位深立即生效）
+ * 前台/后台播放核心服务（MediaSessionService）：
+ * - 自定义 Spotify 风格 5 键通知栏（♡ ⏮ ⏯ ⏭ 🔁）+ 实时 HiFi 协商规格副标题 + 跨进程高清封面
+ * - 点击通知栏直达全屏黑胶播放页
+ * - 熄屏播放中静默就位 Sonify 专属黑胶锁屏界面（无需悬浮窗权限、息屏不耗电）
+ * - 支持蓝牙/耳机线控唤醒断点续播（onPlaybackResumption）
+ * - 监听耳机/USB 拔出自动暂停、每 5 秒/暂停/切歌保存断点、按需 PARTIAL_WAKE_LOCK
  */
 @OptIn(UnstableApi::class)
 class HiFiPlaybackService : MediaSessionService() {
@@ -68,6 +81,9 @@ class HiFiPlaybackService : MediaSessionService() {
     private var positionSaveJob: Job? = null
     private var statsPollJob: Job? = null
 
+    @Volatile
+    private var currentTrackIsFavorite: Boolean = false
+
     private val noisyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
@@ -80,9 +96,26 @@ class HiFiPlaybackService : MediaSessionService() {
         }
     }
 
+    private val screenOffReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_SCREEN_OFF) {
+                val app = HiFiApp.from(this@HiFiPlaybackService)
+                if (app.prefs.current.lockScreenVinylEnabled &&
+                    player.isPlaying &&
+                    player.mediaItemCount > 0
+                ) {
+                    launchVinylLockScreen()
+                }
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         val app = HiFiApp.from(this)
+
+        // 注册 Spotify 风格 5 键通知栏 Provider（含黑胶单色小图标）
+        setMediaNotificationProvider(SonifyMediaNotificationProvider(this))
 
         hybridSink = HybridAudioSink(this, app.usbManager, app.prefs, app.volumeController)
         val renderersFactory = HiFiRenderersFactory(this, hybridSink)
@@ -98,12 +131,27 @@ class HiFiPlaybackService : MediaSessionService() {
 
         player.addListener(playerListener)
 
-        // ★ 用远程音量代理包装 ExoPlayer：后台/息屏按手机物理音量键时自动接管为 USB 独占护耳音量
+        // 用远程音量 + 实时 HiFi 元数据代理包装 ExoPlayer
         sessionPlayer = UsbVolumeForwardingPlayer(player, app)
 
+        val openPlayerIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_OPEN_NOW_PLAYING, true)
+        }
+        val sessionActivityPi = PendingIntent.getActivity(
+            this,
+            1001,
+            openPlayerIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
         mediaSession = MediaSession.Builder(this, sessionPlayer)
+            .setSessionActivity(sessionActivityPi)
+            .setBitmapLoader(SonifyBitmapLoader(this))
             .setCallback(sessionCallback)
             .build()
+
+        updateNotificationCustomLayout()
 
         app.volumeController.onVolumeChangedCallback = { vol ->
             serviceScope.launch {
@@ -111,11 +159,25 @@ class HiFiPlaybackService : MediaSessionService() {
             }
         }
 
-        // 暴露活跃路由流给 UI
+        // 暴露活跃路由流并刷新通知栏 HiFi 规格
         serviceScope.launch {
             hybridSink.activeRoute.collect { route ->
                 _activeRouteFlow.value = route
                 sessionPlayer.notifyDeviceInfoChanged()
+                sessionPlayer.notifyMediaMetadataChanged()
+            }
+        }
+
+        // USB 协商状态变化（采样率/位深切换）实时更新通知栏 HiFi 规格副标题
+        serviceScope.launch {
+            var lastRate = -1
+            var lastBits = -1
+            app.usbManager.state.collect { st ->
+                if (st.stats.rate != lastRate || st.stats.bits != lastBits) {
+                    lastRate = st.stats.rate
+                    lastBits = st.stats.bits
+                    sessionPlayer.notifyMediaMetadataChanged()
+                }
             }
         }
 
@@ -132,7 +194,7 @@ class HiFiPlaybackService : MediaSessionService() {
             }
         }
 
-        // 监听 USB DAC 新连接：若开启 USB 独占，当前未播放或正在播则自动切到 USB DAC
+        // 监听 USB DAC 新连接：若开启 USB 独占，自动切到 USB DAC
         serviceScope.launch {
             app.usbManager.connectedEvents.collect {
                 if (app.prefs.current.usbExclusiveEnabled && player.mediaItemCount > 0) {
@@ -141,11 +203,12 @@ class HiFiPlaybackService : MediaSessionService() {
             }
         }
 
-        // 监听音量模式 / 护耳保护策略变化实时同步到 USB 音量中枢
+        // 监听音量/护耳/通知规格显示开关变化
         serviceScope.launch {
             app.prefs.settings.collect {
                 app.volumeController.onProtectionPolicyChanged()
                 sessionPlayer.notifyDeviceInfoChanged()
+                sessionPlayer.notifyMediaMetadataChanged()
             }
         }
 
@@ -153,7 +216,13 @@ class HiFiPlaybackService : MediaSessionService() {
             this,
             noisyReceiver,
             IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
-            ContextCompat.RECEIVER_NOT_EXPORTED
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        ContextCompat.registerReceiver(
+            this,
+            screenOffReceiver,
+            IntentFilter(Intent.ACTION_SCREEN_OFF),
+            ContextCompat.RECEIVER_EXPORTED,
         )
 
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -169,6 +238,7 @@ class HiFiPlaybackService : MediaSessionService() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         saveCurrentPositionImmediate()
+        // 播放中划掉多任务卡片继续在后台运行；仅在暂停或无曲目时退出服务
         if (!player.playWhenReady || player.mediaItemCount == 0) {
             stopSelf()
         }
@@ -182,6 +252,7 @@ class HiFiPlaybackService : MediaSessionService() {
         positionSaveJob?.cancel()
         statsPollJob?.cancel()
         runCatching { unregisterReceiver(noisyReceiver) }
+        runCatching { unregisterReceiver(screenOffReceiver) }
         mediaSession?.release()
         mediaSession = null
         player.removeListener(playerListener)
@@ -204,6 +275,102 @@ class HiFiPlaybackService : MediaSessionService() {
         player.playWhenReady = autoResume
     }
 
+    /** 通知栏与 App 内收藏同步后调用，即时刷新通知栏心形图标 */
+    fun notifyFavoriteChanged(trackPath: String, isFavorite: Boolean) {
+        if (player.currentMediaItem?.mediaId == trackPath) {
+            currentTrackIsFavorite = isFavorite
+            updateNotificationCustomLayout()
+        }
+    }
+
+    private fun refreshFavoriteStateForCurrentTrack() {
+        val path = player.currentMediaItem?.mediaId ?: return
+        val app = HiFiApp.from(this)
+        serviceScope.launch(Dispatchers.IO) {
+            val fav = app.db.trackDao().findByPath(path)?.isFavorite == true
+            serviceScope.launch(Dispatchers.Main.immediate) {
+                currentTrackIsFavorite = fav
+                updateNotificationCustomLayout()
+            }
+        }
+    }
+
+    private fun updateNotificationCustomLayout() {
+        val session = mediaSession ?: return
+        val favButton = CommandButton.Builder()
+            .setSessionCommand(SessionCommand(CMD_TOGGLE_FAVORITE, Bundle.EMPTY))
+            .setIconResId(
+                if (currentTrackIsFavorite) R.drawable.ic_notif_favorite_filled
+                else R.drawable.ic_notif_favorite_outline
+            )
+            .setDisplayName(if (currentTrackIsFavorite) "取消收藏" else "收藏")
+            .build()
+
+        val (repeatIcon, repeatLabel) = when (player.repeatMode) {
+            Player.REPEAT_MODE_ALL -> R.drawable.ic_notif_repeat_all to "列表循环"
+            Player.REPEAT_MODE_ONE -> R.drawable.ic_notif_repeat_one to "单曲循环"
+            else -> R.drawable.ic_notif_repeat_off to "顺序播放"
+        }
+        val repeatButton = CommandButton.Builder()
+            .setSessionCommand(SessionCommand(CMD_CYCLE_REPEAT, Bundle.EMPTY))
+            .setIconResId(repeatIcon)
+            .setDisplayName(repeatLabel)
+            .build()
+
+        session.setCustomLayout(ImmutableList.of(favButton, repeatButton))
+    }
+
+    private fun launchVinylLockScreen() {
+        runCatching {
+            val intent = Intent(this, LockScreenActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_NO_ANIMATION
+            }
+            val pi = PendingIntent.getActivity(
+                this,
+                LOCKSCREEN_NOTIF_ID,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
+            // Android 10+ 后台启动限制（BAL）会拦截熄屏后直接 startActivity，
+            // 使用静默高优先级 FullScreenIntent 通道官方合规唤起黑胶锁屏界面，
+            // LockScreenActivity 启动后会立即撤销该触发通知，不污染通知栏。
+            val nm = getSystemService(NotificationManager::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
+                val ch = NotificationChannel(
+                    LOCKSCREEN_CHANNEL_ID,
+                    "Sonify 黑胶锁屏",
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    setSound(null, null)
+                    enableVibration(false)
+                    enableLights(false)
+                    lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+                }
+                nm.createNotificationChannel(ch)
+            }
+
+            val notif = NotificationCompat.Builder(this, LOCKSCREEN_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_sonify_notification)
+                .setContentTitle(player.currentMediaItem?.mediaMetadata?.title ?: "Sonify")
+                .setContentText("黑胶锁屏播放中")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setSilent(true)
+                .setAutoCancel(true)
+                .setFullScreenIntent(pi, true)
+                .build()
+
+            nm?.notify(LOCKSCREEN_NOTIF_ID, notif)
+            Log.i(TAG, "已通过 FullScreenIntent 触发黑胶锁屏界面")
+        }.onFailure {
+            Log.w(TAG, "启动黑胶锁屏界面失败: ${it.message}")
+        }
+    }
+
     private val sessionCallback = object : MediaSession.Callback {
         override fun onConnect(
             session: MediaSession,
@@ -212,6 +379,8 @@ class HiFiPlaybackService : MediaSessionService() {
             val base = super.onConnect(session, controller)
             val cmds = base.availableSessionCommands.buildUpon()
                 .add(SessionCommand(CMD_REBIND_ROUTE, Bundle.EMPTY))
+                .add(SessionCommand(CMD_TOGGLE_FAVORITE, Bundle.EMPTY))
+                .add(SessionCommand(CMD_CYCLE_REPEAT, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.accept(cmds, base.availablePlayerCommands)
         }
@@ -222,11 +391,65 @@ class HiFiPlaybackService : MediaSessionService() {
             customCommand: SessionCommand,
             args: Bundle,
         ): ListenableFuture<SessionResult> {
-            if (customCommand.customAction == CMD_REBIND_ROUTE) {
-                rebindOutputRoute()
-                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            when (customCommand.customAction) {
+                CMD_REBIND_ROUTE -> {
+                    rebindOutputRoute()
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+
+                CMD_TOGGLE_FAVORITE -> {
+                    val path = player.currentMediaItem?.mediaId
+                    if (!path.isNullOrBlank()) {
+                        val next = !currentTrackIsFavorite
+                        currentTrackIsFavorite = next
+                        updateNotificationCustomLayout()
+                        val app = HiFiApp.from(this@HiFiPlaybackService)
+                        serviceScope.launch(Dispatchers.IO) {
+                            app.db.trackDao().setFavorite(path, next)
+                        }
+                    }
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+
+                CMD_CYCLE_REPEAT -> {
+                    player.repeatMode = when (player.repeatMode) {
+                        Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                        Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                        else -> Player.REPEAT_MODE_OFF
+                    }
+                    updateNotificationCustomLayout()
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
             }
             return super.onCustomCommand(session, controller, customCommand, args)
+        }
+
+        /** 耳机线控 / 蓝牙按键 / 系统锁屏媒体卡片在进程重启后一键恢复上次断点续播 */
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): ListenableFuture<MediaItemsWithStartPosition> {
+            val future = SettableFuture.create<MediaItemsWithStartPosition>()
+            val app = HiFiApp.from(this@HiFiPlaybackService)
+            serviceScope.launch(Dispatchers.IO) {
+                try {
+                    val allTracks = app.db.trackDao().observeAll().first()
+                    if (allTracks.isEmpty()) {
+                        future.setException(IllegalStateException("媒体库为空"))
+                        return@launch
+                    }
+                    val lastPath = app.prefs.current.lastTrackPath
+                    val startIdx = allTracks.indexOfFirst { it.path == lastPath }.coerceAtLeast(0)
+                    val startPos = if (lastPath != null && allTracks[startIdx].path == lastPath) {
+                        app.prefs.current.lastPositionMs.coerceAtLeast(0L)
+                    } else 0L
+                    val items = allTracks.map { trackToMediaItem(it) }
+                    future.set(MediaItemsWithStartPosition(items, startIdx, startPos))
+                } catch (t: Throwable) {
+                    future.setException(t)
+                }
+            }
+            return future
         }
     }
 
@@ -248,7 +471,13 @@ class HiFiPlaybackService : MediaSessionService() {
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             saveCurrentPositionImmediate()
+            refreshFavoriteStateForCurrentTrack()
             HiFiApp.from(this@HiFiPlaybackService).usbManager.refreshStats()
+            sessionPlayer.notifyMediaMetadataChanged()
+        }
+
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            updateNotificationCustomLayout()
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -295,7 +524,7 @@ class HiFiPlaybackService : MediaSessionService() {
     private fun acquireWakeLock() {
         runCatching {
             val wl = wakeLock ?: return
-            if (!wl.isHeld) wl.acquire(6 * 60 * 60 * 1000L) // 最长 6 小时保底
+            if (!wl.isHeld) wl.acquire(6 * 60 * 60 * 1000L)
         }
     }
 
@@ -309,6 +538,11 @@ class HiFiPlaybackService : MediaSessionService() {
     companion object {
         private const val TAG = "HiFiService"
         const val CMD_REBIND_ROUTE = "com.sonify.player.CMD_REBIND_ROUTE"
+        const val CMD_TOGGLE_FAVORITE = "com.sonify.player.CMD_TOGGLE_FAVORITE"
+        const val CMD_CYCLE_REPEAT = "com.sonify.player.CMD_CYCLE_REPEAT"
+        const val EXTRA_OPEN_NOW_PLAYING = "com.sonify.player.EXTRA_OPEN_NOW_PLAYING"
+        const val LOCKSCREEN_CHANNEL_ID = "sonify_lockscreen_trigger"
+        const val LOCKSCREEN_NOTIF_ID = 2026
 
         @Volatile
         var instance: HiFiPlaybackService? = null
@@ -338,10 +572,10 @@ class HiFiPlaybackService : MediaSessionService() {
 }
 
 /**
- * 远程音量 ForwardingPlayer：
- * - USB 独占开启且已连 DAC（非固定直通）时，向系统 MediaSession 声明 PLAYBACK_TYPE_REMOTE (0..100)，
- *   令息屏/后台时的物理音量键自动走 UsbVolumeController（并严格受护耳上限约束）；
- * - 切回本机输出时返回 PLAYBACK_TYPE_LOCAL，恢复原生 Android 系统音量。
+ * 远程音量 + 实时 HiFi 规格元数据 ForwardingPlayer：
+ * 1. USB 独占开启且已连 DAC（非固定直通）时，向系统 MediaSession 声明 PLAYBACK_TYPE_REMOTE (0..100)，
+ *    令息屏/后台时的物理音量键自动走 UsbVolumeController（严格受护耳上限约束）；
+ * 2. 动态把实时 HiFi 协商规格（如 "USB 独占 · 44.1k/32b"）注入通知栏与原生锁屏卡片的 artist/subtitle。
  */
 @OptIn(UnstableApi::class)
 private class UsbVolumeForwardingPlayer(
@@ -364,6 +598,33 @@ private class UsbVolumeForwardingPlayer(
     override fun removeListener(listener: Player.Listener) {
         externalListeners.remove(listener)
         super.removeListener(listener)
+    }
+
+    override fun getMediaMetadata(): MediaMetadata {
+        val base = super.getMediaMetadata()
+        val settings = app.prefs.current
+        val usbSt = app.usbManager.state.value
+        val route = HiFiPlaybackService.activeRouteFlow.value
+
+        val specBadge = SonifyNotificationFormat.formatSpecBadge(
+            activeRoute = route,
+            usbConnected = usbSt.isConnected,
+            stats = usbSt.stats,
+            deviceName = usbSt.deviceDisplayName,
+        )
+        val rawArtist = base.artist?.toString().orEmpty()
+        val rawAlbum = base.albumTitle?.toString().orEmpty()
+        val enrichedArtist = SonifyNotificationFormat.formatArtistLine(
+            artist = rawArtist,
+            album = rawAlbum,
+            showSpec = settings.notifShowAudioSpec,
+            specBadge = specBadge,
+        )
+
+        return base.buildUpon()
+            .setArtist(enrichedArtist)
+            .setSubtitle(if (settings.notifShowAudioSpec) specBadge else rawAlbum)
+            .build()
     }
 
     override fun getAvailableCommands(): Player.Commands {
@@ -442,6 +703,11 @@ private class UsbVolumeForwardingPlayer(
     fun notifyDeviceInfoChanged() {
         val info = getDeviceInfo()
         externalListeners.toList().forEach { it.onDeviceInfoChanged(info) }
+    }
+
+    fun notifyMediaMetadataChanged() {
+        val meta = getMediaMetadata()
+        externalListeners.toList().forEach { it.onMediaMetadataChanged(meta) }
     }
 
     fun notifyVolumeChanged(percent: Int) {

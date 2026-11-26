@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <sys/resource.h>
 #include <sys/time.h>
 
 // ---------------------------------------------------------------------------
@@ -276,6 +277,14 @@ void LIBUSB_CALL UacStream::onTransfer(libusb_transfer *t) {
 }
 
 void UacStream::eventLoop() {
+    // 提升 USB 等时事件线程调度优先级（等同 ANDROID_PRIORITY_URGENT_AUDIO），
+    // 防止手机息屏进入低功耗调度后 125µs microframe 回调抖动引发欠载爆音
+    if (setpriority(PRIO_PROCESS, 0, -16) == 0) {
+        LOGI("USB 事件线程优先级已提升 (nice=-16)");
+    } else {
+        LOGW("USB 事件线程优先级提升受限，使用默认调度优先级继续");
+    }
+
     while (running_.load() || inFlight_.load() > 0) {
         struct timeval tv;
         tv.tv_sec  = 0;

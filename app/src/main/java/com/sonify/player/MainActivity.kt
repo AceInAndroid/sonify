@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.sonify.player.playback.HiFiPlaybackService
 import com.sonify.player.ui.PlayerViewModel
 import com.sonify.player.ui.components.MiniPlayerBar
 import com.sonify.player.ui.components.OutputDeviceSheet
@@ -81,9 +82,13 @@ private enum class MainTab(val label: String, val icon: ImageVector) {
 class MainActivity : ComponentActivity() {
 
     private val vm: PlayerViewModel by viewModels()
+    private val openPlayerTrigger = mutableStateOf(0L)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent?.getBooleanExtra(HiFiPlaybackService.EXTRA_OPEN_NOW_PLAYING, false) == true) {
+            openPlayerTrigger.value = System.currentTimeMillis()
+        }
         setContent {
             val settings by vm.settings.collectAsState()
             HiFiPlayerTheme(
@@ -94,9 +99,16 @@ class MainActivity : ComponentActivity() {
                     color = LocalHiFiColors.current.canvas,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    HiFiRootScreen(vm)
+                    HiFiRootScreen(vm, openPlayerTrigger.value)
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(HiFiPlaybackService.EXTRA_OPEN_NOW_PLAYING, false)) {
+            openPlayerTrigger.value = System.currentTimeMillis()
         }
     }
 
@@ -125,7 +137,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun HiFiRootScreen(vm: PlayerViewModel) {
+private fun HiFiRootScreen(vm: PlayerViewModel, openPlayerTrigger: Long) {
     val context = LocalContext.current
     val app = remember { HiFiApp.from(context) }
     val scope = rememberCoroutineScope()
@@ -143,6 +155,13 @@ private fun HiFiRootScreen(vm: PlayerViewModel) {
     var showNowPlaying by remember { mutableStateOf(false) }
     var showOutputSheet by remember { mutableStateOf(false) }
     var hasStoragePermission by remember { mutableStateOf(checkStoragePermission(context)) }
+
+    // 点击通知栏或从黑胶锁屏页解锁进入时自动展开全屏黑胶播放页
+    LaunchedEffect(openPlayerTrigger) {
+        if (openPlayerTrigger > 0L) {
+            showNowPlaying = true
+        }
+    }
 
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
