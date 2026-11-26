@@ -80,11 +80,15 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    // Media3 (ExoPlayer + MediaSessionService)
+    // Media3 (ExoPlayer + MediaSessionService + OkHttp DataSource for Subsonic streaming)
     val media3Version = "1.4.1"
     implementation("androidx.media3:media3-exoplayer:$media3Version")
     implementation("androidx.media3:media3-session:$media3Version")
     implementation("androidx.media3:media3-common:$media3Version")
+    implementation("androidx.media3:media3-datasource-okhttp:$media3Version")
+
+    // Networking (Subsonic / OpenSubsonic REST API & streaming)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // Room
     val roomVersion = "2.6.1"
@@ -102,6 +106,7 @@ dependencies {
     // Unit tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.json:json:20240303")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

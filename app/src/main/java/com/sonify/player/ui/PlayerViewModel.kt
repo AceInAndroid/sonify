@@ -19,6 +19,7 @@ import com.sonify.player.data.TrackEntity
 import com.sonify.player.library.ScanState
 import com.sonify.player.playback.AudioFocusState
 import com.sonify.player.playback.HiFiPlaybackService
+import com.sonify.player.subsonic.SubsonicUri
 import com.sonify.player.usb.UsbConnectionState
 import com.sonify.player.usb.VolumeHudState
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +60,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     val tracks: StateFlow<List<TrackEntity>> = app.db.trackDao().observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val remoteCachedTracks: StateFlow<List<TrackEntity>> = app.subsonicRepo.cachedTracks
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private var activeQueueByPath: Map<String, TrackEntity> = emptyMap()
 
     private val _playback = MutableStateFlow(PlaybackUiState())
     val playback: StateFlow<PlaybackUiState> = _playback.asStateFlow()
@@ -112,7 +118,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun syncFromPlayer(player: Player) {
-        val allByPath = tracks.value.associateBy { it.path }
+        val allByPath = buildMap<String, TrackEntity> {
+            remoteCachedTracks.value.forEach { put(it.path, it) }
+            tracks.value.forEach { put(it.path, it) }
+            activeQueueByPath.forEach { (k, v) -> putIfAbsent(k, v) }
+        }
         val count = player.mediaItemCount
         val queue = buildList(count) {
             for (i in 0 until count) {
@@ -166,6 +176,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             app.usbManager.tryAutoConnectPermitted()
         }
 
+        activeQueueByPath = queue.associateBy { it.path }
         _playback.update { it.copy(contextLabel = contextLabel) }
         val items: List<MediaItem> = queue.map { HiFiPlaybackService.trackToMediaItem(it) }
         ctrl.setMediaItems(items, safeIdx, startPositionMs.coerceAtLeast(0L))
@@ -241,8 +252,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun toggleFavorite(track: TrackEntity) {
         viewModelScope.launch(Dispatchers.IO) {
             val next = !track.isFavorite
-            app.db.trackDao().setFavorite(track.path, next)
+            if (SubsonicUri.isTrackUri(track.path)) {
+                app.subsonicRepo.toggleRemoteFavorite(track.path, next)
+            } else {
+                app.db.trackDao().setFavorite(track.path, next)
+            }
             HiFiPlaybackService.instance?.notifyFavoriteChanged(track.path, next)
+            activeQueueByPath = activeQueueByPath.toMutableMap().apply {
+                this[track.path] = track.copy(isFavorite = next)
+            }
             _playback.update { st ->
                 if (st.currentTrack?.path == track.path) {
                     st.copy(currentTrack = st.currentTrack.copy(isFavorite = next))

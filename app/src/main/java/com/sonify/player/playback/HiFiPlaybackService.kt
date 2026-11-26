@@ -24,7 +24,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSession.MediaItemsWithStartPosition
@@ -44,6 +46,8 @@ import com.sonify.player.audio.HybridAudioSink
 import com.sonify.player.data.PlaybackPositionEntity
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.data.VolumeMode
+import com.sonify.player.subsonic.SubsonicDataSourceFactory
+import com.sonify.player.subsonic.SubsonicUri
 import com.sonify.player.ui.lockscreen.LockScreenActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -84,6 +88,8 @@ class HiFiPlaybackService : MediaSessionService() {
 
     @Volatile
     private var currentTrackIsFavorite: Boolean = false
+    private var scrobbledNowPlayingPath: String? = null
+    private var scrobbledSubmittedPath: String? = null
 
     private val noisyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -127,8 +133,20 @@ class HiFiPlaybackService : MediaSessionService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
+        val dataSourceFactory = SubsonicDataSourceFactory(this, app.subsonicRepo, app.prefs)
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 20_000,
+                /* maxBufferMs = */ 60_000,
+                /* bufferForPlaybackMs = */ 2_500,
+                /* bufferForPlaybackAfterRebufferMs = */ 5_000,
+            )
+            .build()
+
         // 禁用 ExoPlayer 内置简易焦点，改由 AudioFocusController 统一接管（兼容 USB 独占 Ducking / 抢占 / 恢复）
         player = ExoPlayer.Builder(this, renderersFactory)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .setLoadControl(loadControl)
             .setAudioAttributes(audioAttrs, /* handleAudioFocus= */ false)
             .build()
 
@@ -180,7 +198,7 @@ class HiFiPlaybackService : MediaSessionService() {
 
         mediaSession = MediaSession.Builder(this, sessionPlayer)
             .setSessionActivity(sessionActivityPi)
-            .setBitmapLoader(SonifyBitmapLoader(this))
+            .setBitmapLoader(SonifyBitmapLoader(this, app.subsonicRepo))
             .setCallback(sessionCallback)
             .build()
 
@@ -328,7 +346,11 @@ class HiFiPlaybackService : MediaSessionService() {
         val path = player.currentMediaItem?.mediaId ?: return
         val app = HiFiApp.from(this)
         serviceScope.launch(Dispatchers.IO) {
-            val fav = app.db.trackDao().findByPath(path)?.isFavorite == true
+            val fav = if (SubsonicUri.isTrackUri(path)) {
+                app.subsonicRepo.findCachedTrack(path)?.isFavorite == true
+            } else {
+                app.db.trackDao().findByPath(path)?.isFavorite == true
+            }
             serviceScope.launch(Dispatchers.Main.immediate) {
                 currentTrackIsFavorite = fav
                 updateNotificationCustomLayout()
@@ -446,7 +468,11 @@ class HiFiPlaybackService : MediaSessionService() {
                         updateNotificationCustomLayout()
                         val app = HiFiApp.from(this@HiFiPlaybackService)
                         serviceScope.launch(Dispatchers.IO) {
-                            app.db.trackDao().setFavorite(path, next)
+                            if (SubsonicUri.isTrackUri(path)) {
+                                app.subsonicRepo.toggleRemoteFavorite(path, next)
+                            } else {
+                                app.db.trackDao().setFavorite(path, next)
+                            }
                         }
                     }
                     return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -474,12 +500,18 @@ class HiFiPlaybackService : MediaSessionService() {
             val app = HiFiApp.from(this@HiFiPlaybackService)
             serviceScope.launch(Dispatchers.IO) {
                 try {
-                    val allTracks = app.db.trackDao().observeAll().first()
+                    val lastPath = app.prefs.current.lastTrackPath
+                    val allTracks = if (SubsonicUri.isTrackUri(lastPath) && lastPath != null) {
+                        app.subsonicRepo.findResumptionQueue(lastPath).ifEmpty {
+                            app.db.trackDao().observeAll().first()
+                        }
+                    } else {
+                        app.db.trackDao().observeAll().first()
+                    }
                     if (allTracks.isEmpty()) {
                         future.setException(IllegalStateException("媒体库为空"))
                         return@launch
                     }
-                    val lastPath = app.prefs.current.lastTrackPath
                     val startIdx = allTracks.indexOfFirst { it.path == lastPath }.coerceAtLeast(0)
                     val startPos = if (lastPath != null && allTracks[startIdx].path == lastPath) {
                         app.prefs.current.lastPositionMs.coerceAtLeast(0L)
@@ -501,6 +533,13 @@ class HiFiPlaybackService : MediaSessionService() {
                 if (app.prefs.current.wakeLockEnabled) acquireWakeLock()
                 startPositionSaver()
                 startStatsPoller()
+                val curPath = player.currentMediaItem?.mediaId
+                if (curPath != null && SubsonicUri.isTrackUri(curPath) && scrobbledNowPlayingPath != curPath) {
+                    scrobbledNowPlayingPath = curPath
+                    serviceScope.launch(Dispatchers.IO) {
+                        app.subsonicRepo.scrobbleIfEnabled(curPath, submission = false)
+                    }
+                }
             } else {
                 releaseWakeLock()
                 positionSaveJob?.cancel()
@@ -511,10 +550,20 @@ class HiFiPlaybackService : MediaSessionService() {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            scrobbledNowPlayingPath = null
+            scrobbledSubmittedPath = null
             saveCurrentPositionImmediate()
             refreshFavoriteStateForCurrentTrack()
-            HiFiApp.from(this@HiFiPlaybackService).usbManager.refreshStats()
+            val app = HiFiApp.from(this@HiFiPlaybackService)
+            app.usbManager.refreshStats()
             sessionPlayer.notifyMediaMetadataChanged()
+            val nextPath = mediaItem?.mediaId
+            if (nextPath != null && SubsonicUri.isTrackUri(nextPath) && player.isPlaying) {
+                scrobbledNowPlayingPath = nextPath
+                serviceScope.launch(Dispatchers.IO) {
+                    app.subsonicRepo.scrobbleIfEnabled(nextPath, submission = false)
+                }
+            }
         }
 
         override fun onRepeatModeChanged(repeatMode: Int) {
@@ -538,6 +587,21 @@ class HiFiPlaybackService : MediaSessionService() {
             while (isActive && player.isPlaying) {
                 delay(5000)
                 saveCurrentPositionImmediate()
+                checkSubsonicScrobbleSubmit()
+            }
+        }
+    }
+
+    private fun checkSubsonicScrobbleSubmit() {
+        val path = player.currentMediaItem?.mediaId ?: return
+        if (!SubsonicUri.isTrackUri(path) || scrobbledSubmittedPath == path) return
+        val duration = player.duration
+        val pos = player.currentPosition
+        if (duration > 30_000L && (pos >= duration / 2L || pos >= 240_000L)) {
+            scrobbledSubmittedPath = path
+            val app = HiFiApp.from(this)
+            serviceScope.launch(Dispatchers.IO) {
+                app.subsonicRepo.scrobbleIfEnabled(path, submission = true)
             }
         }
     }
@@ -598,7 +662,7 @@ class HiFiPlaybackService : MediaSessionService() {
         private val _audioFocusStateFlow = MutableStateFlow(AudioFocusState.NONE)
         val audioFocusStateFlow: StateFlow<AudioFocusState> = _audioFocusStateFlow.asStateFlow()
 
-        /** 将 TrackEntity 转换为 Media3 MediaItem */
+        /** 将 TrackEntity 转换为 Media3 MediaItem（同时兼容本地文件与 Subsonic 远程虚拟 URI） */
         fun trackToMediaItem(track: TrackEntity): MediaItem {
             val metaBuilder = MediaMetadata.Builder()
                 .setTitle(track.title)
@@ -606,12 +670,27 @@ class HiFiPlaybackService : MediaSessionService() {
                 .setAlbumTitle(track.album)
                 .setTrackNumber(track.trackNumber.takeIf { it > 0 })
             track.coverPath?.let { cp ->
-                val f = File(cp)
-                if (f.isFile) metaBuilder.setArtworkUri(Uri.fromFile(f))
+                val artUri = if (SubsonicUri.isCoverUri(cp) ||
+                    cp.startsWith("http://", ignoreCase = true) ||
+                    cp.startsWith("https://", ignoreCase = true)
+                ) {
+                    Uri.parse(cp)
+                } else {
+                    File(cp).takeIf { it.isFile }?.let { Uri.fromFile(it) }
+                }
+                if (artUri != null) metaBuilder.setArtworkUri(artUri)
+            }
+            val audioUri = if (SubsonicUri.isTrackUri(track.path) ||
+                track.path.startsWith("http://", ignoreCase = true) ||
+                track.path.startsWith("https://", ignoreCase = true)
+            ) {
+                Uri.parse(track.path)
+            } else {
+                Uri.fromFile(File(track.path))
             }
             return MediaItem.Builder()
                 .setMediaId(track.path)
-                .setUri(Uri.fromFile(File(track.path)))
+                .setUri(audioUri)
                 .setMediaMetadata(metaBuilder.build())
                 .build()
         }

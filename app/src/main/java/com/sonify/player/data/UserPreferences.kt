@@ -92,6 +92,38 @@ enum class ImmersiveScope(val label: String, val subtitle: String) {
     ),
 }
 
+enum class StreamQuality(
+    val label: String,
+    val subtitle: String,
+    val format: String,
+    val maxBitRate: Int,
+) {
+    RAW(
+        "原盘无损直通（推荐）",
+        "不经服务端转码（format=raw），完美匹配 USB DAC Bit-Perfect 独占",
+        "raw",
+        0,
+    ),
+    MP3_320(
+        "高音质 MP3 320 kbps",
+        "兼顾音质与带宽，适合移动网络聆听",
+        "mp3",
+        320,
+    ),
+    OPUS_192(
+        "流畅 Opus 192 kbps",
+        "高压缩效率，适合弱网或省流量场景",
+        "opus",
+        192,
+    ),
+    MP3_192(
+        "省流量 MP3 192 kbps",
+        "通用兼容转码档位，显著减少蜂窝流量消耗",
+        "mp3",
+        192,
+    ),
+}
+
 enum class AudioFocusPolicy(val label: String, val subtitle: String) {
     STANDARD_DUCK(
         "标准模式 · 压低避让（推荐）",
@@ -147,6 +179,11 @@ data class AppSettings(
     val lockScreenVinylEnabled: Boolean = true,
     val notifShowAudioSpec: Boolean = true,
     val wakeLockEnabled: Boolean = true,
+    // Subsonic 远程媒体服务器
+    val subsonicWifiQuality: StreamQuality = StreamQuality.RAW,
+    val subsonicCellularQuality: StreamQuality = StreamQuality.MP3_320,
+    val subsonicScrobbleEnabled: Boolean = true,
+    val lastLibrarySource: String = "local",
     val lastTrackPath: String? = null,
     val lastPositionMs: Long = 0L,
 ) {
@@ -199,6 +236,10 @@ class UserPreferences(private val context: Context) {
         val LOCKSCREEN_VINYL = booleanPreferencesKey("lockscreen_vinyl")
         val NOTIF_SHOW_SPEC = booleanPreferencesKey("notif_show_spec")
         val WAKELOCK = booleanPreferencesKey("wakelock")
+        val SUBSONIC_WIFI_QUALITY = stringPreferencesKey("subsonic_wifi_quality")
+        val SUBSONIC_CELLULAR_QUALITY = stringPreferencesKey("subsonic_cellular_quality")
+        val SUBSONIC_SCROBBLE = booleanPreferencesKey("subsonic_scrobble")
+        val LAST_LIBRARY_SOURCE = stringPreferencesKey("last_library_source")
         val LAST_TRACK_PATH = stringPreferencesKey("last_track_path")
         val LAST_POSITION_MS = longPreferencesKey("last_position_ms")
 
@@ -265,6 +306,14 @@ class UserPreferences(private val context: Context) {
                 lockScreenVinylEnabled = p[Keys.LOCKSCREEN_VINYL] ?: true,
                 notifShowAudioSpec = p[Keys.NOTIF_SHOW_SPEC] ?: true,
                 wakeLockEnabled = p[Keys.WAKELOCK] ?: true,
+                subsonicWifiQuality = p[Keys.SUBSONIC_WIFI_QUALITY]?.let {
+                    runCatching { StreamQuality.valueOf(it) }.getOrNull()
+                } ?: StreamQuality.RAW,
+                subsonicCellularQuality = p[Keys.SUBSONIC_CELLULAR_QUALITY]?.let {
+                    runCatching { StreamQuality.valueOf(it) }.getOrNull()
+                } ?: StreamQuality.MP3_320,
+                subsonicScrobbleEnabled = p[Keys.SUBSONIC_SCROBBLE] ?: true,
+                lastLibrarySource = p[Keys.LAST_LIBRARY_SOURCE] ?: "local",
                 lastTrackPath = p[Keys.LAST_TRACK_PATH],
                 lastPositionMs = p[Keys.LAST_POSITION_MS] ?: 0L,
             )
@@ -424,6 +473,22 @@ class UserPreferences(private val context: Context) {
 
     suspend fun setWakeLock(enabled: Boolean) {
         context.dataStore.edit { it[Keys.WAKELOCK] = enabled }
+    }
+
+    suspend fun setSubsonicWifiQuality(quality: StreamQuality) {
+        context.dataStore.edit { it[Keys.SUBSONIC_WIFI_QUALITY] = quality.name }
+    }
+
+    suspend fun setSubsonicCellularQuality(quality: StreamQuality) {
+        context.dataStore.edit { it[Keys.SUBSONIC_CELLULAR_QUALITY] = quality.name }
+    }
+
+    suspend fun setSubsonicScrobble(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.SUBSONIC_SCROBBLE] = enabled }
+    }
+
+    suspend fun setLastLibrarySource(source: String) {
+        context.dataStore.edit { it[Keys.LAST_LIBRARY_SOURCE] = source }
     }
 
     suspend fun saveLastPlayback(trackPath: String, positionMs: Long) {

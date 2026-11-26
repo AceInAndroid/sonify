@@ -62,6 +62,7 @@
 - **Background Playback Reliability**: `MediaSessionService` foreground service, Spotify-style 5-button notification (`♡ Favorite · ⏮ · ⏯ · ⏭ · 🔁 Repeat`) with live HiFi output spec subtitle and in-process `512×512` artwork loader, dedicated **Vinyl Lockscreen** (`LockScreenActivity` via `USE_FULL_SCREEN_INTENT`), `nice = -16` audio-priority USB event loop for glitch-free screen-off playback, headphone/USB unplug auto-pause, headset button resumption (`onPlaybackResumption`), and smart `WakeLock`.
 - **System Audio Focus & Non-Destructive Ducking**: Full Android `AudioFocus` preemption, automatic pause/resume around phone calls and voice prompts, and `-12 dB` USB hardware/software ducking with 3 configurable policies (`Standard Duck`, `Pause on Duck`, `Ignore Duck`).
 - **Immersive Music Mode & Zen Vinyl**: True Edge-to-Edge layout with independent status bar and navigation bar hiding (`Now Playing & Lockscreen` or `Global` scope), optional desktop-stand keep-screen-on, and one-tap **Zen Vinyl** mode (tap the spinning disc to hide all chrome, leaving only the enlarged vinyl, live signal badge, track title, and a 2dp bottom progress bar).
+- **Subsonic / OpenSubsonic Media Server Support**: Multi-account login & switching for self-hosted servers (**Navidrome, Subsonic, Airsonic-Advanced, Gonic, LMS, Ampache, Jellyfin Subsonic plugin**), passwords encrypted at rest via **Android Keystore (AES-256-GCM)**, salted MD5 token auth (+ optional legacy `p=enc:` & per-server self-signed TLS trust), on-demand browsing (Newest/All Albums, Artists, Playlists, Starred, Random Mix, multi-folder filter, live `search3`), bidirectional favorite sync, optional scrobbling, and **Bit-Perfect `format=raw` streaming** directly through the USB DAC engine (with optional cellular transcoding).
 
 ---
 
@@ -136,7 +137,7 @@ adb logcat -s HiFiAudio:* HiFiVolume:* HiFiAudioSink:* HiFiCodecRenderer:*
 - [ ] **M3**: 10-band Parametric EQ (C++ biquad DSP + frequency response curve UI), synchronized LRC & floating lyrics, WiFi file transfer, playlists & FTS4 search
 - [ ] **M4**: Extended theme presets, battery optimization guides, multi-DAC quirk presets
 
-*(Non-goals by design: online streaming services, cloud/NAS, DSD, proprietary closed-source audio effects.)*
+*(Non-goals by design: commercial subscription streaming platforms, DSD, proprietary closed-source audio effects.)*
 
 ---
 

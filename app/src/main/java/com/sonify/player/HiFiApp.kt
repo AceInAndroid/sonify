@@ -2,16 +2,27 @@ package com.sonify.player
 
 import android.app.Application
 import android.content.Context
+import coil.ImageLoader
+import coil.ImageLoaderFactory
 import com.sonify.player.data.LibraryDatabase
 import com.sonify.player.data.UserPreferences
 import com.sonify.player.library.MediaScanner
+import com.sonify.player.subsonic.SubsonicRepository
+import com.sonify.player.ui.theme.AmbientColorExtractor
+import com.sonify.player.ui.theme.SubsonicCoverFetcher
 import com.sonify.player.usb.UsbAudioManager
 import com.sonify.player.usb.UsbVolumeController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
- * 轻量级应用级依赖容器，统一管理跨界面/跨 Service 共享的 USB、音量护耳、数据库、设置与扫描器实例。
+ * 轻量级应用级依赖容器，统一管理跨界面/跨 Service 共享的 USB、音量护耳、数据库、设置、扫描器与 Subsonic 仓库。
  */
-class HiFiApp : Application() {
+class HiFiApp : Application(), ImageLoaderFactory {
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     lateinit var prefs: UserPreferences
         private set
@@ -23,6 +34,8 @@ class HiFiApp : Application() {
         private set
     lateinit var scanner: MediaScanner
         private set
+    lateinit var subsonicRepo: SubsonicRepository
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -31,7 +44,21 @@ class HiFiApp : Application() {
         volumeController = UsbVolumeController(prefs)
         usbManager = UsbAudioManager(this, volumeController)
         scanner = MediaScanner(this, db, prefs)
+        subsonicRepo = SubsonicRepository(this, db, prefs)
+        AmbientColorExtractor.init(this, subsonicRepo)
+
+        appScope.launch {
+            subsonicRepo.preloadCredentials()
+        }
     }
+
+    override fun newImageLoader(): ImageLoader =
+        ImageLoader.Builder(this)
+            .components {
+                add(SubsonicCoverFetcher.Factory(this@HiFiApp, subsonicRepo))
+            }
+            .crossfade(true)
+            .build()
 
     companion object {
         fun from(context: Context): HiFiApp = context.applicationContext as HiFiApp

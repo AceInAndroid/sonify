@@ -62,6 +62,7 @@
 - **后台、锁屏与通知栏体验**：`MediaSessionService` 前台服务、Spotify 风格 5 键通知栏（`♡ 收藏 · ⏮ · ⏯ · ⏭ · 🔁 循环`）+ 实时 HiFi 协商规格副标题 + 跨进程 `512×512` 高清封面加载、专属 **黑胶锁屏界面**（基于 `USE_FULL_SCREEN_INTENT` 零悬浮窗权限）、USB 事件线程 `nice = -16` 音频高优先级防息屏爆音、耳机/USB 拔出自动暂停、线控一键断点续播与按需 `WakeLock`。
 - **系统音频焦点抢占与无损 Ducking**：完整适配 Android 音频焦点（第三方音视频互斥抢占、来电/导航打断自动暂停与恢复），支持 USB 独占 `-12 dB` 硬件/软件自动降音，并在设置页提供三种策略（标准降音 / 遇提示暂停 / 忽略短提示音）。
 - **沉浸音乐模式 & 纯享黑胶（Zen Vinyl）**：全链路 Edge-to-Edge 无黑边延伸，支持分别配置隐藏顶部状态栏与底部导航栏（默认仅在播放页与锁屏页生效，亦支持全局沉浸）、桌面黑胶架常亮开关，以及点击唱片一键切换 **纯享黑胶** 视图（仅留放大旋转黑胶、信号胶囊、曲目名与底部 2dp 进度线，轻触任意处复原）。
+- **Subsonic / OpenSubsonic 媒体服务器支持**：支持多服务器账号登录与一键切换（兼容 **Navidrome / Subsonic / Airsonic / Gonic / LMS / Ampache / Jellyfin Subsonic 插件**），账号密码采用 **Android Keystore（AES-256-GCM）** 硬件密钥加密保存，默认随机盐值 MD5 Token 认证（可选旧版 `p=enc:` 兼容与单服务器信任自签名 HTTPS 证书）；支持最新专辑、全部专辑分页、艺术家、歌单、已收藏、随机发现、多目录筛选与 `search3` 实时远程搜索，双向收藏同步与 Scrobble 上报，默认 Wi-Fi **原盘无损直通（`format=raw`）** 直连 USB DAC 独占引擎，同时支持移动网络按需转码。
 
 ---
 
@@ -136,7 +137,7 @@ adb logcat -s HiFiAudio:* HiFiVolume:* HiFiAudioSink:* HiFiCodecRenderer:*
 - [ ] **M3**：10 段参数均衡器 PEQ（C++ biquad + 实时幅频曲线）、LRC 歌词与桌面悬浮歌词、WiFi 传歌、播放列表与 FTS4 拼音搜索
 - [ ] **M4**：多套深色皮肤预设、电池保活与厂商指引、更多 DAC 兼容微调
 
-*（明确不做范围：在线流媒体、网盘/NAS、DSD 与黑盒私有音效。）*
+*（明确不做范围：商业在线音乐平台订阅服务、DSD 与黑盒私有音效。）*
 
 ---
 

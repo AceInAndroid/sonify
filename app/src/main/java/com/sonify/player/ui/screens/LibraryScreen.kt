@@ -1,5 +1,6 @@
 package com.sonify.player.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,12 +31,15 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -57,10 +61,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.sonify.player.data.AppSettings
+import com.sonify.player.data.SubsonicServerEntity
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.library.ScanState
+import com.sonify.player.subsonic.SubsonicAlbum
+import com.sonify.player.subsonic.SubsonicArtist
+import com.sonify.player.subsonic.SubsonicPlaylist
 import com.sonify.player.ui.PlaybackUiState
+import com.sonify.player.ui.SubsonicBrowseUiState
+import com.sonify.player.ui.SubsonicDrillState
+import com.sonify.player.ui.SubsonicTab
 import com.sonify.player.ui.components.VinylDisc
+import com.sonify.player.ui.theme.CoverArtSupport
 import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.ui.theme.formatDuration
 import java.io.File
@@ -86,6 +98,22 @@ fun LibraryScreen(
     settings: AppSettings,
     scanState: ScanState,
     hasStoragePermission: Boolean,
+    subsonicServers: List<SubsonicServerEntity>,
+    selectedSubsonicServer: SubsonicServerEntity?,
+    subsonicState: SubsonicBrowseUiState,
+    onSelectLocalSource: () -> Unit,
+    onSelectSubsonicServer: (SubsonicServerEntity) -> Unit,
+    onOpenSubsonicAccounts: (Boolean) -> Unit,
+    onSubsonicSelectTab: (SubsonicTab) -> Unit,
+    onSubsonicSelectFolder: (String?) -> Unit,
+    onSubsonicRefresh: () -> Unit,
+    onSubsonicLoadMoreAlbums: () -> Unit,
+    onSubsonicOpenAlbum: (SubsonicAlbum) -> Unit,
+    onSubsonicOpenArtist: (SubsonicArtist) -> Unit,
+    onSubsonicOpenPlaylist: (SubsonicPlaylist) -> Unit,
+    onSubsonicCloseDrill: () -> Unit,
+    onSubsonicToggleSearch: (Boolean) -> Unit,
+    onSubsonicSearchQuery: (String) -> Unit,
     onRequestPermission: () -> Unit,
     onScan: () -> Unit,
     onCancelScan: () -> Unit,
@@ -98,8 +126,18 @@ fun LibraryScreen(
     var filter by remember { mutableStateOf(LibraryFilter.SONGS) }
     var drillGroup by remember { mutableStateOf<DrillDownGroup?>(null) }
 
+    BackHandler(enabled = drillGroup != null) {
+        drillGroup = null
+    }
+    BackHandler(enabled = selectedSubsonicServer != null && subsonicState.drill != SubsonicDrillState.None) {
+        onSubsonicCloseDrill()
+    }
+    BackHandler(enabled = selectedSubsonicServer != null && subsonicState.searchActive && subsonicState.drill == SubsonicDrillState.None) {
+        onSubsonicToggleSearch(false)
+    }
+
     val currentGroup = drillGroup
-    if (currentGroup != null) {
+    if (selectedSubsonicServer == null && currentGroup != null) {
         GroupDetailScreen(
             group = currentGroup,
             currentTrackPath = playback.currentTrack?.path,
@@ -115,45 +153,193 @@ fun LibraryScreen(
         else settings.lastTrackPath?.let { p -> tracks.firstOrNull { it.path == p } }
     }
 
+    val inRemoteDrill = selectedSubsonicServer != null && subsonicState.drill != SubsonicDrillState.None
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.canvas)
     ) {
-        // 顶部 Spotify 风格标题栏
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "音乐库",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = colors.textPrimary,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(
-                onClick = {
-                    if (scanState.isScanning) onCancelScan()
-                    else if (!hasStoragePermission) onRequestPermission()
-                    else onScan()
-                }
+        if (!inRemoteDrill) {
+            // 顶部 Spotify 风格标题栏
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = if (scanState.isScanning) Icons.Rounded.Close else Icons.Rounded.Refresh,
-                    contentDescription = if (scanState.isScanning) "取消扫描" else "扫描本地音乐",
-                    tint = if (scanState.isScanning) colors.accent else colors.textPrimary,
+                Text(
+                    text = selectedSubsonicServer?.name ?: "音乐库",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+                if (selectedSubsonicServer != null) {
+                    IconButton(onClick = { onSubsonicToggleSearch(!subsonicState.searchActive) }) {
+                        Icon(
+                            imageVector = if (subsonicState.searchActive) Icons.Rounded.Close else Icons.Rounded.Search,
+                            contentDescription = "搜索服务器",
+                            tint = if (subsonicState.searchActive) colors.accent else colors.textPrimary,
+                        )
+                    }
+                    IconButton(onClick = onSubsonicRefresh) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = "刷新远程曲库",
+                            tint = colors.textPrimary,
+                        )
+                    }
+                    IconButton(onClick = { onOpenSubsonicAccounts(false) }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Cloud,
+                            contentDescription = "管理 Subsonic 账号",
+                            tint = colors.exclusiveGreen,
+                        )
+                    }
+                } else {
+                    IconButton(
+                        onClick = {
+                            if (scanState.isScanning) onCancelScan()
+                            else if (!hasStoragePermission) onRequestPermission()
+                            else onScan()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (scanState.isScanning) Icons.Rounded.Close else Icons.Rounded.Refresh,
+                            contentDescription = if (scanState.isScanning) "取消扫描" else "扫描本地音乐",
+                            tint = if (scanState.isScanning) colors.accent else colors.textPrimary,
+                        )
+                    }
+                    IconButton(onClick = onImportFiles) {
+                        Icon(
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = "导入音频文件",
+                            tint = colors.textPrimary,
+                        )
+                    }
+                }
             }
-            IconButton(onClick = onImportFiles) {
-                Icon(
-                    imageVector = Icons.Rounded.Add,
-                    contentDescription = "导入音频文件",
-                    tint = colors.textPrimary,
-                )
+
+            // 顶部数据源切换胶囊条：本地音乐 / 已保存的 Subsonic 服务器账号 / 登录新服务器
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item(key = "source_local") {
+                    val localSelected = selectedSubsonicServer == null
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(if (localSelected) colors.surface3 else colors.surface1)
+                            .border(
+                                1.dp,
+                                if (localSelected) colors.accent.copy(alpha = 0.7f) else colors.hairline,
+                                RoundedCornerShape(999.dp),
+                            )
+                            .clickable { onSelectLocalSource() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Smartphone,
+                            contentDescription = null,
+                            tint = if (localSelected) colors.accent else colors.textSecondary,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            text = "本地音乐",
+                            fontSize = 12.sp,
+                            fontWeight = if (localSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (localSelected) colors.textPrimary else colors.textSecondary,
+                        )
+                    }
+                }
+
+                items(subsonicServers, key = { "srv_${it.id}" }) { srv ->
+                    val srvSelected = selectedSubsonicServer?.id == srv.id
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(if (srvSelected) colors.surface3 else colors.surface1)
+                            .border(
+                                1.dp,
+                                if (srvSelected) colors.exclusiveGreen.copy(alpha = 0.75f) else colors.hairline,
+                                RoundedCornerShape(999.dp),
+                            )
+                            .clickable { onSelectSubsonicServer(srv) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(if (srvSelected) colors.exclusiveGreen else colors.textMuted)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = srv.name,
+                            fontSize = 12.sp,
+                            fontWeight = if (srvSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (srvSelected) colors.textPrimary else colors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+
+                item(key = "source_add_subsonic") {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(colors.surface1)
+                            .border(1.dp, colors.hairline, RoundedCornerShape(999.dp))
+                            .clickable { onOpenSubsonicAccounts(subsonicServers.isEmpty()) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = if (subsonicServers.isEmpty()) Icons.Rounded.Add else Icons.Rounded.Cloud,
+                            contentDescription = null,
+                            tint = colors.accent,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = if (subsonicServers.isEmpty()) "登录 Subsonic" else "管理账号",
+                            fontSize = 12.sp,
+                            color = colors.textSecondary,
+                        )
+                    }
+                }
             }
+        }
+
+        // 若选中了 Subsonic 服务器，直接呈现远程按需浏览内容
+        if (selectedSubsonicServer != null) {
+            SubsonicLibraryContent(
+                server = selectedSubsonicServer,
+                state = subsonicState,
+                currentTrackPath = playback.currentTrack?.path,
+                onSelectTab = onSubsonicSelectTab,
+                onSelectFolder = onSubsonicSelectFolder,
+                onRefresh = onSubsonicRefresh,
+                onLoadMoreAlbums = onSubsonicLoadMoreAlbums,
+                onOpenAlbum = onSubsonicOpenAlbum,
+                onOpenArtist = onSubsonicOpenArtist,
+                onOpenPlaylist = onSubsonicOpenPlaylist,
+                onCloseDrill = onSubsonicCloseDrill,
+                onUpdateSearchQuery = onSubsonicSearchQuery,
+                onCloseSearch = { onSubsonicToggleSearch(false) },
+                onPlayTracks = onPlayTracks,
+                onOpenAccounts = { onOpenSubsonicAccounts(false) },
+                bottomPadding = bottomPadding,
+            )
+            return
         }
 
         // 扫描进度条
@@ -444,10 +630,10 @@ fun LibraryScreen(
                                     .background(colors.surface2),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                val f = group.coverPath?.let { File(it) }?.takeIf { it.isFile }
-                                if (f != null) {
+                                val coverModel = CoverArtSupport.resolveCoilModel(group.coverPath)
+                                if (coverModel != null) {
                                     AsyncImage(
-                                        model = f,
+                                        model = coverModel,
                                         contentDescription = null,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.fillMaxSize(),
@@ -752,10 +938,10 @@ fun CoverSquare(
             .background(colors.surface2),
         contentAlignment = Alignment.Center,
     ) {
-        val file = coverPath?.let { File(it) }?.takeIf { it.isFile }
-        if (file != null) {
+        val model = CoverArtSupport.resolveCoilModel(coverPath)
+        if (model != null) {
             AsyncImage(
-                model = file,
+                model = model,
                 contentDescription = "封面",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

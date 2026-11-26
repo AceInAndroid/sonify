@@ -30,8 +30,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.sonify.player.ui.theme.CoverArtSupport
 import com.sonify.player.ui.theme.LocalHiFiColors
-import java.io.File
 
 /**
  * 极简黑胶唱片组件（Spotify Dark × Vinyl Style）：
@@ -138,10 +138,10 @@ fun VinylDisc(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                val coverFile = coverPath?.let { File(it) }?.takeIf { it.isFile }
-                if (coverFile != null) {
+                val coverModel = CoverArtSupport.resolveCoilModel(coverPath)
+                if (coverModel != null) {
                     AsyncImage(
-                        model = coverFile,
+                        model = coverModel,
                         contentDescription = "专辑封面",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),

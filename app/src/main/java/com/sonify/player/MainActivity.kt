@@ -62,9 +62,12 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.sonify.player.playback.HiFiPlaybackService
+import com.sonify.player.subsonic.SubsonicRepository
 import com.sonify.player.ui.PlayerViewModel
+import com.sonify.player.ui.SubsonicViewModel
 import com.sonify.player.ui.components.MiniPlayerBar
 import com.sonify.player.ui.components.OutputDeviceSheet
+import com.sonify.player.ui.components.SubsonicAccountsSheet
 import com.sonify.player.ui.components.VolumeHudOverlay
 import com.sonify.player.ui.screens.LibraryScreen
 import com.sonify.player.ui.screens.NowPlayingScreen
@@ -86,6 +89,7 @@ private enum class MainTab(val label: String, val icon: ImageVector) {
 class MainActivity : ComponentActivity() {
 
     private val vm: PlayerViewModel by viewModels()
+    private val subsonicVm: SubsonicViewModel by viewModels()
     private val openPlayerTrigger = mutableStateOf(0L)
     private var latestBarsSpec = SystemBarsSpec()
 
@@ -107,6 +111,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     HiFiRootScreen(
                         vm = vm,
+                        subsonicVm = subsonicVm,
                         openPlayerTrigger = openPlayerTrigger.value,
                         onApplySystemBars = { spec ->
                             latestBarsSpec = spec
@@ -160,6 +165,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun HiFiRootScreen(
     vm: PlayerViewModel,
+    subsonicVm: SubsonicViewModel,
     openPlayerTrigger: Long,
     onApplySystemBars: (SystemBarsSpec) -> Unit,
 ) {
@@ -177,10 +183,26 @@ private fun HiFiRootScreen(
     val activeRoute by vm.activeRoute.collectAsState()
     val audioFocusState by vm.audioFocusState.collectAsState()
 
+    val subsonicServers by subsonicVm.servers.collectAsState()
+    val activeSubsonicServer by subsonicVm.activeServer.collectAsState()
+    val subsonicBrowse by subsonicVm.browse.collectAsState()
+    val subsonicAction by subsonicVm.accountAction.collectAsState()
+
     var currentTab by remember { mutableStateOf(MainTab.LIBRARY) }
     var showNowPlaying by remember { mutableStateOf(false) }
     var showOutputSheet by remember { mutableStateOf(false) }
+    var showSubsonicSheet by remember { mutableStateOf(false) }
+    var subsonicSheetInitialAdd by remember { mutableStateOf(false) }
     var hasStoragePermission by remember { mutableStateOf(checkStoragePermission(context)) }
+
+    // 音乐库当前数据源：根据上次偏好在本地与已保存的 Subsonic 服务器之间无缝切换
+    val selectedServerId = SubsonicRepository.parseServerIdFromSourceKey(settings.lastLibrarySource)
+    val selectedSubsonicServer = remember(selectedServerId, subsonicServers) {
+        selectedServerId?.let { id -> subsonicServers.firstOrNull { it.id == id } }
+    }
+    LaunchedEffect(selectedSubsonicServer?.id) {
+        selectedSubsonicServer?.let { subsonicVm.ensureLoadedFor(it) }
+    }
 
     val isPlayerSurface = showNowPlaying && playback.currentTrack != null
     val barsSpec = remember(settings, isPlayerSurface, playback.isPlaying) {
@@ -276,6 +298,30 @@ private fun HiFiRootScreen(
                     settings = settings,
                     scanState = scanState,
                     hasStoragePermission = hasStoragePermission,
+                    subsonicServers = subsonicServers,
+                    selectedSubsonicServer = selectedSubsonicServer,
+                    subsonicState = subsonicBrowse,
+                    onSelectLocalSource = {
+                        scope.launch { app.prefs.setLastLibrarySource(SubsonicRepository.LOCAL_SOURCE_KEY) }
+                    },
+                    onSelectSubsonicServer = { srv ->
+                        subsonicVm.switchActiveServer(srv)
+                    },
+                    onOpenSubsonicAccounts = { openAdd ->
+                        subsonicVm.clearAccountMessage()
+                        subsonicSheetInitialAdd = openAdd
+                        showSubsonicSheet = true
+                    },
+                    onSubsonicSelectTab = subsonicVm::selectTab,
+                    onSubsonicSelectFolder = subsonicVm::selectMusicFolder,
+                    onSubsonicRefresh = subsonicVm::refresh,
+                    onSubsonicLoadMoreAlbums = subsonicVm::loadMoreAlbums,
+                    onSubsonicOpenAlbum = subsonicVm::openAlbum,
+                    onSubsonicOpenArtist = subsonicVm::openArtist,
+                    onSubsonicOpenPlaylist = subsonicVm::openPlaylist,
+                    onSubsonicCloseDrill = subsonicVm::closeDrill,
+                    onSubsonicToggleSearch = subsonicVm::setSearchActive,
+                    onSubsonicSearchQuery = subsonicVm::updateSearchQuery,
                     onRequestPermission = ::requestStorageAccess,
                     onScan = vm::startScan,
                     onCancelScan = vm::cancelScan,
@@ -311,10 +357,17 @@ private fun HiFiRootScreen(
                     settings = settings,
                     prefs = app.prefs,
                     volumeController = app.volumeController,
+                    subsonicServers = subsonicServers,
+                    activeSubsonicServer = activeSubsonicServer,
                     nativeBuildTime = usbState.stats.buildTime,
                     onRebindRoute = vm::rebindAudioRoute,
                     onScanNow = {
                         if (hasStoragePermission) vm.startScan() else requestStorageAccess()
+                    },
+                    onOpenSubsonicAccounts = {
+                        subsonicVm.clearAccountMessage()
+                        subsonicSheetInitialAdd = subsonicServers.isEmpty()
+                        showSubsonicSheet = true
                     },
                     bottomPadding = bottomClearance,
                 )
@@ -470,6 +523,37 @@ private fun HiFiRootScreen(
                 }
             },
             onDismiss = { showOutputSheet = false },
+        )
+    }
+
+    // Subsonic 多账号加密登录与管理 Sheet
+    if (showSubsonicSheet) {
+        SubsonicAccountsSheet(
+            servers = subsonicServers,
+            actionState = subsonicAction,
+            initialShowAddForm = subsonicSheetInitialAdd,
+            onDismiss = { showSubsonicSheet = false },
+            onClearMessage = subsonicVm::clearAccountMessage,
+            onSelectServer = { srv ->
+                subsonicVm.switchActiveServer(srv)
+                currentTab = MainTab.LIBRARY
+            },
+            onTestServer = subsonicVm::testExistingServer,
+            onDeleteServer = subsonicVm::deleteServer,
+            onLoginAndSave = { editingId, name, url, user, pass, legacy, selfSigned, onDone ->
+                subsonicVm.loginAndSaveServer(
+                    editingId = editingId,
+                    displayName = name,
+                    baseUrl = url,
+                    username = user,
+                    password = pass,
+                    useLegacyAuth = legacy,
+                    allowSelfSignedTls = selfSigned,
+                ) { _, _ ->
+                    currentTab = MainTab.LIBRARY
+                    onDone()
+                }
+            },
         )
     }
 }

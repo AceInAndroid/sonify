@@ -16,18 +16,22 @@ import androidx.media3.common.util.UnstableApi
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.ListeningExecutorService
 import com.google.common.util.concurrent.MoreExecutors
+import com.sonify.player.subsonic.SubsonicRepository
+import com.sonify.player.subsonic.SubsonicUri
+import com.sonify.player.ui.theme.CoverArtSupport
 import java.io.File
 import java.util.concurrent.Executors
 
 /**
  * 通知栏与锁屏高清封面加载器：
- * - 直接在本进程内将本地封面缩放为 512x512 Bitmap 传给 MediaSession，
- *   彻底避免 Android SystemUI 跨进程无法读取 file:// URI 导致通知栏黑块的问题；
+ * - 直接在本进程内将本地/Subsonic 远程封面缩放为 512x512 Bitmap 传给 MediaSession，
+ *   彻底避免 Android SystemUI 跨进程无法读取 file:// 或需认证 URI 导致通知栏黑块的问题；
  * - 无封面时绘制极简黑胶默认封面图，保持 Spotify Dark × 黑胶风格一致。
  */
 @OptIn(UnstableApi::class)
 class SonifyBitmapLoader(
     private val context: Context,
+    private val subsonicRepo: SubsonicRepository? = null,
 ) : BitmapLoader {
 
     private val executor: ListeningExecutorService =
@@ -60,6 +64,14 @@ class SonifyBitmapLoader(
                 "content" -> runCatching {
                     context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 }.getOrNull()?.let { decodeScaledBytes(it) }
+
+                SubsonicUri.COVER_SCHEME -> {
+                    val repo = subsonicRepo
+                    if (repo != null) {
+                        CoverArtSupport.fetchCoverFileSync(context, repo, key, MAX_ART_PX)
+                            ?.let { decodeScaledFile(it.absolutePath) }
+                    } else null
+                }
 
                 else -> null
             } ?: getDefaultVinylArtwork()

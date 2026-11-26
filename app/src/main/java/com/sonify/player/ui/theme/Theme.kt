@@ -1,5 +1,6 @@
 package com.sonify.player.ui.theme
 
+import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
@@ -13,6 +14,8 @@ import androidx.core.graphics.ColorUtils
 import androidx.palette.graphics.Palette
 import com.sonify.player.data.AccentStyle
 import com.sonify.player.data.DarkCanvasStyle
+import com.sonify.player.subsonic.SubsonicRepository
+import com.sonify.player.subsonic.SubsonicUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -97,20 +100,39 @@ fun HiFiPlayerTheme(
     }
 }
 
-/** 封面主色提取缓存，生成类似 Spotify 播放页和 MiniPlayer 的低饱和深色氛围色 */
+/** 封面主色提取缓存，生成类似 Spotify 播放页和 MiniPlayer 的低饱和深色氛围色（支持本地与 Subsonic 远程封面） */
 object AmbientColorExtractor {
     private val cache = ConcurrentHashMap<String, Color>()
     val DefaultAmbient = Color(0xFF2A241E)
+
+    @Volatile
+    private var appContext: Context? = null
+
+    @Volatile
+    private var subsonicRepo: SubsonicRepository? = null
+
+    fun init(context: Context, repo: SubsonicRepository) {
+        appContext = context.applicationContext
+        subsonicRepo = repo
+    }
 
     suspend fun extract(coverPath: String?): Color {
         if (coverPath.isNullOrBlank()) return DefaultAmbient
         cache[coverPath]?.let { return it }
 
         val extracted = withContext(Dispatchers.IO) {
-            val file = File(coverPath)
-            if (!file.isFile) return@withContext DefaultAmbient
+            val file = if (SubsonicUri.isCoverUri(coverPath)) {
+                val ctx = appContext
+                val repo = subsonicRepo
+                if (ctx != null && repo != null) {
+                    CoverArtSupport.fetchCoverFileSync(ctx, repo, coverPath, size = 300)
+                } else null
+            } else {
+                File(coverPath).takeIf { it.isFile }
+            } ?: return@withContext DefaultAmbient
+
             val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
-            val bmp = runCatching { BitmapFactory.decodeFile(coverPath, opts) }.getOrNull()
+            val bmp = runCatching { BitmapFactory.decodeFile(file.absolutePath, opts) }.getOrNull()
                 ?: return@withContext DefaultAmbient
             try {
                 val palette = Palette.from(bmp).maximumColorCount(12).generate()

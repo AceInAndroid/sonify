@@ -11,6 +11,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(
@@ -131,18 +133,210 @@ interface PlaybackPositionDao {
     suspend fun clear(path: String)
 }
 
+@Entity(tableName = "subsonic_servers")
+data class SubsonicServerEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val baseUrl: String,
+    val username: String,
+    val encryptedPassword: String,
+    val useLegacyAuth: Boolean = false,
+    val allowSelfSignedTls: Boolean = false,
+    val musicFolderId: String? = null,
+    val serverType: String = "",
+    val serverVersion: String = "",
+    val isActive: Boolean = false,
+    val lastConnectedAt: Long = 0L,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(
+    tableName = "subsonic_tracks",
+    indices = [
+        Index(value = ["serverId"]),
+    ]
+)
+data class SubsonicTrackCacheEntity(
+    @PrimaryKey val path: String,
+    val serverId: Long,
+    val remoteId: String,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val albumArtist: String = "",
+    val albumId: String = "",
+    val artistId: String = "",
+    val trackNumber: Int = 0,
+    val discNumber: Int = 0,
+    val durationMs: Long = 0L,
+    val sampleRate: Int = 0,
+    val bitDepth: Int = 0,
+    val channels: Int = 2,
+    val bitrateKbps: Int = 0,
+    val format: String = "AUDIO",
+    val fileSize: Long = 0L,
+    val coverPath: String? = null,
+    val isFavorite: Boolean = false,
+    val updatedAt: Long = System.currentTimeMillis(),
+) {
+    fun toTrackEntity(): TrackEntity = TrackEntity(
+        id = 0,
+        path = path,
+        title = title,
+        artist = artist,
+        album = album,
+        albumArtist = albumArtist,
+        trackNumber = trackNumber,
+        discNumber = discNumber,
+        durationMs = durationMs,
+        sampleRate = sampleRate,
+        bitDepth = bitDepth,
+        channels = channels,
+        bitrateKbps = bitrateKbps,
+        format = format,
+        fileSize = fileSize,
+        lastModified = updatedAt,
+        coverPath = coverPath,
+        lrcPath = null,
+        folderPath = "subsonic://$serverId",
+        addedAt = updatedAt,
+        isFavorite = isFavorite,
+    )
+}
+
+@Dao
+interface SubsonicServerDao {
+
+    @Query("SELECT * FROM subsonic_servers ORDER BY isActive DESC, lastConnectedAt DESC, id ASC")
+    fun observeAll(): Flow<List<SubsonicServerEntity>>
+
+    @Query("SELECT * FROM subsonic_servers ORDER BY isActive DESC, lastConnectedAt DESC, id ASC")
+    suspend fun getAll(): List<SubsonicServerEntity>
+
+    @Query("SELECT * FROM subsonic_servers WHERE id = :id LIMIT 1")
+    suspend fun findById(id: Long): SubsonicServerEntity?
+
+    @Query("SELECT * FROM subsonic_servers WHERE isActive = 1 LIMIT 1")
+    suspend fun findActive(): SubsonicServerEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(server: SubsonicServerEntity): Long
+
+    @Query("UPDATE subsonic_servers SET isActive = CASE WHEN id = :serverId THEN 1 ELSE 0 END")
+    suspend fun setActive(serverId: Long)
+
+    @Query("UPDATE subsonic_servers SET musicFolderId = :folderId WHERE id = :serverId")
+    suspend fun setMusicFolder(serverId: Long, folderId: String?)
+
+    @Query("UPDATE subsonic_servers SET lastConnectedAt = :ts, serverType = :type, serverVersion = :version WHERE id = :serverId")
+    suspend fun updateConnectionInfo(serverId: Long, ts: Long, type: String, version: String)
+
+    @Query("DELETE FROM subsonic_servers WHERE id = :serverId")
+    suspend fun deleteById(serverId: Long)
+}
+
+@Dao
+interface SubsonicTrackCacheDao {
+
+    @Query("SELECT * FROM subsonic_tracks ORDER BY updatedAt DESC")
+    fun observeAll(): Flow<List<SubsonicTrackCacheEntity>>
+
+    @Query("SELECT * FROM subsonic_tracks WHERE path = :path LIMIT 1")
+    suspend fun findByPath(path: String): SubsonicTrackCacheEntity?
+
+    @Query("SELECT * FROM subsonic_tracks WHERE serverId = :serverId AND albumId = :albumId ORDER BY discNumber ASC, trackNumber ASC, title COLLATE NOCASE ASC")
+    suspend fun findByAlbum(serverId: Long, albumId: String): List<SubsonicTrackCacheEntity>
+
+    @Query("SELECT * FROM subsonic_tracks WHERE serverId = :serverId ORDER BY updatedAt DESC LIMIT :limit")
+    suspend fun findRecentByServer(serverId: Long, limit: Int = 50): List<SubsonicTrackCacheEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(tracks: List<SubsonicTrackCacheEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(track: SubsonicTrackCacheEntity)
+
+    @Query("UPDATE subsonic_tracks SET isFavorite = :favorite WHERE path = :path")
+    suspend fun setFavorite(path: String, favorite: Boolean)
+
+    @Query("DELETE FROM subsonic_tracks WHERE serverId = :serverId")
+    suspend fun deleteByServer(serverId: Long)
+}
+
 @Database(
-    entities = [TrackEntity::class, PlaybackPositionEntity::class],
-    version = 1,
+    entities = [
+        TrackEntity::class,
+        PlaybackPositionEntity::class,
+        SubsonicServerEntity::class,
+        SubsonicTrackCacheEntity::class,
+    ],
+    version = 2,
     exportSchema = false,
 )
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun trackDao(): TrackDao
     abstract fun playbackPositionDao(): PlaybackPositionDao
+    abstract fun subsonicServerDao(): SubsonicServerDao
+    abstract fun subsonicTrackCacheDao(): SubsonicTrackCacheDao
 
     companion object {
         @Volatile
         private var instance: LibraryDatabase? = null
+
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `subsonic_servers` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `baseUrl` TEXT NOT NULL,
+                        `username` TEXT NOT NULL,
+                        `encryptedPassword` TEXT NOT NULL,
+                        `useLegacyAuth` INTEGER NOT NULL,
+                        `allowSelfSignedTls` INTEGER NOT NULL,
+                        `musicFolderId` TEXT,
+                        `serverType` TEXT NOT NULL,
+                        `serverVersion` TEXT NOT NULL,
+                        `isActive` INTEGER NOT NULL,
+                        `lastConnectedAt` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `subsonic_tracks` (
+                        `path` TEXT NOT NULL,
+                        `serverId` INTEGER NOT NULL,
+                        `remoteId` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `artist` TEXT NOT NULL,
+                        `album` TEXT NOT NULL,
+                        `albumArtist` TEXT NOT NULL,
+                        `albumId` TEXT NOT NULL,
+                        `artistId` TEXT NOT NULL,
+                        `trackNumber` INTEGER NOT NULL,
+                        `discNumber` INTEGER NOT NULL,
+                        `durationMs` INTEGER NOT NULL,
+                        `sampleRate` INTEGER NOT NULL,
+                        `bitDepth` INTEGER NOT NULL,
+                        `channels` INTEGER NOT NULL,
+                        `bitrateKbps` INTEGER NOT NULL,
+                        `format` TEXT NOT NULL,
+                        `fileSize` INTEGER NOT NULL,
+                        `coverPath` TEXT,
+                        `isFavorite` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`path`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_subsonic_tracks_serverId` ON `subsonic_tracks` (`serverId`)"
+                )
+            }
+        }
 
         fun get(context: Context): LibraryDatabase =
             instance ?: synchronized(this) {
@@ -150,7 +344,11 @@ abstract class LibraryDatabase : RoomDatabase() {
                     context.applicationContext,
                     LibraryDatabase::class.java,
                     "sonify_library.db"
-                ).fallbackToDestructiveMigration().build().also { instance = it }
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .fallbackToDestructiveMigration()
+                    .build()
+                    .also { instance = it }
             }
     }
 }

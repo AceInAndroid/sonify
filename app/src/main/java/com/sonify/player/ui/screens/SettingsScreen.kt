@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Folder
@@ -37,11 +38,13 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.SignalCellularAlt
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,10 +82,13 @@ import com.sonify.player.data.ImmersiveScope
 import com.sonify.player.data.ImportMode
 import com.sonify.player.data.MinDurationFilter
 import com.sonify.player.data.SampleRatePolicy
+import com.sonify.player.data.StreamQuality
+import com.sonify.player.data.SubsonicServerEntity
 import com.sonify.player.data.UserPreferences
 import com.sonify.player.data.VolumeMode
 import com.sonify.player.ui.components.SheetOption
 import com.sonify.player.ui.components.SpotifyOptionSheet
+import com.sonify.player.ui.theme.CoverArtSupport
 import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.usb.UsbVolumeController
 import com.sonify.player.usb.VolumeMath
@@ -104,6 +110,8 @@ private enum class ActiveSheet {
     DARK_CANVAS,
     ACCENT_STYLE,
     IMMERSIVE_SCOPE,
+    SUBSONIC_WIFI_QUALITY,
+    SUBSONIC_CELLULAR_QUALITY,
 }
 
 private sealed interface HighVolumeConfirm {
@@ -121,9 +129,12 @@ fun SettingsScreen(
     settings: AppSettings,
     prefs: UserPreferences,
     volumeController: UsbVolumeController,
+    subsonicServers: List<SubsonicServerEntity>,
+    activeSubsonicServer: SubsonicServerEntity?,
     nativeBuildTime: String,
     onRebindRoute: () -> Unit,
     onScanNow: () -> Unit,
+    onOpenSubsonicAccounts: () -> Unit,
     bottomPadding: Dp,
 ) {
     val colors = LocalHiFiColors.current
@@ -134,6 +145,7 @@ fun SettingsScreen(
     var showDirsDialog by remember { mutableStateOf(false) }
     var showKeepAliveDialog by remember { mutableStateOf(false) }
     var highVolConfirm by remember { mutableStateOf<HighVolumeConfirm?>(null) }
+    var coverCacheBytes by remember { mutableStateOf(CoverArtSupport.getCoverCacheSizeBytes(context)) }
 
     val pm = remember { context.getSystemService(PowerManager::class.java) }
     val ignoringBattery = remember(settings) {
@@ -331,6 +343,53 @@ fun SettingsScreen(
             title = "过滤短音频",
             subtitle = settings.minDurationFilter.label,
             onClick = { activeSheet = ActiveSheet.MIN_DURATION },
+        )
+
+        // ==================== 分组 3.5：媒体服务器（Subsonic / OpenSubsonic） ====================
+        SettingsGroupHeader("媒体服务器（Subsonic）")
+
+        SettingsSelectItem(
+            icon = Icons.Rounded.Cloud,
+            title = "服务器与账号管理",
+            subtitle = if (subsonicServers.isEmpty()) {
+                "尚未登录 · 支持 Navidrome / Subsonic / Airsonic / Gonic 等"
+            } else {
+                val cur = activeSubsonicServer ?: subsonicServers.first()
+                "已保存 ${subsonicServers.size} 个账号 · 当前：${cur.name}（${cur.username}）"
+            },
+            onClick = onOpenSubsonicAccounts,
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Wifi,
+            title = "Wi-Fi 流媒体音质",
+            subtitle = settings.subsonicWifiQuality.label,
+            onClick = { activeSheet = ActiveSheet.SUBSONIC_WIFI_QUALITY },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.SignalCellularAlt,
+            title = "移动网络流媒体音质",
+            subtitle = settings.subsonicCellularQuality.label,
+            onClick = { activeSheet = ActiveSheet.SUBSONIC_CELLULAR_QUALITY },
+        )
+        SettingsSwitchItem(
+            icon = Icons.Rounded.History,
+            title = "同步播放记录（Scrobble）",
+            subtitle = "向 Subsonic 服务器上报正在播放与听完计数",
+            checked = settings.subsonicScrobbleEnabled,
+            onCheckedChange = { scope.launch { prefs.setSubsonicScrobble(it) } },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Delete,
+            title = "清除远程封面缓存",
+            subtitle = if (coverCacheBytes <= 0L) "当前无缓存" else {
+                val mb = coverCacheBytes / (1024.0 * 1024.0)
+                if (mb >= 1.0) "已占用 ${"%.1f".format(mb)} MB · 点击清理"
+                else "已占用 ${(coverCacheBytes / 1024L).coerceAtLeast(1L)} KB · 点击清理"
+            },
+            onClick = {
+                CoverArtSupport.clearAllCoverCache(context)
+                coverCacheBytes = CoverArtSupport.getCoverCacheSizeBytes(context)
+            },
         )
 
         // ==================== 分组 4：外观风格 ====================
@@ -648,6 +707,22 @@ fun SettingsScreen(
             options = ImmersiveScope.entries.map { SheetOption(it, it.label, it.subtitle) },
             selected = settings.immersiveScope,
             onSelect = { scope.launch { prefs.setImmersiveScope(it) } },
+            onDismiss = { activeSheet = ActiveSheet.NONE },
+        )
+
+        ActiveSheet.SUBSONIC_WIFI_QUALITY -> SpotifyOptionSheet(
+            title = "Wi-Fi 流媒体音质",
+            options = StreamQuality.entries.map { SheetOption(it, it.label, it.subtitle) },
+            selected = settings.subsonicWifiQuality,
+            onSelect = { scope.launch { prefs.setSubsonicWifiQuality(it) } },
+            onDismiss = { activeSheet = ActiveSheet.NONE },
+        )
+
+        ActiveSheet.SUBSONIC_CELLULAR_QUALITY -> SpotifyOptionSheet(
+            title = "移动网络流媒体音质",
+            options = StreamQuality.entries.map { SheetOption(it, it.label, it.subtitle) },
+            selected = settings.subsonicCellularQuality,
+            onSelect = { scope.launch { prefs.setSubsonicCellularQuality(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
