@@ -17,6 +17,7 @@ import com.sonify.player.audio.ActiveOutputRoute
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.library.ScanState
+import com.sonify.player.playback.AudioFocusState
 import com.sonify.player.playback.HiFiPlaybackService
 import com.sonify.player.usb.UsbConnectionState
 import com.sonify.player.usb.VolumeHudState
@@ -54,6 +55,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val volumeState: StateFlow<VolumeHudState> = app.volumeController.state
     val scanState: StateFlow<ScanState> = app.scanner.state
     val activeRoute: StateFlow<ActiveOutputRoute> = HiFiPlaybackService.activeRouteFlow
+    val audioFocusState: StateFlow<AudioFocusState> = HiFiPlaybackService.audioFocusStateFlow
 
     val tracks: StateFlow<List<TrackEntity>> = app.db.trackDao().observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

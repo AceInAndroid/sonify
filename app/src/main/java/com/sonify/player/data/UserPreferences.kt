@@ -81,6 +81,21 @@ enum class AccentStyle(val label: String) {
     SPOTIFY_GREEN("Spotify 翠绿 (#1DB954)"),
 }
 
+enum class AudioFocusPolicy(val label: String, val subtitle: String) {
+    STANDARD_DUCK(
+        "标准模式 · 压低避让（推荐）",
+        "播歌抢占其他应用；来电/语音暂停并自动恢复；导航/提示音临时压低 -12 dB"
+    ),
+    PAUSE_ON_DUCK(
+        "纯净模式 · 暂停避让",
+        "遇到提示音或导航播报时暂停播放而非降音量，结束后自动续播"
+    ),
+    IGNORE_DUCK(
+        "沉浸模式 · 忽略短提示音",
+        "忽略消息提示音不断流不降音量，仅来电或视频等强打断时礼让暂停"
+    ),
+}
+
 data class AppSettings(
     val usbExclusiveEnabled: Boolean = true,
     val sampleRatePolicy: SampleRatePolicy = SampleRatePolicy.FOLLOW_SOURCE,
@@ -98,6 +113,7 @@ data class AppSettings(
     val feedbackControlEnabled: Boolean = true,
     val resetAltOnRateChange: Boolean = false,
     // 播放控制
+    val audioFocusPolicy: AudioFocusPolicy = AudioFocusPolicy.STANDARD_DUCK,
     val gaplessEnabled: Boolean = true,
     val fadeEnabled: Boolean = true,
     val pauseOnUnplug: Boolean = true,
@@ -147,6 +163,7 @@ class UserPreferences(private val context: Context) {
 
         val FEEDBACK_CONTROL = booleanPreferencesKey("feedback_control")
         val RESET_ALT = booleanPreferencesKey("reset_alt")
+        val AUDIO_FOCUS_POLICY = stringPreferencesKey("audio_focus_policy")
         val GAPLESS = booleanPreferencesKey("gapless")
         val FADE = booleanPreferencesKey("fade")
         val PAUSE_ON_UNPLUG = booleanPreferencesKey("pause_on_unplug")
@@ -193,6 +210,9 @@ class UserPreferences(private val context: Context) {
                 usbVolumePercent = (p[Keys.USB_VOLUME_PCT] ?: 25).coerceIn(0, 100),
                 feedbackControlEnabled = p[Keys.FEEDBACK_CONTROL] ?: true,
                 resetAltOnRateChange = p[Keys.RESET_ALT] ?: false,
+                audioFocusPolicy = p[Keys.AUDIO_FOCUS_POLICY]?.let {
+                    runCatching { AudioFocusPolicy.valueOf(it) }.getOrNull()
+                } ?: AudioFocusPolicy.STANDARD_DUCK,
                 gaplessEnabled = p[Keys.GAPLESS] ?: true,
                 fadeEnabled = p[Keys.FADE] ?: true,
                 pauseOnUnplug = p[Keys.PAUSE_ON_UNPLUG] ?: true,
@@ -282,6 +302,10 @@ class UserPreferences(private val context: Context) {
 
     suspend fun setResetAlt(enabled: Boolean) {
         context.dataStore.edit { it[Keys.RESET_ALT] = enabled }
+    }
+
+    suspend fun setAudioFocusPolicy(policy: AudioFocusPolicy) {
+        context.dataStore.edit { it[Keys.AUDIO_FOCUS_POLICY] = policy.name }
     }
 
     suspend fun setGapless(enabled: Boolean) {

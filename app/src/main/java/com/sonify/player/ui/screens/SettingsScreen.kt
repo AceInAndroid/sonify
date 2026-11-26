@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sonify.player.data.AccentStyle
 import com.sonify.player.data.AppSettings
+import com.sonify.player.data.AudioFocusPolicy
 import com.sonify.player.data.BitDepthPref
 import com.sonify.player.data.BufferSizePref
 import com.sonify.player.data.CoverStyle
@@ -94,6 +95,7 @@ private enum class ActiveSheet {
     MAX_VOLUME_LIMIT,
     SAFE_STARTUP_VOLUME,
     VOLUME_STEP,
+    AUDIO_FOCUS_POLICY,
     IMPORT_MODE,
     MIN_DURATION,
     COVER_STYLE,
@@ -266,6 +268,12 @@ fun SettingsScreen(
         // ==================== 分组 2：播放控制 ====================
         SettingsGroupHeader("播放控制")
 
+        SettingsSelectItem(
+            icon = Icons.Rounded.GraphicEq,
+            title = "系统音频焦点策略",
+            subtitle = settings.audioFocusPolicy.label,
+            onClick = { activeSheet = ActiveSheet.AUDIO_FOCUS_POLICY },
+        )
         SettingsSwitchItem(
             icon = Icons.Rounded.Album,
             title = "无缝播放（Gapless）",
@@ -544,6 +552,14 @@ fun SettingsScreen(
             ),
             selected = settings.volumeStepPercent,
             onSelect = { step -> scope.launch { prefs.setVolumeStepPercent(step) } },
+            onDismiss = { activeSheet = ActiveSheet.NONE },
+        )
+
+        ActiveSheet.AUDIO_FOCUS_POLICY -> SpotifyOptionSheet(
+            title = "系统音频焦点交互策略",
+            options = AudioFocusPolicy.entries.map { SheetOption(it, it.label, it.subtitle) },
+            selected = settings.audioFocusPolicy,
+            onSelect = { policy -> scope.launch { prefs.setAudioFocusPolicy(policy) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 

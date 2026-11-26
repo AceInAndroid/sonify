@@ -150,6 +150,7 @@ private fun HiFiRootScreen(vm: PlayerViewModel, openPlayerTrigger: Long) {
     val tracks by vm.tracks.collectAsState()
     val playback by vm.playback.collectAsState()
     val activeRoute by vm.activeRoute.collectAsState()
+    val audioFocusState by vm.audioFocusState.collectAsState()
 
     var currentTab by remember { mutableStateOf(MainTab.LIBRARY) }
     var showNowPlaying by remember { mutableStateOf(false) }
@@ -362,6 +363,7 @@ private fun HiFiRootScreen(vm: PlayerViewModel, openPlayerTrigger: Long) {
                 usbState = usbState,
                 volumeState = volumeState,
                 activeRoute = activeRoute,
+                audioFocusState = audioFocusState,
                 onCollapse = { showNowPlaying = false },
                 onTogglePlayPause = vm::togglePlayPause,
                 onSkipNext = vm::skipNext,

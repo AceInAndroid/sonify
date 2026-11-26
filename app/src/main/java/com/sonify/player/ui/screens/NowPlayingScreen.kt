@@ -74,6 +74,7 @@ import com.sonify.player.data.AppSettings
 import com.sonify.player.data.CoverStyle
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.data.VolumeMode
+import com.sonify.player.playback.AudioFocusState
 import com.sonify.player.ui.PlaybackUiState
 import com.sonify.player.ui.components.VinylDisc
 import com.sonify.player.ui.theme.AmbientColorExtractor
@@ -99,6 +100,7 @@ fun NowPlayingScreen(
     usbState: UsbConnectionState,
     volumeState: VolumeHudState,
     activeRoute: ActiveOutputRoute,
+    audioFocusState: AudioFocusState = AudioFocusState.NONE,
     onCollapse: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
@@ -292,6 +294,25 @@ fun NowPlayingScreen(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Medium,
                     color = if (isUsbExclusive) colors.exclusiveGreen else colors.textSecondary,
+                )
+            }
+
+            // 系统音频焦点交互状态提示（临时避让 / 通话等待 / 被其他应用抢占）
+            audioFocusState.bannerText?.let { focusTip ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = focusTip,
+                    fontSize = 11.sp,
+                    color = if (audioFocusState == AudioFocusState.LOST_PERMANENT) colors.accent else colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.White.copy(alpha = 0.06f))
+                        .clickable {
+                            if (!playback.isPlaying) onTogglePlayPause()
+                        }
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
                 )
             }
 

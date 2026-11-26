@@ -120,6 +120,10 @@ class UsbVolumeController(
     @Volatile
     private var lastNonZeroPercent = 25
 
+    /** 音频焦点临时避让（Ducking）衰减 dB（正常为 0.0，Duck 时为 -12.0，不污染持久化记忆音量） */
+    @Volatile
+    private var duckAttenuationDb = 0.0
+
     private val _state = MutableStateFlow(VolumeHudState())
     val state: StateFlow<VolumeHudState> = _state.asStateFlow()
 
@@ -205,6 +209,14 @@ class UsbVolumeController(
         applyPercentInternal(_state.value.volumePercent, showHud = false, persist = true)
     }
 
+    /** 音频焦点 Ducking 临时衰减（不改写用户记忆百分比，恢复焦点后瞬间归零还原本色） */
+    fun setDuckAttenuationDb(duckDb: Double) {
+        val clampedDuck = duckDb.coerceIn(-24.0, 0.0)
+        if (duckAttenuationDb == clampedDuck) return
+        duckAttenuationDb = clampedDuck
+        applyPercentInternal(_state.value.volumePercent, showHud = false, persist = false)
+    }
+
     @Synchronized
     private fun applyPercentInternal(requested: Int, showHud: Boolean, persist: Boolean) {
         val s = prefs.current
@@ -218,18 +230,21 @@ class UsbVolumeController(
         val effectiveLimit = if (s.hearingProtectionEnabled) s.maxVolumeLimitPercent.coerceIn(20, 100) else 100
         val isMute = clamped <= 0
 
+        val duckDb = duckAttenuationDb
         val engine: EffectiveVolumeEngine
-        var appliedDb = VolumeMath.percentToDb(clamped, VolumeMath.DEFAULT_MIN_DB, VolumeMath.DEFAULT_MAX_DB)
+        val baseSwDb = VolumeMath.percentToDb(clamped, VolumeMath.DEFAULT_MIN_DB, VolumeMath.DEFAULT_MAX_DB)
+        var appliedDb = (baseSwDb + duckDb).coerceAtLeast(-96.0)
 
         if (s.volumeMode == VolumeMode.FIXED_DIRECT) {
             engine = EffectiveVolumeEngine.FIXED_DIRECT
-            appliedDb = 0.0
+            appliedDb = duckDb
             if (connected) {
                 if (hasHwVol) UsbAudioNative.nativeSetHardwareVolumeDb(0.0f, false)
-                UsbAudioNative.nativeSetSoftwareVolumeDb(0.0f, false, 0.0f)
+                // 固定直通模式下，正常态 0dB 直通；Duck 态临时温和衰减，结束立刻还原 0dB Bit-Perfect
+                UsbAudioNative.nativeSetSoftwareVolumeDb(duckDb.toFloat(), false, 0.0f)
             }
         } else if (s.volumeMode == VolumeMode.AUTO_HARDWARE && hasHwVol && connected) {
-            val hwDb = VolumeMath.percentToDb(clamped, hwMinDb, hwMaxDb)
+            val hwDb = (VolumeMath.percentToDb(clamped, hwMinDb, hwMaxDb) + duckDb).coerceAtLeast(hwMinDb)
             val hwOk = UsbAudioNative.nativeSetHardwareVolumeDb(hwDb.toFloat(), isMute)
             if (hwOk) {
                 engine = EffectiveVolumeEngine.HARDWARE_UAC

@@ -74,6 +74,7 @@ class HiFiPlaybackService : MediaSessionService() {
 
     private lateinit var hybridSink: HybridAudioSink
     private lateinit var player: ExoPlayer
+    private lateinit var audioFocus: AudioFocusController
     private lateinit var sessionPlayer: UsbVolumeForwardingPlayer
     private var mediaSession: MediaSession? = null
 
@@ -89,7 +90,8 @@ class HiFiPlaybackService : MediaSessionService() {
             if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
                 val app = HiFiApp.from(this@HiFiPlaybackService)
                 if (app.prefs.current.pauseOnUnplug && player.isPlaying) {
-                    Log.i(TAG, "收到 AUDIO_BECOMING_NOISY（耳机/蓝牙断开），自动暂停")
+                    Log.i(TAG, "收到 AUDIO_BECOMING_NOISY（耳机/蓝牙断开），自动暂停并清除自动续播")
+                    audioFocus.onUserPaused()
                     player.pause()
                 }
             }
@@ -125,14 +127,45 @@ class HiFiPlaybackService : MediaSessionService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
+        // 禁用 ExoPlayer 内置简易焦点，改由 AudioFocusController 统一接管（兼容 USB 独占 Ducking / 抢占 / 恢复）
         player = ExoPlayer.Builder(this, renderersFactory)
-            .setAudioAttributes(audioAttrs, /* handleAudioFocus= */ true)
+            .setAudioAttributes(audioAttrs, /* handleAudioFocus= */ false)
             .build()
 
         player.addListener(playerListener)
 
-        // 用远程音量 + 实时 HiFi 元数据代理包装 ExoPlayer
-        sessionPlayer = UsbVolumeForwardingPlayer(player, app)
+        audioFocus = AudioFocusController(
+            context = this,
+            policyProvider = { app.prefs.current.audioFocusPolicy },
+            isPlayingProvider = { player.isPlaying || player.playWhenReady },
+            onResumeRequested = {
+                if (player.mediaItemCount > 0) {
+                    if (player.playbackState == Player.STATE_IDLE) player.prepare()
+                    player.play()
+                }
+            },
+            onPauseRequested = { _ ->
+                if (player.isPlaying || player.playWhenReady) {
+                    player.pause()
+                }
+            },
+            onDuckChanged = { ducked ->
+                // 本机输出与 USB 独占（硬件/软件）双通路同步温和压低与还原
+                player.volume = if (ducked) 0.25f else 1.0f
+                app.volumeController.setDuckAttenuationDb(
+                    if (ducked) AudioFocusController.DUCK_ATTENUATION_DB else 0.0
+                )
+            },
+        )
+
+        serviceScope.launch {
+            audioFocus.focusState.collect { st ->
+                _audioFocusStateFlow.value = st
+            }
+        }
+
+        // 用远程音量 + 音频焦点抢占拦截 + 实时 HiFi 元数据代理包装 ExoPlayer
+        sessionPlayer = UsbVolumeForwardingPlayer(player, app, audioFocus)
 
         val openPlayerIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -181,11 +214,12 @@ class HiFiPlaybackService : MediaSessionService() {
             }
         }
 
-        // 监听 USB DAC 拔出：立即暂停并切换状态
+        // 监听 USB DAC 拔出：立即暂停并切换状态（同时取消自动恢复，防止拔掉 DAC 后外放）
         serviceScope.launch {
             app.usbManager.detachedEvents.collect {
                 if (app.prefs.current.pauseOnUnplug && player.isPlaying) {
                     Log.i(TAG, "USB DAC 拔出，自动暂停")
+                    audioFocus.onUserPaused()
                     player.pause()
                 }
                 if (_activeRouteFlow.value == ActiveOutputRoute.USB_EXCLUSIVE) {
@@ -247,6 +281,7 @@ class HiFiPlaybackService : MediaSessionService() {
     override fun onDestroy() {
         instance = null
         HiFiApp.from(this).volumeController.onVolumeChangedCallback = null
+        audioFocus.abandonFocus()
         saveCurrentPositionImmediate()
         releaseWakeLock()
         positionSaveJob?.cancel()
@@ -272,7 +307,13 @@ class HiFiPlaybackService : MediaSessionService() {
         hybridSink.reset()
         player.seekTo(index, posMs)
         player.prepare()
-        player.playWhenReady = autoResume
+        if (autoResume) {
+            if (audioFocus.requestFocusForPlayback()) {
+                player.playWhenReady = true
+            }
+        } else {
+            player.playWhenReady = false
+        }
     }
 
     /** 通知栏与 App 内收藏同步后调用，即时刷新通知栏心形图标 */
@@ -483,6 +524,9 @@ class HiFiPlaybackService : MediaSessionService() {
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
                 releaseWakeLock()
+                if (playbackState == Player.STATE_ENDED) {
+                    audioFocus.abandonFocus()
+                }
                 HiFiApp.from(this@HiFiPlaybackService).usbManager.refreshStats()
             }
         }
@@ -551,6 +595,9 @@ class HiFiPlaybackService : MediaSessionService() {
         private val _activeRouteFlow = MutableStateFlow(ActiveOutputRoute.NONE)
         val activeRouteFlow: StateFlow<ActiveOutputRoute> = _activeRouteFlow.asStateFlow()
 
+        private val _audioFocusStateFlow = MutableStateFlow(AudioFocusState.NONE)
+        val audioFocusStateFlow: StateFlow<AudioFocusState> = _audioFocusStateFlow.asStateFlow()
+
         /** 将 TrackEntity 转换为 Media3 MediaItem */
         fun trackToMediaItem(track: TrackEntity): MediaItem {
             val metaBuilder = MediaMetadata.Builder()
@@ -581,9 +628,38 @@ class HiFiPlaybackService : MediaSessionService() {
 private class UsbVolumeForwardingPlayer(
     player: Player,
     private val app: HiFiApp,
+    private val audioFocus: AudioFocusController,
 ) : ForwardingPlayer(player) {
 
     private val externalListeners = mutableListOf<Player.Listener>()
+
+    /** 统一拦截所有来源（UI/通知栏/锁屏/线控）的播放启动，先抢占系统音频焦点 */
+    override fun play() {
+        if (audioFocus.requestFocusForPlayback()) {
+            super.play()
+        }
+    }
+
+    override fun setPlayWhenReady(playWhenReady: Boolean) {
+        if (playWhenReady) {
+            if (audioFocus.requestFocusForPlayback()) {
+                super.setPlayWhenReady(true)
+            }
+        } else {
+            audioFocus.onUserPaused()
+            super.setPlayWhenReady(false)
+        }
+    }
+
+    override fun pause() {
+        audioFocus.onUserPaused()
+        super.pause()
+    }
+
+    override fun stop() {
+        audioFocus.abandonFocus()
+        super.stop()
+    }
 
     private fun isRemoteUsbVolumeActive(): Boolean =
         app.usbManager.isConnected &&
