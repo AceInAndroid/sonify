@@ -60,6 +60,8 @@
 - **Click-Free Transitions**: 5 ms smooth fade-in / fade-out on pause, resume, seek, and sample-rate switching.
 - **Ultra-Fast Lossless Metadata Scanner**: Custom binary header parser for FLAC (`STREAMINFO`, `VORBIS_COMMENT`, embedded `PICTURE`) and WAV (`fmt`, `data`, `LIST/INFO`) with local folder cover fallback and incremental fingerprinting via Room.
 - **Background Playback Reliability**: `MediaSessionService` foreground service, Spotify-style 5-button notification (`♡ Favorite · ⏮ · ⏯ · ⏭ · 🔁 Repeat`) with live HiFi output spec subtitle and in-process `512×512` artwork loader, dedicated **Vinyl Lockscreen** (`LockScreenActivity` via `USE_FULL_SCREEN_INTENT`), `nice = -16` audio-priority USB event loop for glitch-free screen-off playback, headphone/USB unplug auto-pause, headset button resumption (`onPlaybackResumption`), and smart `WakeLock`.
+- **System Audio Focus & Non-Destructive Ducking**: Full Android `AudioFocus` preemption, automatic pause/resume around phone calls and voice prompts, and `-12 dB` USB hardware/software ducking with 3 configurable policies (`Standard Duck`, `Pause on Duck`, `Ignore Duck`).
+- **Immersive Music Mode & Zen Vinyl**: True Edge-to-Edge layout with independent status bar and navigation bar hiding (`Now Playing & Lockscreen` or `Global` scope), optional desktop-stand keep-screen-on, and one-tap **Zen Vinyl** mode (tap the spinning disc to hide all chrome, leaving only the enlarged vinyl, live signal badge, track title, and a 2dp bottom progress bar).
 
 ---
 

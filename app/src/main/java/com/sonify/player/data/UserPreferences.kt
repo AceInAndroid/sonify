@@ -81,6 +81,17 @@ enum class AccentStyle(val label: String) {
     SPOTIFY_GREEN("Spotify 翠绿 (#1DB954)"),
 }
 
+enum class ImmersiveScope(val label: String, val subtitle: String) {
+    PLAYER_AND_LOCKSCREEN(
+        "仅播放页与锁屏（推荐）",
+        "进入黑胶播放页与锁屏时自动隐藏系统栏，回到音乐库与设置自动恢复"
+    ),
+    GLOBAL(
+        "全局应用",
+        "在 Sonify 所有页面均隐藏所选系统栏，边缘滑动可临时呼出"
+    ),
+}
+
 enum class AudioFocusPolicy(val label: String, val subtitle: String) {
     STANDARD_DUCK(
         "标准模式 · 压低避让（推荐）",
@@ -122,11 +133,16 @@ data class AppSettings(
     val scanDirs: List<String> = defaultScanDirs(),
     val importMode: ImportMode = ImportMode.REFERENCE,
     val minDurationFilter: MinDurationFilter = MinDurationFilter.SEC_15,
-    // 外观
+    // 外观与沉浸音乐模式
     val coverStyle: CoverStyle = CoverStyle.VINYL,
     val darkCanvasStyle: DarkCanvasStyle = DarkCanvasStyle.SPOTIFY_CHARCOAL,
     val accentStyle: AccentStyle = AccentStyle.VINYL_GOLD,
     val ambientBackground: Boolean = true,
+    val immersiveMusicMode: Boolean = true,
+    val immersiveScope: ImmersiveScope = ImmersiveScope.PLAYER_AND_LOCKSCREEN,
+    val immersiveHideStatusBar: Boolean = true,
+    val immersiveHideNavBar: Boolean = true,
+    val immersiveKeepScreenOn: Boolean = false,
     // 通知、锁屏与后台
     val lockScreenVinylEnabled: Boolean = true,
     val notifShowAudioSpec: Boolean = true,
@@ -175,6 +191,11 @@ class UserPreferences(private val context: Context) {
         val DARK_CANVAS = stringPreferencesKey("dark_canvas")
         val ACCENT_STYLE = stringPreferencesKey("accent_style")
         val AMBIENT_BG = booleanPreferencesKey("ambient_bg")
+        val IMMERSIVE_MODE = booleanPreferencesKey("immersive_music_mode")
+        val IMMERSIVE_SCOPE = stringPreferencesKey("immersive_scope")
+        val IMMERSIVE_HIDE_STATUS = booleanPreferencesKey("immersive_hide_status_bar")
+        val IMMERSIVE_HIDE_NAV = booleanPreferencesKey("immersive_hide_nav_bar")
+        val IMMERSIVE_KEEP_SCREEN_ON = booleanPreferencesKey("immersive_keep_screen_on")
         val LOCKSCREEN_VINYL = booleanPreferencesKey("lockscreen_vinyl")
         val NOTIF_SHOW_SPEC = booleanPreferencesKey("notif_show_spec")
         val WAKELOCK = booleanPreferencesKey("wakelock")
@@ -234,6 +255,13 @@ class UserPreferences(private val context: Context) {
                     runCatching { AccentStyle.valueOf(it) }.getOrNull()
                 } ?: AccentStyle.VINYL_GOLD,
                 ambientBackground = p[Keys.AMBIENT_BG] ?: true,
+                immersiveMusicMode = p[Keys.IMMERSIVE_MODE] ?: true,
+                immersiveScope = p[Keys.IMMERSIVE_SCOPE]?.let {
+                    runCatching { ImmersiveScope.valueOf(it) }.getOrNull()
+                } ?: ImmersiveScope.PLAYER_AND_LOCKSCREEN,
+                immersiveHideStatusBar = p[Keys.IMMERSIVE_HIDE_STATUS] ?: true,
+                immersiveHideNavBar = p[Keys.IMMERSIVE_HIDE_NAV] ?: true,
+                immersiveKeepScreenOn = p[Keys.IMMERSIVE_KEEP_SCREEN_ON] ?: false,
                 lockScreenVinylEnabled = p[Keys.LOCKSCREEN_VINYL] ?: true,
                 notifShowAudioSpec = p[Keys.NOTIF_SHOW_SPEC] ?: true,
                 wakeLockEnabled = p[Keys.WAKELOCK] ?: true,
@@ -364,6 +392,26 @@ class UserPreferences(private val context: Context) {
 
     suspend fun setAmbientBackground(enabled: Boolean) {
         context.dataStore.edit { it[Keys.AMBIENT_BG] = enabled }
+    }
+
+    suspend fun setImmersiveMusicMode(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.IMMERSIVE_MODE] = enabled }
+    }
+
+    suspend fun setImmersiveScope(scope: ImmersiveScope) {
+        context.dataStore.edit { it[Keys.IMMERSIVE_SCOPE] = scope.name }
+    }
+
+    suspend fun setImmersiveHideStatusBar(hide: Boolean) {
+        context.dataStore.edit { it[Keys.IMMERSIVE_HIDE_STATUS] = hide }
+    }
+
+    suspend fun setImmersiveHideNavBar(hide: Boolean) {
+        context.dataStore.edit { it[Keys.IMMERSIVE_HIDE_NAV] = hide }
+    }
+
+    suspend fun setImmersiveKeepScreenOn(keep: Boolean) {
+        context.dataStore.edit { it[Keys.IMMERSIVE_KEEP_SCREEN_ON] = keep }
     }
 
     suspend fun setLockScreenVinyl(enabled: Boolean) {

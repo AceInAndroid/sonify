@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.History
@@ -74,6 +75,7 @@ import com.sonify.player.data.BitDepthPref
 import com.sonify.player.data.BufferSizePref
 import com.sonify.player.data.CoverStyle
 import com.sonify.player.data.DarkCanvasStyle
+import com.sonify.player.data.ImmersiveScope
 import com.sonify.player.data.ImportMode
 import com.sonify.player.data.MinDurationFilter
 import com.sonify.player.data.SampleRatePolicy
@@ -101,6 +103,7 @@ private enum class ActiveSheet {
     COVER_STYLE,
     DARK_CANVAS,
     ACCENT_STYLE,
+    IMMERSIVE_SCOPE,
 }
 
 private sealed interface HighVolumeConfirm {
@@ -358,6 +361,43 @@ fun SettingsScreen(
             checked = settings.ambientBackground,
             onCheckedChange = { scope.launch { prefs.setAmbientBackground(it) } },
         )
+        SettingsSwitchItem(
+            icon = Icons.Rounded.Fullscreen,
+            title = "沉浸音乐模式",
+            subtitle = "隐藏状态栏与导航栏，边到边无干扰黑胶听音（边缘内滑呼出系统栏）",
+            checked = settings.immersiveMusicMode,
+            accentChecked = colors.accent,
+            onCheckedChange = { scope.launch { prefs.setImmersiveMusicMode(it) } },
+        )
+        if (settings.immersiveMusicMode) {
+            SettingsSelectItem(
+                icon = Icons.Rounded.Fullscreen,
+                title = "沉浸生效范围",
+                subtitle = settings.immersiveScope.label,
+                onClick = { activeSheet = ActiveSheet.IMMERSIVE_SCOPE },
+            )
+            SettingsSwitchItem(
+                icon = Icons.Rounded.Fullscreen,
+                title = "隐藏顶部状态栏",
+                subtitle = "隐藏时间、电量与顶部通知图标",
+                checked = settings.immersiveHideStatusBar,
+                onCheckedChange = { scope.launch { prefs.setImmersiveHideStatusBar(it) } },
+            )
+            SettingsSwitchItem(
+                icon = Icons.Rounded.Fullscreen,
+                title = "隐藏底部导航栏",
+                subtitle = "隐藏返回/主页/多任务三键或手势条",
+                checked = settings.immersiveHideNavBar,
+                onCheckedChange = { scope.launch { prefs.setImmersiveHideNavBar(it) } },
+            )
+            SettingsSwitchItem(
+                icon = Icons.Rounded.Album,
+                title = "沉浸时保持屏幕常亮",
+                subtitle = "仅播放页播放中生效，适合接 USB DAC 作桌面黑胶摆台",
+                checked = settings.immersiveKeepScreenOn,
+                onCheckedChange = { scope.launch { prefs.setImmersiveKeepScreenOn(it) } },
+            )
+        }
 
         // ==================== 分组 5：通知、锁屏与后台保活 ====================
         SettingsGroupHeader("通知、锁屏与后台保活")
@@ -600,6 +640,14 @@ fun SettingsScreen(
             options = AccentStyle.entries.map { SheetOption(it, it.label) },
             selected = settings.accentStyle,
             onSelect = { scope.launch { prefs.setAccentStyle(it) } },
+            onDismiss = { activeSheet = ActiveSheet.NONE },
+        )
+
+        ActiveSheet.IMMERSIVE_SCOPE -> SpotifyOptionSheet(
+            title = "沉浸音乐模式生效范围",
+            options = ImmersiveScope.entries.map { SheetOption(it, it.label, it.subtitle) },
+            selected = settings.immersiveScope,
+            onSelect = { scope.launch { prefs.setImmersiveScope(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 

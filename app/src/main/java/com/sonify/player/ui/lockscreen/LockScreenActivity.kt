@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -82,7 +83,10 @@ import com.sonify.player.ui.components.VolumeHudOverlay
 import com.sonify.player.ui.screens.CoverSquare
 import com.sonify.player.ui.theme.AmbientColorExtractor
 import com.sonify.player.ui.theme.HiFiPlayerTheme
+import com.sonify.player.ui.theme.ImmersiveBarRule
 import com.sonify.player.ui.theme.LocalHiFiColors
+import com.sonify.player.ui.theme.SystemBarsController
+import com.sonify.player.ui.theme.SystemBarsSpec
 import com.sonify.player.ui.theme.formatDuration
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -100,6 +104,7 @@ class LockScreenActivity : ComponentActivity() {
 
     private val vm: PlayerViewModel by viewModels()
     private val isActiveOnScreen = mutableStateOf(false)
+    private var latestBarsSpec = SystemBarsSpec()
 
     private val unlockReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -111,6 +116,7 @@ class LockScreenActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SystemBarsController.enableEdgeToEdge(window)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -128,6 +134,19 @@ class LockScreenActivity : ComponentActivity() {
 
         setContent {
             val settings by vm.settings.collectAsState()
+            val barsSpec = remember(settings) {
+                ImmersiveBarRule.resolve(
+                    settings = settings,
+                    isPlayerSurface = true,
+                    isPlaying = false,
+                    allowKeepScreenOn = false, // 锁屏不强行常亮避免口袋耗电
+                )
+            }
+            LaunchedEffect(barsSpec) {
+                latestBarsSpec = barsSpec
+                SystemBarsController.apply(window, barsSpec)
+            }
+
             HiFiPlayerTheme(
                 canvasStyle = settings.darkCanvasStyle,
                 accentStyle = settings.accentStyle,
@@ -138,12 +157,20 @@ class LockScreenActivity : ComponentActivity() {
                 ) {
                     LockScreenContent(
                         vm = vm,
+                        barsSpec = barsSpec,
                         isScreenActive = isActiveOnScreen.value,
                         onDismissLockScreen = { finish() },
                         onUnlockAndOpenApp = ::unlockAndOpenSonify,
                     )
                 }
             }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            SystemBarsController.apply(window, latestBarsSpec)
         }
     }
 
@@ -211,6 +238,7 @@ class LockScreenActivity : ComponentActivity() {
 @Composable
 private fun LockScreenContent(
     vm: PlayerViewModel,
+    barsSpec: SystemBarsSpec,
     isScreenActive: Boolean,
     onDismissLockScreen: () -> Unit,
     onUnlockAndOpenApp: () -> Unit,
@@ -260,6 +288,9 @@ private fun LockScreenContent(
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val artworkSize = (screenWidth * 0.62f).coerceIn(200f, 260f).dp
 
+    val topSafeMod = if (barsSpec.hideStatusBar) Modifier.displayCutoutPadding() else Modifier.statusBarsPadding()
+    val bottomSafeMod = if (barsSpec.hideNavBar) Modifier.padding(bottom = 10.dp) else Modifier.navigationBarsPadding()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -280,12 +311,12 @@ private fun LockScreenContent(
                     },
                 )
             }
-            .statusBarsPadding()
-            .navigationBarsPadding()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .then(topSafeMod)
+                .then(bottomSafeMod)
                 .padding(horizontal = 26.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -557,7 +588,7 @@ private fun LockScreenContent(
             volumeState = volumeState,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .statusBarsPadding(),
+                .then(topSafeMod),
         )
     }
 }

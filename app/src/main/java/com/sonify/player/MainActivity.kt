@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -70,7 +71,10 @@ import com.sonify.player.ui.screens.NowPlayingScreen
 import com.sonify.player.ui.screens.SettingsScreen
 import com.sonify.player.ui.screens.UsbDeviceScreen
 import com.sonify.player.ui.theme.HiFiPlayerTheme
+import com.sonify.player.ui.theme.ImmersiveBarRule
 import com.sonify.player.ui.theme.LocalHiFiColors
+import com.sonify.player.ui.theme.SystemBarsController
+import com.sonify.player.ui.theme.SystemBarsSpec
 import kotlinx.coroutines.launch
 
 private enum class MainTab(val label: String, val icon: ImageVector) {
@@ -83,9 +87,11 @@ class MainActivity : ComponentActivity() {
 
     private val vm: PlayerViewModel by viewModels()
     private val openPlayerTrigger = mutableStateOf(0L)
+    private var latestBarsSpec = SystemBarsSpec()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SystemBarsController.enableEdgeToEdge(window)
         if (intent?.getBooleanExtra(HiFiPlaybackService.EXTRA_OPEN_NOW_PLAYING, false) == true) {
             openPlayerTrigger.value = System.currentTimeMillis()
         }
@@ -99,9 +105,24 @@ class MainActivity : ComponentActivity() {
                     color = LocalHiFiColors.current.canvas,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    HiFiRootScreen(vm, openPlayerTrigger.value)
+                    HiFiRootScreen(
+                        vm = vm,
+                        openPlayerTrigger = openPlayerTrigger.value,
+                        onApplySystemBars = { spec ->
+                            latestBarsSpec = spec
+                            SystemBarsController.apply(window, spec)
+                        },
+                    )
                 }
             }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Android 10+ 弹出权限框或关闭 BottomSheet 后可能复位系统栏，重获焦点时自动重申沉浸态
+        if (hasFocus) {
+            SystemBarsController.apply(window, latestBarsSpec)
         }
     }
 
@@ -137,7 +158,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun HiFiRootScreen(vm: PlayerViewModel, openPlayerTrigger: Long) {
+private fun HiFiRootScreen(
+    vm: PlayerViewModel,
+    openPlayerTrigger: Long,
+    onApplySystemBars: (SystemBarsSpec) -> Unit,
+) {
     val context = LocalContext.current
     val app = remember { HiFiApp.from(context) }
     val scope = rememberCoroutineScope()
@@ -156,6 +181,18 @@ private fun HiFiRootScreen(vm: PlayerViewModel, openPlayerTrigger: Long) {
     var showNowPlaying by remember { mutableStateOf(false) }
     var showOutputSheet by remember { mutableStateOf(false) }
     var hasStoragePermission by remember { mutableStateOf(checkStoragePermission(context)) }
+
+    val isPlayerSurface = showNowPlaying && playback.currentTrack != null
+    val barsSpec = remember(settings, isPlayerSurface, playback.isPlaying) {
+        ImmersiveBarRule.resolve(
+            settings = settings,
+            isPlayerSurface = isPlayerSurface,
+            isPlaying = playback.isPlaying,
+        )
+    }
+    LaunchedEffect(barsSpec) {
+        onApplySystemBars(barsSpec)
+    }
 
     // 点击通知栏或从黑胶锁屏页解锁进入时自动展开全屏黑胶播放页
     LaunchedEffect(openPlayerTrigger) {
@@ -219,61 +256,69 @@ private fun HiFiRootScreen(vm: PlayerViewModel, openPlayerTrigger: Long) {
     val hasMiniPlayer = playback.currentTrack != null
     val bottomClearance = if (hasMiniPlayer) 132.dp else 68.dp
 
+    val topSafeModifier = if (barsSpec.hideStatusBar) Modifier.displayCutoutPadding() else Modifier.statusBarsPadding()
+    val bottomSafeModifier = if (barsSpec.hideNavBar) Modifier.padding(bottom = 4.dp) else Modifier.navigationBarsPadding()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.canvas)
-            .statusBarsPadding()
     ) {
-        when (currentTab) {
-            MainTab.LIBRARY -> LibraryScreen(
-                tracks = tracks,
-                playback = playback,
-                settings = settings,
-                scanState = scanState,
-                hasStoragePermission = hasStoragePermission,
-                onRequestPermission = ::requestStorageAccess,
-                onScan = vm::startScan,
-                onCancelScan = vm::cancelScan,
-                onImportFiles = { importLauncher.launch(arrayOf("audio/*")) },
-                onPlayTracks = { list, idx, ctxLabel ->
-                    vm.playTracks(list, idx, ctxLabel)
-                },
-                onResumeLast = { vm.resumeLastPlayback(tracks) },
-                bottomPadding = bottomClearance,
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(topSafeModifier)
+        ) {
+            when (currentTab) {
+                MainTab.LIBRARY -> LibraryScreen(
+                    tracks = tracks,
+                    playback = playback,
+                    settings = settings,
+                    scanState = scanState,
+                    hasStoragePermission = hasStoragePermission,
+                    onRequestPermission = ::requestStorageAccess,
+                    onScan = vm::startScan,
+                    onCancelScan = vm::cancelScan,
+                    onImportFiles = { importLauncher.launch(arrayOf("audio/*")) },
+                    onPlayTracks = { list, idx, ctxLabel ->
+                        vm.playTracks(list, idx, ctxLabel)
+                    },
+                    onResumeLast = { vm.resumeLastPlayback(tracks) },
+                    bottomPadding = bottomClearance,
+                )
 
-            MainTab.USB -> UsbDeviceScreen(
-                usbState = usbState,
-                settings = settings,
-                activeRoute = activeRoute,
-                onRefreshDevices = { app.usbManager.refreshDevices() },
-                onConnectDevice = { dev ->
-                    scope.launch { app.usbManager.connectDevice(dev) }
-                },
-                onDisconnectDevice = { app.usbManager.close() },
-                onToggleExclusive = { enabled ->
-                    scope.launch {
-                        app.prefs.setUsbExclusive(enabled)
-                        vm.rebindAudioRoute()
-                    }
-                },
-                onRefreshStats = { app.usbManager.refreshStats() },
-                onAppendLog = { app.usbManager.appendLog(it) },
-                bottomPadding = bottomClearance,
-            )
+                MainTab.USB -> UsbDeviceScreen(
+                    usbState = usbState,
+                    settings = settings,
+                    activeRoute = activeRoute,
+                    onRefreshDevices = { app.usbManager.refreshDevices() },
+                    onConnectDevice = { dev ->
+                        scope.launch { app.usbManager.connectDevice(dev) }
+                    },
+                    onDisconnectDevice = { app.usbManager.close() },
+                    onToggleExclusive = { enabled ->
+                        scope.launch {
+                            app.prefs.setUsbExclusive(enabled)
+                            vm.rebindAudioRoute()
+                        }
+                    },
+                    onRefreshStats = { app.usbManager.refreshStats() },
+                    onAppendLog = { app.usbManager.appendLog(it) },
+                    bottomPadding = bottomClearance,
+                )
 
-            MainTab.SETTINGS -> SettingsScreen(
-                settings = settings,
-                prefs = app.prefs,
-                volumeController = app.volumeController,
-                nativeBuildTime = usbState.stats.buildTime,
-                onRebindRoute = vm::rebindAudioRoute,
-                onScanNow = {
-                    if (hasStoragePermission) vm.startScan() else requestStorageAccess()
-                },
-                bottomPadding = bottomClearance,
-            )
+                MainTab.SETTINGS -> SettingsScreen(
+                    settings = settings,
+                    prefs = app.prefs,
+                    volumeController = app.volumeController,
+                    nativeBuildTime = usbState.stats.buildTime,
+                    onRebindRoute = vm::rebindAudioRoute,
+                    onScanNow = {
+                        if (hasStoragePermission) vm.startScan() else requestStorageAccess()
+                    },
+                    bottomPadding = bottomClearance,
+                )
+            }
         }
 
         // 底部悬浮 MiniPlayer + Spotify 风格半透明渐变 3-Tab 导航栏
@@ -288,7 +333,7 @@ private fun HiFiRootScreen(vm: PlayerViewModel, openPlayerTrigger: Long) {
                         1.0f to colors.canvas,
                     )
                 )
-                .navigationBarsPadding()
+                .then(bottomSafeModifier)
         ) {
             if (hasMiniPlayer) {
                 MiniPlayerBar(
@@ -364,6 +409,7 @@ private fun HiFiRootScreen(vm: PlayerViewModel, openPlayerTrigger: Long) {
                 volumeState = volumeState,
                 activeRoute = activeRoute,
                 audioFocusState = audioFocusState,
+                barsSpec = barsSpec,
                 onCollapse = { showNowPlaying = false },
                 onTogglePlayPause = vm::togglePlayPause,
                 onSkipNext = vm::skipNext,
@@ -380,6 +426,9 @@ private fun HiFiRootScreen(vm: PlayerViewModel, openPlayerTrigger: Long) {
                 onToggleMute = { muted ->
                     app.volumeController.setMuted(muted, showHud = false)
                 },
+                onToggleImmersiveMode = { enabled ->
+                    scope.launch { app.prefs.setImmersiveMusicMode(enabled) }
+                },
             )
         }
 
@@ -388,7 +437,7 @@ private fun HiFiRootScreen(vm: PlayerViewModel, openPlayerTrigger: Long) {
             volumeState = volumeState,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .statusBarsPadding(),
+                .then(topSafeModifier),
         )
     }
 
