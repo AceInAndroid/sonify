@@ -10,7 +10,7 @@
 [![USB Audio](https://img.shields.io/badge/USB%20Audio-UAC1%20%2F%20UAC2%20Exclusive-1ED760)]()
 [![License](https://img.shields.io/badge/License-Non--Commercial%20Only-EF5350)](LICENSE)
 
-**English** | [简体中文](README_ZH.md) | [Download v1.0.0 APK](https://github.com/AceInAndroid/sonify/releases/tag/v1.0.0)
+**English** | [简体中文](README_ZH.md) | [Official Website](https://sonify.zhangbing.tech) | [Download v1.0.0 APK](https://github.com/AceInAndroid/sonify/releases/tag/v1.0.0)
 
 </div>
 

@@ -55,6 +55,21 @@ FORBIDDEN_PROP_KEYS = frozenset({
 })
 BJ_TZ = datetime.timezone(datetime.timedelta(hours=8))
 
+STATIC_MIME_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".ico": "image/x-icon",
+    ".json": "application/json; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+    ".woff2": "font/woff2",
+}
+
 
 def bj_day_str(ts_ms: int | None = None) -> str:
     if ts_ms is None:
@@ -498,10 +513,12 @@ def make_handler(
     login_limiter: RateLimiter,
     admin_token: str,
     dashboard_html_path: str,
+    web_dir: str | None = None,
 ):
     crashes_dir = os.path.join(data_dir, "crashes")
     os.makedirs(crashes_dir, exist_ok=True)
     os.makedirs(releases_dir, exist_ok=True)
+    web_root = os.path.realpath(web_dir) if web_dir else None
 
     def read_manifest(channel: str = "stable") -> tuple[str | None, dict | None]:
         candidates = [
@@ -527,7 +544,7 @@ def make_handler(
             real_ip = self.headers.get("X-Real-IP", "").strip()
             return cf or fwd or real_ip or self.client_address[0]
 
-        def _send_json(self, status: int, obj: dict, extra_headers: dict | None = None):
+        def _send_json(self, status: int, obj: dict, extra_headers: dict | None = None, head_only: bool = False):
             raw = json.dumps(obj, ensure_ascii=False).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -538,9 +555,10 @@ def make_handler(
                 for k, v in extra_headers.items():
                     self.send_header(k, v)
             self.end_headers()
-            self.wfile.write(raw)
+            if not head_only:
+                self.wfile.write(raw)
 
-        def _send_html(self, status: int, html: str):
+        def _send_html(self, status: int, html: str, head_only: bool = False):
             raw = html.encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -548,7 +566,8 @@ def make_handler(
             self.send_header("Cache-Control", "no-store")
             self.send_header("Connection", "close")
             self.end_headers()
-            self.wfile.write(raw)
+            if not head_only:
+                self.wfile.write(raw)
 
         def _is_admin_authed(self) -> bool:
             if not admin_token:
@@ -583,7 +602,58 @@ def make_handler(
             except Exception as exc:
                 return None, 400, f"invalid_json: {exc}"
 
+        def do_HEAD(self):
+            self._handle_get_or_head(head_only=True)
+
         def do_GET(self):
+            self._handle_get_or_head(head_only=False)
+
+        def _resolve_static_file(self, url_path: str) -> str | None:
+            if not web_root or not os.path.isdir(web_root):
+                return None
+            rel = url_path.lstrip("/")
+            if not rel or rel == "/":
+                rel = "index.html"
+            # Reject control chars, backslashes, or hidden files
+            if "\\" in rel or "\x00" in rel:
+                return None
+            parts = [p for p in rel.split("/") if p]
+            if any(p in (".", "..") or p.startswith(".") for p in parts):
+                return None
+            candidate = os.path.realpath(os.path.join(web_root, *parts))
+            if not (candidate == web_root or candidate.startswith(web_root + os.sep)):
+                return None
+            if os.path.isfile(candidate):
+                return candidate
+            return None
+
+        def _serve_static_file(self, fpath: str, head_only: bool = False):
+            ext = os.path.splitext(fpath)[1].lower()
+            ctype = STATIC_MIME_TYPES.get(ext, "application/octet-stream")
+            size = os.path.getsize(fpath)
+            is_asset = ext in (".webp", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".woff2")
+            cache_ctrl = "public, max-age=86400" if is_asset else "no-cache"
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(size))
+            self.send_header("Cache-Control", cache_ctrl)
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            if head_only:
+                return
+            try:
+                with open(fpath, "rb") as f:
+                    while True:
+                        chunk = f.read(65536)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+        def _handle_get_or_head(self, head_only: bool = False):
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
             qs = urllib.parse.parse_qs(parsed.query)
@@ -593,7 +663,7 @@ def make_handler(
                     "status": "ok",
                     "service": "sonify-server",
                     "time": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                })
+                }, head_only=head_only)
                 return
 
             if path == "/api/v1/update/latest":
@@ -603,37 +673,37 @@ def make_handler(
                 try:
                     _, manifest = read_manifest(channel)
                 except Exception as exc:
-                    self._send_json(500, {"error": "manifest_read_error", "message": str(exc)})
+                    self._send_json(500, {"error": "manifest_read_error", "message": str(exc)}, head_only=head_only)
                     return
                 if not manifest:
-                    self._send_json(404, {"error": "no_release_manifest", "message": "尚未发布任何版本"})
+                    self._send_json(404, {"error": "no_release_manifest", "message": "尚未发布任何版本"}, head_only=head_only)
                     return
-                self._send_json(200, manifest)
+                self._send_json(200, manifest, head_only=head_only)
                 return
 
             if path.startswith("/releases/"):
                 fname = path[len("/releases/"):]
                 if not SAFE_FILENAME_RE.match(fname):
-                    self._send_json(400, {"error": "invalid_filename"})
+                    self._send_json(400, {"error": "invalid_filename"}, head_only=head_only)
                     return
                 fpath = os.path.join(releases_dir, fname)
                 if not os.path.isfile(fpath):
-                    self._send_json(404, {"error": "not_found"})
+                    self._send_json(404, {"error": "not_found"}, head_only=head_only)
                     return
-                self._serve_file_with_range(fpath)
+                self._serve_file_with_range(fpath, head_only=head_only)
                 return
 
             if path in ("/admin", "/admin/"):
                 if not os.path.isfile(dashboard_html_path):
-                    self._send_html(500, "<h1>admin_dashboard.html not found</h1>")
+                    self._send_html(500, "<h1>admin_dashboard.html not found</h1>", head_only=head_only)
                     return
                 with open(dashboard_html_path, "r", encoding="utf-8") as f:
-                    self._send_html(200, f.read())
+                    self._send_html(200, f.read(), head_only=head_only)
                 return
 
             if path == "/api/v1/admin/overview":
                 if not self._is_admin_authed():
-                    self._send_json(401, {"error": "unauthorized"})
+                    self._send_json(401, {"error": "unauthorized"}, head_only=head_only)
                     return
                 try:
                     days = int((qs.get("days") or ["14"])[0])
@@ -641,21 +711,28 @@ def make_handler(
                     days = 14
                 _, manifest = read_manifest("stable")
                 data = store.query_overview(days=days, crashes_dir=crashes_dir, manifest=manifest)
-                self._send_json(200, data)
+                self._send_json(200, data, head_only=head_only)
                 return
 
             if path == "/api/v1/admin/crashes":
                 if not self._is_admin_authed():
-                    self._send_json(401, {"error": "unauthorized"})
+                    self._send_json(401, {"error": "unauthorized"}, head_only=head_only)
                     return
                 try:
                     limit = max(1, min(100, int((qs.get("limit") or ["30"])[0])))
                 except ValueError:
                     limit = 30
-                self._send_json(200, {"items": read_recent_crashes(crashes_dir, limit=limit)})
+                self._send_json(200, {"items": read_recent_crashes(crashes_dir, limit=limit)}, head_only=head_only)
                 return
 
-            self._send_json(404, {"error": "not_found"})
+            # Static marketing website (/, /index.html, /styles.css, /app.js, /assets/*)
+            if not path.startswith("/api/"):
+                static_path = self._resolve_static_file(path)
+                if static_path:
+                    self._serve_static_file(static_path, head_only=head_only)
+                    return
+
+            self._send_json(404, {"error": "not_found"}, head_only=head_only)
 
         def do_POST(self):
             parsed = urllib.parse.urlparse(self.path)
@@ -764,7 +841,7 @@ def make_handler(
 
             self._send_json(404, {"error": "not_found"})
 
-        def _serve_file_with_range(self, fpath: str):
+        def _serve_file_with_range(self, fpath: str, head_only: bool = False):
             total = os.path.getsize(fpath)
             range_hdr = self.headers.get("Range")
             start, end = 0, total - 1
@@ -787,8 +864,10 @@ def make_handler(
                     start, end, status = 0, total - 1, 200
 
             length = end - start + 1
+            ext = os.path.splitext(fpath)[1].lower()
+            ctype = "text/plain; charset=utf-8" if ext == ".txt" else "application/vnd.android.package-archive"
             self.send_response(status)
-            self.send_header("Content-Type", "application/vnd.android.package-archive")
+            self.send_header("Content-Type", ctype)
             self.send_header("Accept-Ranges", "bytes")
             self.send_header("Content-Length", str(length))
             self.send_header("Cache-Control", "no-store")
@@ -796,6 +875,8 @@ def make_handler(
             if status == 206:
                 self.send_header("Content-Range", f"bytes {start}-{end}/{total}")
             self.end_headers()
+            if head_only:
+                return
 
             try:
                 with open(fpath, "rb") as f:
@@ -838,6 +919,10 @@ def main():
         "--dashboard-html",
         default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "admin_dashboard.html"),
     )
+    parser.add_argument(
+        "--web-dir",
+        default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "web"),
+    )
     args = parser.parse_args()
 
     releases_dir = args.releases_dir or os.path.join(args.data_dir, "releases")
@@ -852,11 +937,11 @@ def main():
     login_limiter = RateLimiter(LOGIN_RATE_LIMIT_MAX, RATE_LIMIT_WINDOW)
     server = http.server.ThreadingHTTPServer(
         (args.host, args.port),
-        make_handler(args.data_dir, releases_dir, store, limiter, login_limiter, admin_token, args.dashboard_html),
+        make_handler(args.data_dir, releases_dir, store, limiter, login_limiter, admin_token, args.dashboard_html, args.web_dir),
     )
     print(
         f"Sonify server listening on http://{args.host}:{args.port} "
-        f"(data={args.data_dir}, db={db_path}, admin={'enabled' if admin_token else 'disabled'})",
+        f"(data={args.data_dir}, db={db_path}, web={args.web_dir}, admin={'enabled' if admin_token else 'disabled'})",
         flush=True,
     )
     server.serve_forever()

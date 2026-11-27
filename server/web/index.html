@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#121212" />
+  <title>Sonify — Android Bit-Perfect USB 独占 HiFi 播放器</title>
+  <meta name="description" content="Sonify 是一款开源 Android Bit-Perfect USB Audio Class (UAC1/UAC2) 独占 HiFi 音乐播放器，绕过 AudioFlinger 重采样，支持最高 384kHz / 32-bit PCM、黑胶视觉、流体光晕同步歌词、四重防炸耳保护与 Subsonic 媒体库。" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Ambient Background Orbs -->
+  <div class="bg-ambient" aria-hidden="true">
+    <div class="orb orb-gold"></div>
+    <div class="orb orb-green"></div>
+    <div class="orb orb-deep"></div>
+  </div>
+
+  <!-- Top Sticky Navigation -->
+  <header class="navbar" id="navbar">
+    <div class="container nav-inner">
+      <a href="#top" class="brand" aria-label="Sonify Home">
+        <span class="brand-disc" aria-hidden="true">
+          <span class="brand-disc-label"></span>
+        </span>
+        <span class="brand-text">Sonify</span>
+        <span class="brand-badge">HiFi</span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary Navigation">
+        <a href="#showcase" data-i18n="nav.showcase">界面预览</a>
+        <a href="#features" data-i18n="nav.features">核心引擎</a>
+        <a href="#hardware" data-i18n="nav.hardware">实测硬件</a>
+        <a href="#download" data-i18n="nav.download">下载</a>
+      </nav>
+
+      <div class="nav-actions">
+        <div class="lang-switch" role="group" aria-label="Language Switch">
+          <button type="button" class="lang-btn active" data-lang="zh">中文</button>
+          <button type="button" class="lang-btn" data-lang="en">EN</button>
+        </div>
+        <a href="https://github.com/AceInAndroid/sonify" target="_blank" rel="noopener noreferrer" class="btn-icon" aria-label="GitHub Repository" title="GitHub">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+            <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+          </svg>
+        </a>
+        <a href="#download" class="btn btn-primary btn-sm" data-i18n="nav.getApp">免费下载</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <div class="release-pill">
+            <span class="pulse-dot"></span>
+            <span id="liveVersionBadge" data-i18n="hero.badge">v1.0.0 正式版 · Android 7.0+ · ARM64 / ARMv7</span>
+          </div>
+
+          <h1 class="hero-title" data-i18n-html="hero.title">
+            绕过重采样，<br /><span class="text-gradient">听见母带本色。</span>
+          </h1>
+
+          <p class="hero-subtitle" data-i18n="hero.subtitle">
+            专为本地无损与外接 USB DAC 打造的开源 Android HiFi 播放器。内置自研 C++17 / libusb 用户态 UAC1 &amp; UAC2 独占驱动，直通最高 384 kHz / 32-bit Bit-Perfect PCM，融合 Spotify 极简深色美学、旋转黑胶唱片与流体光晕同步歌词。
+          </p>
+
+          <div class="hero-cta">
+            <a href="#download" class="btn btn-primary btn-lg">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span data-i18n="hero.ctaDownload">下载 v1.0.0 正式版</span>
+            </a>
+            <a href="https://github.com/AceInAndroid/sonify" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-lg">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+              </svg>
+              <span data-i18n="hero.ctaGithub">查看 GitHub 源码</span>
+            </a>
+          </div>
+
+          <!-- Live Signal Badge -->
+          <div class="signal-pill" aria-label="Bit-Perfect Audio Path">
+            <span class="signal-src">FLAC 192kHz / 24-bit</span>
+            <span class="signal-arrow">→</span>
+            <span class="signal-dot"></span>
+            <span class="signal-out">USB Exclusive · 192kHz / 32-bit</span>
+          </div>
+
+          <div class="hero-metrics">
+            <div class="metric">
+              <strong>384 kHz</strong>
+              <span data-i18n="hero.m1">最高直通采样率</span>
+            </div>
+            <div class="metric-sep"></div>
+            <div class="metric">
+              <strong>&lt; 10 ppm</strong>
+              <span data-i18n="hero.m2">异步反馈时钟锁定</span>
+            </div>
+            <div class="metric-sep"></div>
+            <div class="metric">
+              <strong>4-Layer</strong>
+              <span data-i18n="hero.m3">硬件级防炸耳保护</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero Visual: Phone + Spinning Vinyl -->
+        <div class="hero-visual">
+          <div class="vinyl-stage" id="vinylStage">
+            <div class="vinyl-record spinning" id="heroVinyl" aria-hidden="true">
+              <div class="vinyl-grooves"></div>
+              <div class="vinyl-sheen"></div>
+              <div class="vinyl-label">
+                <span>SONIFY</span>
+                <small>BIT-PERFECT</small>
+              </div>
+              <div class="vinyl-spindle"></div>
+            </div>
+
+            <div class="phone-frame phone-hero">
+              <div class="phone-notch"></div>
+              <img
+                id="heroScreenshot"
+                src="/assets/screenshots/zh/now_playing.webp"
+                alt="Sonify Now Playing Vinyl Screen"
+                width="320"
+                height="693"
+                fetchpriority="high"
+              />
+            </div>
+
+            <button type="button" class="vinyl-toggle" id="vinylToggle" aria-label="Toggle Vinyl Rotation">
+              <svg id="vinylIconPause" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <rect x="6" y="5" width="4" height="14" rx="1"/>
+                <rect x="14" y="5" width="4" height="14" rx="1"/>
+              </svg>
+              <svg id="vinylIconPlay" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="display:none">
+                <polygon points="7,5 19,12 7,19"/>
+              </svg>
+              <span id="vinylToggleText" data-i18n="hero.vinylPlaying">黑胶旋转中</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive 6-Screen App Showcase -->
+    <section class="section showcase-section" id="showcase">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow" data-i18n="showcase.eyebrow">SPOTIFY DARK × VINYL AESTHETICS</span>
+          <h2 class="section-title" data-i18n="showcase.title">像黑胶一样沉浸，像仪表一样精准</h2>
+          <p class="section-desc" data-i18n="showcase.desc">
+            点击下方标签浏览全部 6 个核心实机界面。切换右上角「中文 / EN」按钮，手机画面也将实时同步为对应语言实拍截图。
+          </p>
+        </div>
+
+        <div class="showcase-tabs" role="tablist" aria-label="App Screens">
+          <button type="button" class="tab-pill active" role="tab" aria-selected="true" data-screen="now_playing" data-i18n="tabs.now_playing">黑胶播放页</button>
+          <button type="button" class="tab-pill" role="tab" aria-selected="false" data-screen="lyrics" data-i18n="tabs.lyrics">流体光晕歌词</button>
+          <button type="button" class="tab-pill" role="tab" aria-selected="false" data-screen="library" data-i18n="tabs.library">无损音乐库</button>
+          <button type="button" class="tab-pill" role="tab" aria-selected="false" data-screen="global_search" data-i18n="tabs.global_search">跨源全局搜索</button>
+          <button type="button" class="tab-pill" role="tab" aria-selected="false" data-screen="usb_dac" data-i18n="tabs.usb_dac">USB DAC 仪表</button>
+          <button type="button" class="tab-pill" role="tab" aria-selected="false" data-screen="settings" data-i18n="tabs.settings">设置与双语</button>
+        </div>
+
+        <div class="showcase-stage" id="showcaseStage" data-theme="now_playing">
+          <div class="showcase-glow" aria-hidden="true"></div>
+
+          <div class="showcase-device">
+            <div class="phone-frame phone-showcase">
+              <div class="phone-notch"></div>
+              <img
+                id="showcaseImg"
+                src="/assets/screenshots/zh/now_playing.webp"
+                alt="Sonify App Screenshot"
+                width="310"
+                height="672"
+                loading="lazy"
+              />
+            </div>
+          </div>
+
+          <div class="showcase-info">
+            <span class="screen-tag" id="screenTag">01 / 06 · NOW PLAYING</span>
+            <h3 class="screen-heading" id="screenTitle">黑胶全屏播放页 &amp; 纯享模式</h3>
+            <p class="screen-body" id="screenBody">
+              纯 Canvas 60fps 绘制旋转黑胶与静止 45° 高光，自动提取专辑主色渲染深邃氛围渐变；实时展示「源格式 → 实际协商输出」双徽章胶囊与单行歌词，轻触唱片即刻进入零干扰 Zen Vinyl 纯享态。
+            </p>
+            <ul class="screen-bullets" id="screenBullets"></ul>
+
+            <div class="showcase-thumbs" aria-label="Quick Screen Selector">
+              <button type="button" class="thumb-dot active" data-screen="now_playing" aria-label="Now Playing"></button>
+              <button type="button" class="thumb-dot" data-screen="lyrics" aria-label="Aurora Lyrics"></button>
+              <button type="button" class="thumb-dot" data-screen="library" aria-label="Library"></button>
+              <button type="button" class="thumb-dot" data-screen="global_search" aria-label="Global Search"></button>
+              <button type="button" class="thumb-dot" data-screen="usb_dac" aria-label="USB DAC"></button>
+              <button type="button" class="thumb-dot" data-screen="settings" aria-label="Settings"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Core Engineering Bento Grid -->
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow" data-i18n="features.eyebrow">AUDIOPHILE ARCHITECTURE</span>
+          <h2 class="section-title" data-i18n="features.title">从 C++ 底层驱动到指尖交互，全程无损</h2>
+          <p class="section-desc" data-i18n="features.desc">
+            拒绝套壳与黑盒音效，每一项特性都围绕真实发烧听音场景打磨。
+          </p>
+        </div>
+
+        <div class="bento-grid">
+          <!-- Wide Card 1: USB Audio Pipeline -->
+          <article class="bento-card bento-wide">
+            <div class="card-kicker kicker-green" data-i18n="f1.kicker">C++17 + LIBUSB 1.0.27</div>
+            <h3 data-i18n="f1.title">真正绕过 Android AudioFlinger 的 USB 独占引擎</h3>
+            <p data-i18n="f1.desc">
+              通过 UsbManager 授权与 claimInterface(force = true) 剥离内核 snd-usb-audio，经 libusb_wrap_sys_device() 直接在用户态按 125 µs 微帧精准排包，并由 16.16 定点异步 Feedback 端点闭环锁定 DAC 晶振。
+            </p>
+
+            <div class="pipeline" aria-label="Bit-Perfect Audio Pipeline">
+              <div class="pipe-node">
+                <span class="pipe-label">FLAC / WAV</span>
+                <small>Up to 384k / 24-32b</small>
+              </div>
+              <div class="pipe-arrow">→</div>
+              <div class="pipe-node">
+                <span class="pipe-label">2MB SPSC Ring</span>
+                <small>Lock-Free · DirectByteBuffer</small>
+              </div>
+              <div class="pipe-arrow">→</div>
+              <div class="pipe-node pipe-highlight">
+                <span class="pipe-label">125µs Iso OUT</span>
+                <small>AudioFlinger Bypassed</small>
+              </div>
+              <div class="pipe-arrow">→</div>
+              <div class="pipe-node pipe-gold">
+                <span class="pipe-label">USB DAC</span>
+                <small>16.16 Async Feedback</small>
+              </div>
+            </div>
+          </article>
+
+          <!-- Interactive Card 2: 4-Layer Ear Protection -->
+          <article class="bento-card bento-tall">
+            <div class="card-kicker kicker-red" data-i18n="f2.kicker">4-LAYER EAR GUARD</div>
+            <h3 data-i18n="f2.title">硬件音量与四重防炸耳护耳</h3>
+            <p data-i18n="f2.desc">
+              优先调用 UAC Feature Unit 硬件衰减器，保持数字 PCM 100% 位精确直通；前后台接管物理音量键，默认 60% 硬上限与 25% 安全起步音量，守护高敏耳塞与听力。
+            </p>
+
+            <div class="ear-sim">
+              <div class="ear-sim-head">
+                <span data-i18n="f2.simLabel">实时护耳模拟（上限 60%）</span>
+                <strong id="earSimReadout">35% · -39.0 dB</strong>
+              </div>
+              <div class="ear-bar-wrap">
+                <div class="ear-ceiling-zone" title="Protected Ceiling Zone (60%-100%)"></div>
+                <input
+                  type="range"
+                  id="earSlider"
+                  min="0"
+                  max="100"
+                  value="35"
+                  aria-label="Volume Ear Protection Simulator"
+                />
+              </div>
+              <div class="ear-sim-foot">
+                <span id="earSimStatus" class="status-safe" data-i18n="f2.safe">● 安全听音区 · Bit-Perfect 硬件衰减</span>
+                <span class="ceiling-tag">MAX 60%</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- Card 3: Fluid Aurora Lyrics -->
+          <article class="bento-card">
+            <div class="card-icon icon-gold">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18V5l12-2v13"/>
+                <circle cx="6" cy="18" r="3"/>
+                <circle cx="18" cy="16" r="3"/>
+              </svg>
+            </div>
+            <h3 data-i18n="f3.title">流体光晕与五级同步歌词</h3>
+            <p data-i18n="f3.desc">
+              本地 LRC（UTF-8/GB18030 防乱码、逐字增强时间戳）→ 内嵌标签 → Subsonic → LRCLIB 在线五级瀑布匹配，搭配 60fps 逐句流光扫色与多色流体氛围光晕。
+            </p>
+          </article>
+
+          <!-- Card 4: Subsonic & Offline Lossless -->
+          <article class="bento-card">
+            <div class="card-icon icon-green">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+              </svg>
+            </div>
+            <h3 data-i18n="f4.title">Subsonic 多服与离线原盘</h3>
+            <p data-i18n="f4.desc">
+              完整兼容 Navidrome / Subsonic / Airsonic / Gonic / Jellyfin，密码经 Android Keystore (AES-256-GCM) 加密保存，Wi-Fi 默认 format=raw 原盘直通与整单离线下载。
+            </p>
+          </article>
+
+          <!-- Card 5: WiFi LAN Music Transfer -->
+          <article class="bento-card">
+            <div class="card-icon icon-gold">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                <circle cx="12" cy="20" r="1"/>
+              </svg>
+            </div>
+            <h3 data-i18n="f5.title">WiFi 局域网无损传歌</h3>
+            <p data-i18n="f5.desc">
+              手机扫码或电脑浏览器拖拽整张专辑文件夹直传，内置三层 SHA-256 防重复校验与零 OOM 流式落盘，上传完毕秒入音乐库。
+            </p>
+          </article>
+
+          <!-- Card 6: Global Search & Bilingual -->
+          <article class="bento-card">
+            <div class="card-icon icon-green">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </div>
+            <h3 data-i18n="f6.title">简繁互通搜索与双语热切换</h3>
+            <p data-i18n="f6.desc">
+              跨本地曲库、歌单、Subsonic 与 .lrc 歌词搜歌，内置简繁归一化与规格搜索（FLAC 96k）；中英双语 1 帧即时切换，不断开 USB DAC 播放。
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Verified Hardware Telemetry Strip -->
+    <section class="section hardware-section" id="hardware">
+      <div class="container">
+        <div class="hardware-card">
+          <div class="hardware-left">
+            <span class="eyebrow" data-i18n="hw.eyebrow">REAL-DEVICE VERIFIED</span>
+            <h2 class="hardware-title" data-i18n="hw.title">真机与外置 DAC 实测数据</h2>
+            <p class="hardware-desc" data-i18n="hw.desc">
+              所有版本均经过物理 Android 10 (API 29) 机型与水月雨 MOONRIVER 3 (UAC2 High-Speed) 实机门禁验收，保证长时间息屏播放稳定零欠载。
+            </p>
+          </div>
+
+          <div class="hardware-specs">
+            <div class="spec-item">
+              <span class="spec-key">DAC</span>
+              <span class="spec-val">Moondrop MOONRIVER 3</span>
+              <small>VID 0x35D8 · PID 0x43DA</small>
+            </div>
+            <div class="spec-item">
+              <span class="spec-key" data-i18n="hw.clock">异步反馈实测</span>
+              <span class="spec-val text-green">44099.6 Hz</span>
+              <small>&lt; 10 ppm · 0 Underruns</small>
+            </div>
+            <div class="spec-item">
+              <span class="spec-key" data-i18n="hw.vol">硬件音量单元</span>
+              <span class="spec-val text-gold">Feature Unit ID=10</span>
+              <small>-100 .. 0 dB · 0.5 dB step</small>
+            </div>
+            <div class="spec-item">
+              <span class="spec-key" data-i18n="hw.compat">系统兼容范围</span>
+              <span class="spec-val">Android 7.0 – 15+</span>
+              <small>API 24+ · arm64-v8a / armeabi-v7a</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Download Section -->
+    <section class="section download-section" id="download">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow" data-i18n="dl.eyebrow">OFFICIAL RELEASE v1.0.0</span>
+          <h2 class="section-title" data-i18n="dl.title">立即下载 Sonify v1.0.0</h2>
+          <p class="section-desc" data-i18n="dl.desc">
+            全部安装包均为官方 V1+V2+V3 正式签名，支持高速直连下载与 SHA-256 完整性校验。
+          </p>
+        </div>
+
+        <div class="download-grid">
+          <!-- ARM64 Recommended -->
+          <article class="dl-card dl-featured">
+            <div class="dl-badge" data-i18n="dl.recommended">推荐 · 绝大多数手机</div>
+            <h3>ARM64 (arm64-v8a)</h3>
+            <p class="dl-desc" data-i18n="dl.arm64Desc">
+              适配绝大多数现代 64 位 Android 手机与 HiFi 国砖播放器，体积更轻、性能最佳。
+            </p>
+            <div class="dl-meta">
+              <span>v1.0.0</span>
+              <span>·</span>
+              <span>16.1 MB</span>
+              <span>·</span>
+              <span>V3 Signed</span>
+            </div>
+            <div class="dl-actions">
+              <a href="/releases/sonify-v1.0.0-arm64-v8a.apk" class="btn btn-primary btn-block" download>
+                <span data-i18n="dl.directBtn">高速直连下载</span>
+              </a>
+              <a href="https://github.com/AceInAndroid/sonify/releases/download/v1.0.0/sonify-v1.0.0-arm64-v8a.apk" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-block btn-sm" data-i18n="dl.ghMirror">
+                GitHub 镜像下载
+              </a>
+            </div>
+            <button type="button" class="sha-box" data-sha="35e14a3f7043262aa2989871670069d34fcbd69a75b3c6995afa3df6c134741c" title="Click to copy SHA-256">
+              <span class="sha-label">SHA-256</span>
+              <code>35e14a3f…c134741c</code>
+              <span class="sha-copy" data-i18n="dl.copy">复制</span>
+            </button>
+          </article>
+
+          <!-- Universal -->
+          <article class="dl-card">
+            <div class="dl-badge badge-neutral" data-i18n="dl.universalBadge">全架构通用</div>
+            <h3>Universal (ARMv8 + v7a)</h3>
+            <p class="dl-desc" data-i18n="dl.uniDesc">
+              同时内置 64 位与 32 位原生音频驱动库；如果不确定设备处理器架构，直接选择此包即可。
+            </p>
+            <div class="dl-meta">
+              <span>v1.0.0</span>
+              <span>·</span>
+              <span>16.6 MB</span>
+              <span>·</span>
+              <span>V3 Signed</span>
+            </div>
+            <div class="dl-actions">
+              <a href="/releases/sonify-v1.0.0-universal.apk" class="btn btn-outline btn-block" download>
+                <span data-i18n="dl.directBtn">高速直连下载</span>
+              </a>
+              <a href="https://github.com/AceInAndroid/sonify/releases/download/v1.0.0/sonify-v1.0.0-universal.apk" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-block btn-sm" data-i18n="dl.ghMirror">
+                GitHub 镜像下载
+              </a>
+            </div>
+            <button type="button" class="sha-box" data-sha="bff5f74dc39d147a4ac40d4134266583eda07674348541ea73ae865771b4eaff" title="Click to copy SHA-256">
+              <span class="sha-label">SHA-256</span>
+              <code>bff5f74d…71b4eaff</code>
+              <span class="sha-copy" data-i18n="dl.copy">复制</span>
+            </button>
+          </article>
+
+          <!-- ARMv7 -->
+          <article class="dl-card">
+            <div class="dl-badge badge-neutral" data-i18n="dl.armv7Badge">32 位旧机型</div>
+            <h3>ARMv7 (armeabi-v7a)</h3>
+            <p class="dl-desc" data-i18n="dl.armv7Desc">
+              专为老款 32 位 Android 手机与早期 HiFi 便携播放器编译的精简安装包。
+            </p>
+            <div class="dl-meta">
+              <span>v1.0.0</span>
+              <span>·</span>
+              <span>15.9 MB</span>
+              <span>·</span>
+              <span>V3 Signed</span>
+            </div>
+            <div class="dl-actions">
+              <a href="/releases/sonify-v1.0.0-armeabi-v7a.apk" class="btn btn-outline btn-block" download>
+                <span data-i18n="dl.directBtn">高速直连下载</span>
+              </a>
+              <a href="https://github.com/AceInAndroid/sonify/releases/download/v1.0.0/sonify-v1.0.0-armeabi-v7a.apk" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-block btn-sm" data-i18n="dl.ghMirror">
+                GitHub 镜像下载
+              </a>
+            </div>
+            <button type="button" class="sha-box" data-sha="2d227dfac89c3e01e320e7166dcdddd072db83ac1dbff3f0169323d2c8594615" title="Click to copy SHA-256">
+              <span class="sha-label">SHA-256</span>
+              <code>2d227dfa…c8594615</code>
+              <span class="sha-copy" data-i18n="dl.copy">复制</span>
+            </button>
+          </article>
+        </div>
+
+        <div class="checksum-bar">
+          <span data-i18n="dl.checksumNote">完整校验文件与版本更新日志：</span>
+          <a href="/releases/SHA256SUMS.txt" target="_blank" rel="noopener noreferrer">SHA256SUMS.txt</a>
+          <span>·</span>
+          <a href="https://github.com/AceInAndroid/sonify/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer" data-i18n="dl.releasePage">GitHub Release v1.0.0</a>
+          <span>·</span>
+          <a href="https://github.com/AceInAndroid/sonify/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer" data-i18n="dl.changelog">更新日志 CHANGELOG</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <div class="brand">
+          <span class="brand-disc" aria-hidden="true"><span class="brand-disc-label"></span></span>
+          <span class="brand-text">Sonify</span>
+        </div>
+        <p class="footer-tagline" data-i18n="footer.tagline">
+          开源 Android Bit-Perfect USB 独占 HiFi 播放器 · 专注纯粹无损听音体验。
+        </p>
+        <p class="license-note" data-i18n="footer.license">
+          遵循 Sonify 非商用开源许可协议 v1.0：允许个人免费使用、学习与社区贡献，未经作者书面授权严禁任何形式商用。
+        </p>
+      </div>
+
+      <div class="footer-cols">
+        <div class="footer-col">
+          <h4 data-i18n="footer.project">开源项目</h4>
+          <a href="https://github.com/AceInAndroid/sonify" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/AceInAndroid/sonify/releases" target="_blank" rel="noopener noreferrer" data-i18n="footer.releases">全部版本</a>
+          <a href="https://github.com/AceInAndroid/sonify/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer" data-i18n="footer.changelog">更新日志</a>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.docs">文档与协议</h4>
+          <a href="https://github.com/AceInAndroid/sonify/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" data-i18n="footer.licenseLink">非商用许可协议</a>
+          <a href="https://github.com/AceInAndroid/sonify/blob/main/docs/i18n/I18N_STANDARD.md" target="_blank" rel="noopener noreferrer" data-i18n="footer.i18n">多语言适配标准</a>
+          <a href="https://github.com/AceInAndroid/sonify/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.issues">问题反馈</a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© 2026 Sonify · AceInAndroid</span>
+      <span class="footer-domain">sonify.zhangbing.tech</span>
+    </div>
+  </footer>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
