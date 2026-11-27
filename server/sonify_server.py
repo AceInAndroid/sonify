@@ -751,6 +751,10 @@ def make_handler(
                     manifest["minSupportedVersionCode"] = max(1, int(payload["minSupportedVersionCode"]))
                 if "releaseNotes" in payload and isinstance(payload["releaseNotes"], str):
                     manifest["releaseNotes"] = payload["releaseNotes"][:4000]
+                if "changelogUrl" in payload and isinstance(payload["changelogUrl"], str):
+                    manifest["changelogUrl"] = payload["changelogUrl"].strip()[:512]
+                if "repoUrl" in payload and isinstance(payload["repoUrl"], str):
+                    manifest["repoUrl"] = payload["repoUrl"].strip()[:512]
                 tmp_path = f"{manifest_path}.tmp"
                 with open(tmp_path, "w", encoding="utf-8") as f:
                     json.dump(manifest, f, ensure_ascii=False, indent=2)

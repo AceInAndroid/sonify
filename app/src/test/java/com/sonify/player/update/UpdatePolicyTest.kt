@@ -102,7 +102,9 @@ class UpdatePolicyTest {
               "apkUrl": "https://sonify.zhangbing.tech/releases/sonify-v0.3.0.apk",
               "fileSize": 10485760,
               "sha256": "${"B".repeat(64)}",
-              "publishedAt": "2026-11-27T12:00:00Z"
+              "publishedAt": "2026-11-27T12:00:00Z",
+              "changelogUrl": "https://github.com/AceInAndroid/sonify/releases/tag/v0.3.0",
+              "repoUrl": "https://github.com/AceInAndroid/sonify"
             }
         """.trimIndent()
         val parsed = ReleaseInfo.fromJson(json)
@@ -110,7 +112,19 @@ class UpdatePolicyTest {
         assertEquals(3, parsed!!.versionCode)
         assertEquals("0.3.0", parsed.versionName)
         assertEquals("b".repeat(64), parsed.sha256)
+        assertEquals("https://github.com/AceInAndroid/sonify/releases/tag/v0.3.0", parsed.changelogUrl)
+        assertEquals("https://github.com/AceInAndroid/sonify", parsed.repoUrl)
 
         assertNull(ReleaseInfo.fromJson("""{"versionCode": 0, "versionName": ""}"""))
+    }
+
+    @Test
+    fun releaseNotesCatalog_formatsDatesAndFallbackNotes() {
+        assertTrue(ReleaseNotesCatalog.entries.isNotEmpty())
+        assertEquals("2026-11-27", ReleaseNotesCatalog.formatPublishedDate("2026-11-27T04:40:00Z"))
+        assertEquals("", ReleaseNotesCatalog.formatPublishedDate(""))
+        val fallback = ReleaseNotesCatalog.formatCurrentNotes(null, "0.2.0")
+        assertTrue(fallback.contains("全局搜索"))
+        assertEquals("Custom notes", ReleaseNotesCatalog.formatCurrentNotes(sampleRelease().copy(releaseNotes = "Custom notes"), "0.2.0"))
     }
 }

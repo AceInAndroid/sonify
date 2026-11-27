@@ -187,6 +187,10 @@
         <label for="notesInput">更新日志（releaseNotes）</label>
         <textarea id="notesInput" rows="3"></textarea>
       </div>
+      <div class="field">
+        <label for="changelogUrlInput">GitHub 发布页 / 更新日志链接（changelogUrl）</label>
+        <input id="changelogUrlInput" type="url" placeholder="https://github.com/AceInAndroid/sonify/releases" />
+      </div>
       <button class="primary" style="width:100%;padding:9px;" onclick="saveReleasePolicy()">立即保存并在线生效</button>
     </div>
   </section>
@@ -328,6 +332,7 @@ async function saveReleasePolicy() {
     forceUpdate: document.getElementById('forceToggle').checked,
     minSupportedVersionCode: parseInt(document.getElementById('minVerInput').value, 10) || 1,
     releaseNotes: document.getElementById('notesInput').value,
+    changelogUrl: document.getElementById('changelogUrlInput').value.trim(),
   };
   const res = await fetch('/api/v1/admin/release/policy', {
     method: 'POST', headers: {'Content-Type':'application/json'},
@@ -385,6 +390,7 @@ async function loadAll() {
     document.getElementById('forceToggle').checked = !!rel.forceUpdate;
     document.getElementById('minVerInput').value = rel.minSupportedVersionCode || 1;
     document.getElementById('notesInput').value = rel.releaseNotes || '';
+    document.getElementById('changelogUrlInput').value = rel.changelogUrl || 'https://github.com/AceInAndroid/sonify/releases';
   }
 
   document.getElementById('eventsBody').innerHTML = (data.topEvents || []).length

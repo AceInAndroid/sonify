@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
@@ -104,9 +105,11 @@ import com.sonify.player.data.StreamQuality
 import com.sonify.player.data.SubsonicServerEntity
 import com.sonify.player.data.UserPreferences
 import com.sonify.player.data.VolumeMode
+import com.sonify.player.ui.components.ChangelogDialog
 import com.sonify.player.ui.components.LyricsSettingsPreviewCard
 import com.sonify.player.ui.components.SheetOption
 import com.sonify.player.ui.components.SpotifyOptionSheet
+import com.sonify.player.update.ProjectLinks
 import com.sonify.player.ui.theme.CoverArtSupport
 import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.usb.UsbVolumeController
@@ -184,6 +187,7 @@ fun SettingsScreen(
     var activeSheet by remember { mutableStateOf(ActiveSheet.NONE) }
     var showDirsDialog by remember { mutableStateOf(false) }
     var showKeepAliveDialog by remember { mutableStateOf(false) }
+    var showChangelogDialog by remember { mutableStateOf(false) }
     var showUpdateServerDialog by remember { mutableStateOf(false) }
     var showSimulateCrashConfirm by remember { mutableStateOf(false) }
     var highVolConfirm by remember { mutableStateOf<HighVolumeConfirm?>(null) }
@@ -758,6 +762,18 @@ fun SettingsScreen(
             badgeText = updateAvailableBadge?.let { "v${it.versionName}" },
             onClick = onCheckUpdate,
         )
+        SettingsSelectItem(
+            icon = Icons.Rounded.History,
+            title = "版本更新日志",
+            subtitle = "查看 v${BuildConfig.VERSION_NAME} 及历史版本更新内容与特性说明",
+            onClick = { showChangelogDialog = true },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Code,
+            title = "GitHub 开源主页",
+            subtitle = "github.com/AceInAndroid/sonify · 仅限个人非商用（禁止商用）",
+            onClick = { ProjectLinks.openExternalUrl(context, ProjectLinks.GITHUB_REPO_URL) },
+        )
         SettingsSwitchItem(
             icon = Icons.Rounded.Download,
             title = "自动检查更新",
@@ -807,6 +823,7 @@ fun SettingsScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable { ProjectLinks.openExternalUrl(context, ProjectLinks.GITHUB_LICENSE_URL) }
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -829,8 +846,17 @@ fun SettingsScreen(
                     fontFamily = FontFamily.Monospace,
                     color = colors.textMuted,
                 )
+                Text(
+                    text = "开源协议：Sonify Non-Commercial v1.0（禁止商用） · 点击查看",
+                    fontSize = 11.sp,
+                    color = colors.textMuted,
+                )
             }
         }
+    }
+
+    if (showChangelogDialog) {
+        ChangelogDialog(onDismiss = { showChangelogDialog = false })
     }
 
     // ---- 单选 BottomSheet ----

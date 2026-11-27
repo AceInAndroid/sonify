@@ -7,7 +7,7 @@
 [![Platform](https://img.shields.io/badge/Android-7.0%2B%20(API%2024%2B)-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
 [![ABI](https://img.shields.io/badge/ABI-arm64--v8a-blue)]()
 [![USB Audio](https://img.shields.io/badge/USB%20Audio-UAC1%20%2F%20UAC2%20Exclusive-1ED760)]()
-[![License](https://img.shields.io/badge/License-Apache--2.0-E5A93C)](LICENSE)
+[![License](https://img.shields.io/badge/License-仅限非商用-EF5350)](LICENSE)
 
 [English](README.md) | **简体中文**
 
@@ -133,7 +133,7 @@ rm -rf app/build app/.cxx build
 所有新增功能与代码改动上线前必须先通过单元测试与真机功能/视觉验收：
 - 强制门禁规范：[AGENTS.md](AGENTS.md) · [发布门禁清单](docs/testing/RELEASE_GATE.md)
 - 测试总方案：[docs/testing/TEST_PLAN.md](docs/testing/TEST_PLAN.md)
-- 端到端测试用例库（76 条）：[docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
+- 端到端测试用例库（78 条）：[docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
 - 真机测试验收报告：[docs/testing/reports/](docs/testing/reports/)
 
 ### 调试日志
@@ -155,7 +155,11 @@ adb logcat -s HiFiAudio:* HiFiVolume:* HiFiAudioSink:* HiFiCodecRenderer:*
 
 ---
 
-## 开源许可
+## 开源许可协议（禁止商用）
 
-本项目代码基于 [Apache License 2.0](LICENSE) 开源。
-`third_party/libusb/` 遵循其原始 **LGPL-2.1** 许可协议。
+本项目采用 **[Sonify 非商用开源许可协议 v1.0](LICENSE)** 发布：
+- **允许范围**：个人免费使用、学习研究、非商业用途的二次修改与分享，以及向官方仓库提交 Issue / Pull Request。
+- **禁止商用**：**严禁未经作者提前书面授权的任何形式商业用途**，包括但不限于收费分发、套壳广告盈利，或将本项目代码/音频引擎集成、预装至商业软件及商业硬件设备出货。
+- **商业授权**：如需企业或硬件商业授权，请通过 [GitHub 仓库](https://github.com/AceInAndroid/sonify) 联系作者。
+- **第三方组件**：`third_party/libusb/` 仍遵循其原始 **LGPL-2.1** 许可协议（详见 `third_party/libusb/COPYING`）。
+- **版本日志**：查看 [CHANGELOG.md](CHANGELOG.md) 或 [GitHub Releases](https://github.com/AceInAndroid/sonify/releases)。

@@ -176,7 +176,7 @@ class AppUpdateManager(
                     }
                 } else {
                     _availableBadge.value = null
-                    _state.value = UpdateState.UpToDate(System.currentTimeMillis())
+                    _state.value = UpdateState.UpToDate(System.currentTimeMillis(), latestRelease = release)
                 }
             }.onFailure { err ->
                 if (manual) {

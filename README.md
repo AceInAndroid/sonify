@@ -7,7 +7,7 @@
 [![Platform](https://img.shields.io/badge/Android-7.0%2B%20(API%2024%2B)-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
 [![ABI](https://img.shields.io/badge/ABI-arm64--v8a-blue)]()
 [![USB Audio](https://img.shields.io/badge/USB%20Audio-UAC1%20%2F%20UAC2%20Exclusive-1ED760)]()
-[![License](https://img.shields.io/badge/License-Apache--2.0-E5A93C)](LICENSE)
+[![License](https://img.shields.io/badge/License-Non--Commercial%20Only-EF5350)](LICENSE)
 
 **English** | [简体中文](README_ZH.md)
 
@@ -133,7 +133,7 @@ APK output: `app/build/outputs/apk/debug/app-debug.apk`
 Every feature and modification must pass unit tests **and** real-device verification before release:
 - Mandatory Gate Rule: [AGENTS.md](AGENTS.md) & [Release Gate SOP](docs/testing/RELEASE_GATE.md)
 - Master Test Plan: [docs/testing/TEST_PLAN.md](docs/testing/TEST_PLAN.md)
-- End-to-End Test Cases (76 cases): [docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
+- End-to-End Test Cases (78 cases): [docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
 - Device QA Reports: [docs/testing/reports/](docs/testing/reports/)
 
 ### Debugging USB Audio Logs
@@ -155,7 +155,11 @@ adb logcat -s HiFiAudio:* HiFiVolume:* HiFiAudioSink:* HiFiCodecRenderer:*
 
 ---
 
-## License
+## License (Non-Commercial Only)
 
-Licensed under the [Apache License 2.0](LICENSE).
-`third_party/libusb/` is included under its original **LGPL-2.1** license.
+Sonify is released under the **[Sonify Non-Commercial Source-Available License v1.0](LICENSE)**:
+- **Permitted**: Free personal use, learning, academic research, non-commercial modification, and community contributions (Issues / Pull Requests).
+- **Prohibited**: **Any commercial use is strictly prohibited** without prior explicit written authorization from the author—including selling, paid/ad-supported redistribution, or embedding/pre-installing Sonify or its modules into commercial software or hardware products.
+- **Commercial Licensing**: Please contact the author via [GitHub](https://github.com/AceInAndroid/sonify).
+- **Third-Party Notice**: `third_party/libusb/` remains licensed under its original **LGPL-2.1** license (`third_party/libusb/COPYING`).
+- **Release Notes**: See [CHANGELOG.md](CHANGELOG.md) or [GitHub Releases](https://github.com/AceInAndroid/sonify/releases).

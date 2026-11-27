@@ -18,9 +18,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.InstallMobile
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Security
@@ -40,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -50,7 +54,9 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.sonify.player.BuildConfig
 import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.update.ApkInstaller
+import com.sonify.player.update.ProjectLinks
 import com.sonify.player.update.ReleaseInfo
+import com.sonify.player.update.ReleaseNotesCatalog
 import com.sonify.player.update.UpdatePolicy
 import com.sonify.player.update.UpdateState
 import com.sonify.player.update.isForcedUpdate
@@ -58,7 +64,7 @@ import java.io.File
 
 /**
  * Spotify-Dark 风格应用内更新弹窗：
- * - 普通更新支持更新日志、进度与速度、SHA-256 校验、忽略版本与未知来源权限引导；
+ * - 清晰展示本次更新内容、发布日期、安装包体积、内置历史更新日志与 GitHub 项目/发布页直达链接；
  * - 强制更新（Force Update）在 Available / Downloading / Verifying / ReadyToInstall / Error 全生命周期锁死，
  *   禁止返回键与点击外部关闭，隐藏跳过/稍后/关闭按钮，仅允许升级或退出应用。
  */
@@ -76,6 +82,7 @@ fun UpdateDialog(
     val colors = LocalHiFiColors.current
     val context = LocalContext.current
     var needUnknownSourcePermission by remember { mutableStateOf(false) }
+    var showChangelogDialog by remember { mutableStateOf(false) }
 
     val isForced = state.isForcedUpdate
 
@@ -163,19 +170,69 @@ fun UpdateDialog(
                     }
 
                     is UpdateState.UpToDate -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = "v${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.exclusiveGreen,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(colors.exclusiveGreen.copy(alpha = 0.15f))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                            )
+                            val pubDate = state.latestRelease?.publishedAt
+                                ?.let { ReleaseNotesCatalog.formatPublishedDate(it) }
+                                .orEmpty()
+                            if (pubDate.isNotEmpty()) {
+                                Text(
+                                    text = pubDate,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = colors.textMuted,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
                         Text(
-                            text = "当前已安装 Sonify v${BuildConfig.VERSION_NAME}（build ${BuildConfig.VERSION_CODE}），已是最新发行版本。",
-                            fontSize = 13.sp,
-                            color = colors.textSecondary,
+                            text = "当前版本更新内容",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textMuted,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        ReleaseNotesCard(
+                            notes = ReleaseNotesCatalog.formatCurrentNotes(
+                                serverRelease = state.latestRelease,
+                                currentVersionName = BuildConfig.VERSION_NAME,
+                            ),
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        ReleaseQuickLinksRow(
+                            changelogUrl = state.latestRelease?.changelogUrl.orEmpty(),
+                            repoUrl = state.latestRelease?.repoUrl.orEmpty(),
+                            onOpenLocalChangelog = { showChangelogDialog = true },
                         )
                     }
 
                     is UpdateState.Available -> {
-                        ReleaseHeaderAndNotes(state.release)
+                        ReleaseHeaderAndNotes(
+                            release = state.release,
+                            onOpenLocalChangelog = { showChangelogDialog = true },
+                        )
                     }
 
                     is UpdateState.Downloading -> {
-                        ReleaseHeaderAndNotes(state.release)
+                        ReleaseHeaderAndNotes(
+                            release = state.release,
+                            showLinks = false,
+                            onOpenLocalChangelog = { showChangelogDialog = true },
+                        )
                         Spacer(Modifier.height(14.dp))
                         LinearProgressIndicator(
                             progress = { state.progress },
@@ -220,7 +277,11 @@ fun UpdateDialog(
                     }
 
                     is UpdateState.ReadyToInstall -> {
-                        ReleaseHeaderAndNotes(state.release)
+                        ReleaseHeaderAndNotes(
+                            release = state.release,
+                            showLinks = false,
+                            onOpenLocalChangelog = { showChangelogDialog = true },
+                        )
                         Spacer(Modifier.height(12.dp))
                         Row(
                             modifier = Modifier
@@ -246,6 +307,12 @@ fun UpdateDialog(
 
                     is UpdateState.Error -> {
                         Text(state.message, fontSize = 13.sp, color = colors.danger)
+                        Spacer(Modifier.height(10.dp))
+                        ReleaseQuickLinksRow(
+                            changelogUrl = state.release?.changelogUrl.orEmpty(),
+                            repoUrl = state.release?.repoUrl.orEmpty(),
+                            onOpenLocalChangelog = { showChangelogDialog = true },
+                        )
                     }
                 }
             }
@@ -359,11 +426,154 @@ fun UpdateDialog(
             }
         },
     )
+
+    if (showChangelogDialog) {
+        ChangelogDialog(onDismiss = { showChangelogDialog = false })
+    }
+}
+
+/**
+ * 应用内完整版本更新日志弹窗（支持离线浏览 + 一键跳转 GitHub Releases / 仓库主页）。
+ */
+@Composable
+fun ChangelogDialog(
+    onDismiss: () -> Unit,
+) {
+    val colors = LocalHiFiColors.current
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = colors.surface1,
+        titleContentColor = colors.textPrimary,
+        textContentColor = colors.textSecondary,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.History, contentDescription = null, tint = colors.accent, modifier = Modifier.size(21.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("版本更新日志", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ReleaseNotesCatalog.entries.forEachIndexed { idx, entry ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colors.canvas.copy(alpha = 0.65f))
+                            .border(
+                                width = 1.dp,
+                                color = if (idx == 0) colors.accent.copy(alpha = 0.45f) else colors.hairline,
+                                shape = RoundedCornerShape(12.dp),
+                            )
+                            .padding(12.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "v${entry.versionName}",
+                                    fontSize = 13.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (idx == 0) colors.accent else colors.textPrimary,
+                                )
+                                if (entry.versionCode == BuildConfig.VERSION_CODE) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "当前",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(999.dp))
+                                            .background(colors.exclusiveGreen)
+                                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                                    )
+                                }
+                            }
+                            Text(
+                                text = entry.releaseDate,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = colors.textMuted,
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = entry.summary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textSecondary,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        entry.highlights.forEach { bullet ->
+                            Row(
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                Text("• ", fontSize = 12.sp, color = colors.accent, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = bullet,
+                                    fontSize = 12.sp,
+                                    lineHeight = 17.sp,
+                                    color = colors.textPrimary,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Text(
+                    text = "开源协议：Sonify Non-Commercial v1.0（仅限个人非商用，禁止任何未经授权的商业用途）",
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    color = colors.textMuted,
+                )
+            }
+        },
+        confirmButton = {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(colors.accent.copy(alpha = 0.16f))
+                    .border(1.dp, colors.accent.copy(alpha = 0.45f), RoundedCornerShape(999.dp))
+                    .clickable { ProjectLinks.openExternalUrl(context, ProjectLinks.GITHUB_RELEASES_URL) }
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, tint = colors.accent, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("GitHub 发布页", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭", color = colors.textSecondary)
+            }
+        },
+    )
 }
 
 @Composable
-private fun ReleaseHeaderAndNotes(release: ReleaseInfo) {
+private fun ReleaseHeaderAndNotes(
+    release: ReleaseInfo,
+    showLinks: Boolean = true,
+    onOpenLocalChangelog: () -> Unit,
+) {
     val colors = LocalHiFiColors.current
+    val pubDate = ReleaseNotesCatalog.formatPublishedDate(release.publishedAt)
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -375,6 +585,7 @@ private fun ReleaseHeaderAndNotes(release: ReleaseInfo) {
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
             color = colors.accent,
+            maxLines = 1,
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
                 .background(colors.accent.copy(alpha = 0.16f))
@@ -385,27 +596,118 @@ private fun ReleaseHeaderAndNotes(release: ReleaseInfo) {
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
             color = colors.textMuted,
+            maxLines = 1,
         )
     }
 
-    if (release.releaseNotes.isNotBlank()) {
-        Spacer(Modifier.height(10.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 180.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(colors.canvas.copy(alpha = 0.65f))
-                .border(1.dp, colors.hairline, RoundedCornerShape(10.dp))
-                .verticalScroll(rememberScrollState())
-                .padding(12.dp),
-        ) {
+    val notes = release.releaseNotes.trim().ifBlank { "包含体验优化与稳定性修复。" }
+    Spacer(Modifier.height(10.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = "本次更新内容",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = colors.textMuted,
+        )
+        if (pubDate.isNotEmpty()) {
             Text(
-                text = release.releaseNotes,
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
-                color = colors.textPrimary,
+                text = "发布于 $pubDate",
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                color = colors.textMuted,
             )
         }
+    }
+    Spacer(Modifier.height(5.dp))
+    ReleaseNotesCard(notes = notes)
+
+    if (showLinks) {
+        Spacer(Modifier.height(10.dp))
+        ReleaseQuickLinksRow(
+            changelogUrl = release.changelogUrl,
+            repoUrl = release.repoUrl,
+            onOpenLocalChangelog = onOpenLocalChangelog,
+        )
+    }
+}
+
+@Composable
+private fun ReleaseNotesCard(notes: String) {
+    val colors = LocalHiFiColors.current
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 176.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.canvas.copy(alpha = 0.65f))
+            .border(1.dp, colors.hairline, RoundedCornerShape(10.dp))
+            .verticalScroll(rememberScrollState())
+            .padding(12.dp),
+    ) {
+        Text(
+            text = notes,
+            fontSize = 12.sp,
+            lineHeight = 18.sp,
+            color = colors.textPrimary,
+        )
+    }
+}
+
+@Composable
+private fun ReleaseQuickLinksRow(
+    changelogUrl: String,
+    repoUrl: String,
+    onOpenLocalChangelog: () -> Unit,
+) {
+    val context = LocalContext.current
+    val resolvedRepo = repoUrl.ifBlank { ProjectLinks.GITHUB_REPO_URL }
+    val resolvedReleases = changelogUrl.ifBlank { ProjectLinks.GITHUB_RELEASES_URL }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CompactLinkChip(
+            icon = Icons.Rounded.History,
+            label = "更新日志",
+            onClick = onOpenLocalChangelog,
+        )
+        CompactLinkChip(
+            icon = Icons.AutoMirrored.Rounded.OpenInNew,
+            label = "发布页",
+            onClick = { ProjectLinks.openExternalUrl(context, resolvedReleases) },
+        )
+        CompactLinkChip(
+            icon = Icons.Rounded.Code,
+            label = "GitHub",
+            onClick = { ProjectLinks.openExternalUrl(context, resolvedRepo) },
+        )
+    }
+}
+
+@Composable
+private fun CompactLinkChip(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    val colors = LocalHiFiColors.current
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(colors.surface2)
+            .border(1.dp, colors.hairline, RoundedCornerShape(999.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 9.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = colors.accent, modifier = Modifier.size(13.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(label, fontSize = 11.sp, color = colors.textPrimary, fontWeight = FontWeight.Medium)
     }
 }

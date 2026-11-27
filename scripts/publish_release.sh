@@ -11,6 +11,8 @@ MIN_SUPPORTED="1"
 SSH_TARGET="sonify-cloud"
 REMOTE_DIR="/var/lib/sonify-server"
 BASE_URL="https://sonify.zhangbing.tech"
+REPO_URL="https://github.com/AceInAndroid/sonify"
+CHANGELOG_URL="https://github.com/AceInAndroid/sonify/releases"
 DRY_RUN="false"
 
 while [[ $# -gt 0 ]]; do
@@ -19,6 +21,8 @@ while [[ $# -gt 0 ]]; do
     --version-code) VERSION_CODE="$2"; shift 2 ;;
     --version-name) VERSION_NAME="$2"; shift 2 ;;
     --notes) NOTES="$2"; shift 2 ;;
+    --changelog-url) CHANGELOG_URL="$2"; shift 2 ;;
+    --repo-url) REPO_URL="$2"; shift 2 ;;
     --force) FORCE_UPDATE="true"; shift ;;
     --min-supported) MIN_SUPPORTED="$2"; shift 2 ;;
     --ssh|--ssh-target) SSH_TARGET="$2"; shift 2 ;;
@@ -42,9 +46,9 @@ PUBLISHED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 TMP_JSON=$(mktemp)
 trap 'rm -f "$TMP_JSON"' EXIT
 
-python3 - "$TMP_JSON" "$VERSION_CODE" "$VERSION_NAME" "$MIN_SUPPORTED" "$FORCE_UPDATE" "$NOTES" "$BASE_URL/releases/$APK_NAME" "$FILE_SIZE" "$SHA256" "$PUBLISHED_AT" <<'PY'
+python3 - "$TMP_JSON" "$VERSION_CODE" "$VERSION_NAME" "$MIN_SUPPORTED" "$FORCE_UPDATE" "$NOTES" "$BASE_URL/releases/$APK_NAME" "$FILE_SIZE" "$SHA256" "$PUBLISHED_AT" "$CHANGELOG_URL" "$REPO_URL" <<'PY'
 import json, sys
-out, vc, vn, min_vc, force, notes, url, sz, sha, pub = sys.argv[1:]
+out, vc, vn, min_vc, force, notes, url, sz, sha, pub, changelog_url, repo_url = sys.argv[1:]
 notes = notes.replace("\\n", "\n")
 manifest = {
     "channel": "stable",
@@ -57,6 +61,8 @@ manifest = {
     "fileSize": int(sz),
     "sha256": sha,
     "publishedAt": pub,
+    "changelogUrl": changelog_url,
+    "repoUrl": repo_url,
 }
 with open(out, "w", encoding="utf-8") as f:
     json.dump(manifest, f, ensure_ascii=False, indent=2)

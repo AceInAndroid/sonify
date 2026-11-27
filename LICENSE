@@ -1,24 +1,95 @@
-                                 Apache License
-                           Version 2.0, January 2004
-                        http://www.apache.org/licenses/
+Sonify Non-Commercial Source-Available License v1.0
+Sonify 非商用开源许可协议 v1.0
 
-   Copyright 2026 AceInAndroid
+Copyright (c) 2026 AceInAndroid (https://github.com/AceInAndroid/sonify)
+All rights reserved except as expressly granted below.
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+================================================================================
+ENGLISH TERMS
+================================================================================
 
-       http://www.apache.org/licenses/LICENSE-2.0
+1. Grant of Non-Commercial License
+   Subject to the conditions of this License, the copyright holder grants you a
+   worldwide, royalty-free, non-exclusive, revocable license to view, copy,
+   compile, run, and modify the source code of Sonify ("the Software") solely
+   for personal, educational, academic research, or other strictly
+   non-commercial purposes.
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+2. Prohibition of Commercial Use (STRICTLY NON-COMMERCIAL)
+   You may NOT use the Software, in whole or in part, for any commercial purpose
+   without obtaining prior explicit written authorization from the copyright
+   holder. Prohibited commercial activities include, without limitation:
+   - Selling, sublicensing, renting, leasing, or charging any fee for the
+     Software, compiled binaries (APKs), or derivative works;
+   - Distributing the Software or derivative works bundled with advertisements,
+     in-app purchases, paid memberships, or other monetization mechanisms;
+   - Pre-installing, bundling, or embedding the Software or any portion of its
+     code (including the userspace USB Audio driver or UI components) into
+     commercial hardware products (such as DACs, DAPs, phones, or dongles) or
+     commercial/closed-source software products;
+   - Providing paid services, paid distribution channels, or commercial
+     consulting/support centered on rebranded versions of the Software.
 
----
+3. Attribution and Preservation of Notices
+   Any permitted non-commercial redistribution of source code or binaries must:
+   - Retain this entire LICENSE file and all copyright notices intact;
+   - Clearly credit the original project and link to the official repository:
+     https://github.com/AceInAndroid/sonify
+   - Clearly indicate any modifications made to the original source code;
+   - Not remove or obscure the non-commercial restriction terms.
 
-Third-Party Notice:
-- `third_party/libusb/` contains libusb 1.0.27 source code, which is licensed
-  under the GNU Lesser General Public License v2.1 (LGPL-2.1). See
-  `third_party/libusb/COPYING` for details.
+4. Contributions
+   By submitting an Issue, Pull Request, or patch to the official repository, you
+   agree that your contribution may be included and distributed under this
+   License (and any future licensing chosen by the copyright holder).
+
+5. Commercial Licensing Inquiries
+   If you represent a company, hardware manufacturer, or commercial project and
+   wish to license Sonify for commercial use, please contact the author via the
+   official GitHub repository: https://github.com/AceInAndroid/sonify
+
+6. Disclaimer of Warranty & Limitation of Liability
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, OR HEARING/HARDWARE
+   SAFETY. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES ARISING
+   OUT OF THE USE OF OR INABILITY TO USE THE SOFTWARE.
+
+================================================================================
+中文条款摘要（如中英文存在歧义，以英文条款为准）
+================================================================================
+
+1. 允许范围（仅限非商用）
+   允许个人免费下载、编译、自用、学习研究、非商业二次开发，以及向官方仓库提交
+   Issue / Pull Request 参与共建。
+
+2. 严禁商用
+   未经版权方（AceInAndroid）提前书面授权，禁止将本项目全部或部分代码、安装包
+   或衍生作品用于任何形式的商业用途，包括但不限于：
+   - 付费售卖、会员收费、套壳更名分发或任何变相盈利行为；
+   - 在二次打包版本中植入广告、推广引流或内购计费；
+   - 将本项目或其核心模块（含用户态 USB 音频驱动、界面组件等）集成、预装至商业
+     软件或商业硬件产品（如解码耳放、播放器、手机等）中出货。
+
+3. 署名与协议保留
+   任何合规的非商用分享或二次发布，均须完整保留本协议文件、版权声明以及官方仓库
+   链接（https://github.com/AceInAndroid/sonify），并注明修改内容。
+
+4. 商业授权联系
+   如有商业合作或企业授权需求，请通过官方 GitHub 仓库联系作者：
+   https://github.com/AceInAndroid/sonify
+
+5. 免责声明
+   本软件按“现状”提供，不附带任何明示或暗示的担保；使用本软件产生的任何直接或
+   间接风险由使用者自行承担。
+
+================================================================================
+THIRD-PARTY COMPONENT NOTICE / 第三方开源组件声明
+================================================================================
+
+- `third_party/libusb/` contains libusb 1.0.27 source code, which remains
+  licensed under its original GNU Lesser General Public License v2.1 (LGPL-2.1).
+  See `third_party/libusb/COPYING` for details.
+- Other Gradle dependencies (AndroidX, Jetpack Compose, Media3, OkHttp, Coil,
+  ZXing, etc.) remain governed by their respective open-source licenses.

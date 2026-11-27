@@ -17,6 +17,8 @@ data class ReleaseInfo(
     val fileSize: Long,
     val sha256: String,
     val publishedAt: String,
+    val changelogUrl: String = "",
+    val repoUrl: String = "",
 ) {
     companion object {
         fun fromJson(raw: String): ReleaseInfo? = runCatching {
@@ -36,6 +38,8 @@ data class ReleaseInfo(
                 fileSize = o.optLong("fileSize", 0L),
                 sha256 = o.optString("sha256", "").trim().lowercase(),
                 publishedAt = o.optString("publishedAt", ""),
+                changelogUrl = o.optString("changelogUrl", "").trim(),
+                repoUrl = o.optString("repoUrl", "").trim(),
             )
         }.getOrNull()
     }
@@ -44,7 +48,7 @@ data class ReleaseInfo(
 sealed interface UpdateState {
     data object Idle : UpdateState
     data object Checking : UpdateState
-    data class UpToDate(val checkedAtMs: Long) : UpdateState
+    data class UpToDate(val checkedAtMs: Long, val latestRelease: ReleaseInfo? = null) : UpdateState
     data class Available(val release: ReleaseInfo, val isForced: Boolean) : UpdateState
     data class Downloading(
         val release: ReleaseInfo,
