@@ -23,21 +23,25 @@
 > 查看英文界面截图请访问 [README.md](README.md)。
 
 <p align="center">
-  <img src="docs/screenshots/zh/now_playing.png" width="15.5%" alt="黑胶全屏播放页" />
-  <img src="docs/screenshots/zh/lyrics.png" width="15.5%" alt="流体光晕沉浸歌词页" />
-  <img src="docs/screenshots/zh/library.png" width="15.5%" alt="本地无损音乐库" />
-  <img src="docs/screenshots/zh/global_search.png" width="15.5%" alt="全屏跨源全局搜索" />
-  <img src="docs/screenshots/zh/usb_dac.png" width="15.5%" alt="USB DAC 实时链路仪表" />
-  <img src="docs/screenshots/zh/settings.png" width="15.5%" alt="设置与双语热切换" />
+  <img src="docs/screenshots/zh/now_playing.png" width="23%" alt="黑胶全屏播放页与硬件音量" />
+  <img src="docs/screenshots/zh/audio_output.png" width="23%" alt="音频输出与 Bit-Perfect 信号链路" />
+  <img src="docs/screenshots/zh/usb_dac.png" width="23%" alt="USB DAC 实时链路仪表（MOONRIVER 3）" />
+  <img src="docs/screenshots/zh/lyrics.png" width="23%" alt="流体光晕沉浸歌词页" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/zh/library.png" width="23%" alt="本地无损音乐库" />
+  <img src="docs/screenshots/zh/global_search.png" width="23%" alt="全屏跨源全局搜索" />
+  <img src="docs/screenshots/zh/settings.png" width="23%" alt="设置与双语热切换" />
 </p>
 
 | 页面 | 核心特性 |
 |---|---|
-| **黑胶全屏播放页** | 纯 Canvas 绘制旋转黑胶唱片与静止 45° 高光、封面主色暗调氛围渐变、实时 **源格式 → 实际协商输出** 双徽章胶囊、单行实时歌词预览与一键 **纯享黑胶** |
+| **黑胶播放页 & 硬件音量** | 纯 Canvas 旋转黑胶与封面动态氛围渐变、实时 **FLAC → USB 独占 44.1k/32b** 信号胶囊、内置 **UAC 硬件衰减音量条**（`-42.4 dB`）与 **60% 护耳上限** 标记、一键 **纯享黑胶** |
+| **音频输出与信号链路** | 明确标注 **Bit-Perfect USB 独占已锁定（绕过 Android 混音）**，逐层透明展示音频源、UAC2 协商输出（`44100Hz / 32bit 4B`）、实测晶振反馈（`44099.6 Hz`）与缓冲水位，支持一键在 **MOONRIVER 3** 与本机输出间无缝切换 |
+| **USB DAC 实时仪表** | 实拍 **MOONRIVER 3** 独占运行状态卡片与 2×2 工程仪表（协商采样率、位深容器、Feedback 实测频率、缓冲与 0 欠载计数）、VID/PID 设备列表及 440Hz/1kHz 测试音工具 |
 | **流体光晕沉浸歌词页** | 边到边 **流体多色氛围光晕** 背景、60fps **逐句流光扫色高亮**、五级歌词源自动匹配（本地 LRC / 内嵌 / Subsonic / **LRCLIB 在线**）、偏移微调与所见即所得样式面板 |
 | **本地无损音乐库** | 毫秒级无损头解析（FLAC/WAV/MP3/M4A/OGG/OPUS）、专辑/艺人/文件夹/歌单多维钻取、Subsonic 多服切换条与首页「继续上次播放」断点卡片 |
 | **全屏跨源全局搜索** | 聚合本地歌曲、专辑、艺人、歌单、Subsonic 远程曲库（`search3`）与 `.lrc` **歌词搜歌**，内置 **简繁互通归一化** 与快捷发现卡片 |
-| **USB 设备与诊断页** | USB Bit-Perfect 独占总开关、实时协商采样率、位深、异步 Feedback 晶振频率（`fbRate`）、缓冲水位与欠载计数，内置 440Hz/1kHz 工程测试音工具 |
 | **设置与双语热切换** | Spotify 风格极简深色分组设置，覆盖 USB 策略、四重护耳上限、WiFi 传歌、Subsonic、歌词样式、深色主题与 **零中断中英双语热切换** |
 
 ---

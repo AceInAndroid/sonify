@@ -693,6 +693,9 @@ img {
   pointer-events: none;
 }
 
+.showcase-stage[data-theme="audio_output"] .showcase-glow {
+  background: radial-gradient(circle, #1ed760, transparent 70%);
+}
 .showcase-stage[data-theme="lyrics"] .showcase-glow {
   background: radial-gradient(circle, #6d7c36, transparent 70%);
 }

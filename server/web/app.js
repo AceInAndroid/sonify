@@ -23,12 +23,13 @@
       "showcase.eyebrow": "SPOTIFY DARK × VINYL AESTHETICS",
       "showcase.title": "像黑胶一样沉浸，像仪表一样精准",
       "showcase.desc":
-        "点击下方标签浏览全部 6 个核心实机界面。切换右上角「中文 / EN」按钮，手机画面也将实时同步为对应语言实拍截图。",
+        "点击下方标签浏览全部 7 个核心实机界面（含 MOONRIVER 3 实机 USB 独占链路与硬件仪表）。切换右上角「中文 / EN」，手机画面同步热切换对应语言实拍。",
       "tabs.now_playing": "黑胶播放页",
+      "tabs.audio_output": "音频输出与链路",
+      "tabs.usb_dac": "USB DAC 仪表",
       "tabs.lyrics": "流体光晕歌词",
       "tabs.library": "无损音乐库",
       "tabs.global_search": "跨源全局搜索",
-      "tabs.usb_dac": "USB DAC 仪表",
       "tabs.settings": "设置与双语",
       "features.eyebrow": "AUDIOPHILE ARCHITECTURE",
       "features.title": "从 C++ 底层驱动到指尖交互，全程无损",
@@ -110,12 +111,13 @@
       "showcase.eyebrow": "SPOTIFY DARK × VINYL AESTHETICS",
       "showcase.title": "Immersive like Vinyl. Precise like a Lab.",
       "showcase.desc":
-        "Explore all 6 real-device screens below. Toggle the Chinese / EN switch in the top bar and watch every phone screenshot hot-swap to the matching localized UI.",
+        "Explore all 7 real-device screens—including live MOONRIVER 3 USB Exclusive signal path & telemetry. Toggle Chinese / EN in the top bar to hot-swap every phone mockup.",
       "tabs.now_playing": "Now Playing",
+      "tabs.audio_output": "Signal Path",
+      "tabs.usb_dac": "USB DAC",
       "tabs.lyrics": "Aurora Lyrics",
       "tabs.library": "Music Library",
       "tabs.global_search": "Global Search",
-      "tabs.usb_dac": "USB DAC",
       "tabs.settings": "Settings & i18n",
       "features.eyebrow": "AUDIOPHILE ARCHITECTURE",
       "features.title": "Bit-Perfect from C++ Driver to Fingertip",
@@ -182,29 +184,73 @@
   const SCREENS = {
     now_playing: {
       zh: {
-        tag: "01 / 06 · NOW PLAYING",
-        title: "黑胶全屏播放页 & 纯享黑胶",
-        body: "纯 Canvas 60fps 绘制旋转黑胶与静止 45° 高光，自动提取专辑主色渲染暗调氛围渐变；实时展示「源格式 → 实际协商输出」信号胶囊与单行歌词，轻触唱片进入零干扰 Zen Vinyl 纯享态。",
+        tag: "01 / 07 · NOW PLAYING",
+        title: "黑胶全屏播放页 & USB 硬件音量",
+        body: "纯 Canvas 60fps 绘制旋转黑胶与静止 45° 高光，自动提取专辑主色渲染暗调氛围渐变；实时展示「FLAC → ● USB 独占 44.1k/32b」信号胶囊、常驻 UAC 硬件衰减音量条（-42.4 dB）与 60% 护耳上限。",
         bullets: [
-          "FLAC / WAV 原生采样率与位深实时透明展示",
-          "内置独立黑胶锁屏界面与 Spotify 风格 5 键通知栏",
-          "同采样率曲目真·无缝播放（Gapless），5ms 防爆音淡变",
+          "FLAC / WAV 原生采样率与实际 USB 协商位深实时透明展示",
+          "底部直接控制 DAC 硬件音量并标注 60% 护耳硬上限，保持 PCM 位精确直通",
+          "轻触唱片进入 Zen Vinyl 纯享黑胶，支持真·无缝播放与 5ms 防爆音淡变",
         ],
       },
       en: {
-        tag: "01 / 06 · NOW PLAYING",
-        title: "Spinning Vinyl & Zen Vinyl Mode",
-        body: "Pure Canvas 60fps vinyl disc with fixed 45° specular sheen and album-derived ambient gradients. Shows the live Source → Negotiated Output signal badge and single-line lyrics; tap the disc for distraction-free Zen Vinyl.",
+        tag: "01 / 07 · NOW PLAYING",
+        title: "Spinning Vinyl & Hardware Volume Bar",
+        body: "Pure Canvas 60fps vinyl disc with fixed 45° specular sheen and album-derived ambient glow. Shows the live FLAC → USB Exclusive signal badge, embedded UAC hardware attenuator bar (-42.4 dB), and 60% Ear Guard ceiling.",
         bullets: [
-          "Transparent source format to negotiated DAC output signal badge",
-          "Dedicated Vinyl Lockscreen & Spotify-style 5-button notification",
-          "True gapless playback & 5ms click-free fade transitions",
+          "Transparent source format to negotiated USB DAC output badge",
+          "Direct UAC hardware volume slider with 60% Ear Guard ceiling indicator",
+          "One-tap Zen Vinyl mode, true gapless playback & 5ms click-free fades",
+        ],
+      },
+    },
+    audio_output: {
+      zh: {
+        tag: "02 / 07 · SIGNAL PATH",
+        title: "音频输出与完整信号链路面板",
+        body: "点击播放页信号胶囊或底部设备名即可拉起实时链路诊断抽屉：清晰确认「Bit-Perfect USB 独占已锁定（绕过 Android 混音）」，逐层透明呈现音频源、UAC2 输出协商、实测晶振反馈频率与缓冲水位，并支持一键在 USB DAC 与本机输出之间无缝切换。",
+        bullets: [
+          "实时显示音频源（FLAC 44.1kHz / 16bit）→ 输出协商（UAC2 44100Hz / 32bit 4B）",
+          "异步时钟反馈实测锁定 44099.6 Hz · 缓冲 176 ms · 零欠载",
+          "一键在已接入的 MOONRIVER 3 独占通道与本机扬声器/蓝牙间无爆音切换",
+        ],
+      },
+      en: {
+        tag: "02 / 07 · SIGNAL PATH",
+        title: "Audio Output & Bit-Perfect Signal Path",
+        body: "Tap the signal pill or output name on Now Playing to inspect the live end-to-end audio chain: confirms Bit-Perfect USB Exclusive lock (Android mixer bypassed) with source spec, UAC2 negotiated format, measured DAC clock feedback, and one-tap output switching.",
+        bullets: [
+          "End-to-end telemetry: Source FLAC → UAC2 44100Hz / 32bit (4B) negotiation",
+          "Live async clock lock at 44099.6 Hz with 172–176 ms ring buffer & 0 underruns",
+          "Instant click-free switching between MOONRIVER 3 exclusive mode & device audio",
+        ],
+      },
+    },
+    usb_dac: {
+      zh: {
+        tag: "03 / 07 · USB DAC TELEMETRY",
+        title: "USB DAC 独占仪表与实测晶振监控",
+        body: "接入小尾巴后实时呈现「● USB 独占输出运行中」状态卡片与 2×2 工程仪表：协商采样率（44100 Hz）、位深容器（32b / 4B）、异步 Feedback 实测频率（44099.6 Hz）与缓冲/欠载计数（172ms · 0/224），下方完整列出 VID/PID 与 440Hz/1kHz 工程测试音。",
+        bullets: [
+          "实拍水月雨 MOONRIVER 3（VID 0x35D8 / PID 0x43DA）UAC2 高速直通运行状态",
+          "16.16 定点异步 Feedback 闭环锁频，长时间息屏播放稳定零欠载",
+          "支持一键断开独占或拔出自动平滑回退至本机扬声器/耳机",
+        ],
+      },
+      en: {
+        tag: "03 / 07 · USB DAC TELEMETRY",
+        title: "USB DAC Dashboard & Live Crystal Telemetry",
+        body: "Real-time dashboard showing USB Exclusive Streaming Active on Moondrop MOONRIVER 3 with a 2×2 engineering telemetry grid: negotiated sample rate (44100 Hz), bit depth/slot (32b / 4B), measured async feedback (44099.6 Hz), and buffer/underruns (172ms · 0/224).",
+        bullets: [
+          "Live capture on Moondrop MOONRIVER 3 (VID 0x35D8 / PID 0x43DA, UAC2 High-Speed)",
+          "Closed-loop 16.16 async feedback keeps crystal lock within < 10 ppm, 0 underruns",
+          "One-tap Disconnect or automatic fallback to device speaker / Bluetooth on unplug",
         ],
       },
     },
     lyrics: {
       zh: {
-        tag: "02 / 06 · AURORA LYRICS",
+        tag: "04 / 07 · AURORA LYRICS",
         title: "流体多色光晕 & 60fps 流光扫色歌词",
         body: "兼容 Android 10+ 的边到边流体多色光晕背景，逐句 60fps 流光扫色高亮与距离景深羽化；支持本地 LRC、内嵌标签、Subsonic 与 LRCLIB 在线五级瀑布自动匹配与实时偏移微调。",
         bullets: [
@@ -214,7 +260,7 @@
         ],
       },
       en: {
-        tag: "02 / 06 · AURORA LYRICS",
+        tag: "04 / 07 · AURORA LYRICS",
         title: "Fluid Aurora & 60fps Progressive Sweep Lyrics",
         body: "Edge-to-edge multi-color fluid aurora backdrop smooth on Android 10+, paired with 60fps Progressive Sweep lyric highlight, depth-of-field feathering, and a 5-tier lyrics engine with LRCLIB online matching.",
         bullets: [
@@ -226,7 +272,7 @@
     },
     library: {
       zh: {
-        tag: "03 / 06 · MUSIC LIBRARY",
+        tag: "05 / 07 · MUSIC LIBRARY",
         title: "毫秒级无损音乐库 & 多源融合",
         body: "自研二进制无损头解析器秒扫 FLAC / WAV / MP3 / M4A / OGG / OPUS，支持专辑封面网格、艺人、文件夹、自定义歌单与 Subsonic 远程曲库一键切换，首页保留「继续上次播放」断点卡片。",
         bullets: [
@@ -236,7 +282,7 @@
         ],
       },
       en: {
-        tag: "03 / 06 · MUSIC LIBRARY",
+        tag: "05 / 07 · MUSIC LIBRARY",
         title: "Instant Lossless Library & Multi-Source Hub",
         body: "Custom binary header parser scans FLAC, WAV, MP3, M4A, OGG & OPUS in milliseconds. Switch effortlessly between local albums, artists, folders, playlists, and self-hosted Subsonic servers.",
         bullets: [
@@ -248,7 +294,7 @@
     },
     global_search: {
       zh: {
-        tag: "04 / 06 · GLOBAL SEARCH",
+        tag: "06 / 07 · GLOBAL SEARCH",
         title: "全屏跨源全局搜索 & 歌词搜歌",
         body: "一框聚合检索本地歌曲、专辑、艺人、自建歌单、Subsonic 远程曲库（search3）以及本地/缓存 .lrc 歌词片段，点击歌词命中行直达对应秒数起播。",
         bullets: [
@@ -258,7 +304,7 @@
         ],
       },
       en: {
-        tag: "04 / 06 · GLOBAL SEARCH",
+        tag: "06 / 07 · GLOBAL SEARCH",
         title: "Full-Screen Cross-Source & Lyrics Search",
         body: "Unified instant search spanning local songs, albums, artists, playlists, remote Subsonic servers (search3), and local/cached .lrc lyrics—jump directly to the matched timestamp.",
         bullets: [
@@ -268,31 +314,9 @@
         ],
       },
     },
-    usb_dac: {
-      zh: {
-        tag: "05 / 06 · USB DAC TELEMETRY",
-        title: "USB DAC 独占开关与实时工程仪表",
-        body: "一键开启 Bit-Perfect USB 独占输出，实时监控实际协商采样率、位深、异步反馈晶振频率（fbRate）、缓冲水位与欠载计数，内置可折叠 440Hz / 1kHz 纯音测试工具。",
-        bullets: [
-          "支持 UAC1 / UAC2 描述符解析与非标准 wIndex 自动探测",
-          "未接入 DAC 时自动无缝回退至本机扬声器 / 蓝牙 / 3.5mm",
-          "USB 事件线程 nice = -16 音频高优先级，息屏同样零爆音",
-        ],
-      },
-      en: {
-        tag: "05 / 06 · USB DAC TELEMETRY",
-        title: "USB DAC Exclusive Control & Live Telemetry",
-        body: "Toggle Bit-Perfect USB exclusive mode and monitor live negotiated sample rate, bit depth, async feedback clock rate (fbRate), ring buffer depth, and underruns—with built-in 440Hz/1kHz test tones.",
-        bullets: [
-          "Full UAC1/UAC2 descriptor parsing & automatic wIndex probing",
-          "Seamless fallback to phone speaker, 3.5mm, or Bluetooth when unplugged",
-          "nice = -16 audio-priority USB event loop for glitch-free screen-off audio",
-        ],
-      },
-    },
     settings: {
       zh: {
-        tag: "06 / 06 · SETTINGS & I18N",
+        tag: "07 / 07 · SETTINGS & I18N",
         title: "极简分组设置 & 零中断双语热切换",
         body: "覆盖 USB 策略、四重护耳上限、深色底色与强调色、沉浸模式、歌词样式、WiFi 传歌、Subsonic 与应用内安全更新。切换「跟随系统 / 简体中文 / English」1 帧生效，绝不打断 USB DAC 播放。",
         bullets: [
@@ -302,7 +326,7 @@
         ],
       },
       en: {
-        tag: "06 / 06 · SETTINGS & I18N",
+        tag: "07 / 07 · SETTINGS & I18N",
         title: "Minimalist Settings & Zero-Interruption i18n",
         body: "Fine-tune USB policy, 4-layer ear guard, dark canvas & accent themes, immersive mode, lyrics styling, WiFi transfer, Subsonic, and SHA-256 verified updates. Switch English / Simplified Chinese in 1 frame without interrupting USB audio.",
         bullets: [

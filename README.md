@@ -23,21 +23,25 @@
 > Looking for the Simplified Chinese UI screenshots? See [README_ZH.md](README_ZH.md).
 
 <p align="center">
-  <img src="docs/screenshots/en/now_playing.png" width="15.5%" alt="Now Playing Vinyl" />
-  <img src="docs/screenshots/en/lyrics.png" width="15.5%" alt="Immersive Aurora Lyrics" />
-  <img src="docs/screenshots/en/library.png" width="15.5%" alt="Music Library" />
-  <img src="docs/screenshots/en/global_search.png" width="15.5%" alt="Global Search" />
-  <img src="docs/screenshots/en/usb_dac.png" width="15.5%" alt="USB DAC Dashboard" />
-  <img src="docs/screenshots/en/settings.png" width="15.5%" alt="Settings & Language" />
+  <img src="docs/screenshots/en/now_playing.png" width="23%" alt="Now Playing Vinyl & USB Hardware Volume" />
+  <img src="docs/screenshots/en/audio_output.png" width="23%" alt="Audio Output & Bit-Perfect Signal Path" />
+  <img src="docs/screenshots/en/usb_dac.png" width="23%" alt="USB DAC Live Telemetry (MOONRIVER 3)" />
+  <img src="docs/screenshots/en/lyrics.png" width="23%" alt="Immersive Aurora Lyrics" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/en/library.png" width="23%" alt="Music Library" />
+  <img src="docs/screenshots/en/global_search.png" width="23%" alt="Global Search" />
+  <img src="docs/screenshots/en/settings.png" width="23%" alt="Settings & Bilingual UI" />
 </p>
 
 | View | Highlights |
 |---|---|
-| **Now Playing (Vinyl)** | Spinning canvas vinyl disc with fixed specular sheen, dynamic album-art ambient gradient, live **Source → Negotiated Output** signal badge, live single-line lyric preview, and one-tap **Zen Vinyl** mode |
+| **Now Playing (Vinyl & HW Volume)** | Spinning canvas vinyl disc, dynamic cover ambient glow, live **FLAC → USB Exclusive** signal badge, embedded **UAC Hardware Volume** bar (`-42.4 dB`) with 60% **Ear Guard** ceiling, and one-tap **Zen Vinyl** |
+| **Audio Output & Signal Path** | End-to-end Bit-Perfect lock confirmation (**Android mixer bypassed**), source spec, UAC2 negotiated format (`44100Hz / 32bit 4B`), measured DAC async clock (`44099.6 Hz`), buffer depth, and one-tap switching between **MOONRIVER 3** & device audio |
+| **USB DAC Telemetry** | Live **USB Exclusive Streaming Active** card with 2×2 engineering telemetry (`Sample Rate`, `Depth / Slot`, `Async Feedback`, `Buffer / Underrun`), VID/PID hardware listing, and built-in 440Hz/1kHz test tone diagnostics |
 | **Immersive Aurora Lyrics** | Edge-to-edge **Fluid Multi-Color Aurora** backdrop, 60fps **Progressive Sweep** lyric highlight, 5-tier multi-source lyrics engine (Local LRC / Embedded / Subsonic / **LRCLIB Online**), live offset & style customizer |
 | **Music Library** | Instant lossless header scanner (FLAC/WAV/MP3/M4A/OGG/OPUS), album/artist/folder/playlist views, Subsonic multi-server quick switcher, and resume-last-session card |
 | **Global Search** | Full-screen cross-source search across local tracks, albums, artists, playlists, Subsonic remote (`search3`), and `.lrc` **search-by-lyrics** with Simplified ↔ Traditional Chinese normalization & Quick Discovery |
-| **USB DAC Dashboard** | Bit-Perfect USB Exclusive switch, real-time negotiated sample rate, bit depth, async feedback clock rate (`fbRate`), buffer depth, underrun counter, and built-in 440Hz/1kHz test tone diagnostics |
 | **Settings & Bilingual UI** | Minimalist dark grouped preferences for USB policy, 4-layer ear protection, WiFi LAN transfer, Subsonic, lyrics style, dark canvas & accent themes, and **zero-interruption English / Simplified Chinese switching** |
 
 ---
