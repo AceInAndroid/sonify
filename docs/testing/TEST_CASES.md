@@ -103,3 +103,4 @@
 | `TC-REG-02` | P0 | 进程冷重启偏好与数据库持久化 | 修改歌词样式、排序方式后 | `am force-stop com.sonify.player` 后重新启动 App | 冷启时间正常，歌词样式、音乐库排序、本地扫描曲库完整保留不丢失 | ADB 冷启 + UI 核查 |
 | `TC-REG-03` | P0 | 全流程零 Crash / 零 ANR / 零 OOM | 覆盖执行模块 A–F 后 | 检查全过程 `logcat` 错误日志与内存占用 `dumpsys meminfo com.sonify.player` | 零 `FATAL EXCEPTION`、零 `AndroidRuntime:E`、零 ANR、内存 PSS 处于健康区间 | `logcat` + `dumpsys meminfo` |
 | `TC-REG-04` | P1 | 测试收尾现场数据还原 | 全量测试完成 | 删除测试歌单、测试 Subsonic 账号、测试上传音频，恢复默认歌词样式 | 手机曲库恢复干净原貌，无残留测试垃圾文件 | 文件系统 + App UI 核查 |
+| `TC-REG-05` | P0 | 收藏与取消收藏（播放页心形键 & 曲目菜单）线程安全 | 正在播放任意本地或远程曲目 | 1. 在全屏播放页点击右侧收藏心形键，再次点击取消收藏<br>2. 在歌曲列表更多菜单点击收藏并切到「已收藏」核验，再取消收藏 | 心形状态即时高亮/还原，通知栏收藏图标同步刷新，无 `Player is accessed on the wrong thread` 崩溃 | 真机 UI 操作 + 截图 + `logcat` |

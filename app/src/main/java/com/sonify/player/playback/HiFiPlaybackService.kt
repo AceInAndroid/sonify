@@ -334,11 +334,13 @@ class HiFiPlaybackService : MediaSessionService() {
         }
     }
 
-    /** 通知栏与 App 内收藏同步后调用，即时刷新通知栏心形图标 */
+    /** 通知栏与 App 内收藏同步后调用，始终切回主线程访问 ExoPlayer 并刷新通知栏心形图标 */
     fun notifyFavoriteChanged(trackPath: String, isFavorite: Boolean) {
-        if (player.currentMediaItem?.mediaId == trackPath) {
-            currentTrackIsFavorite = isFavorite
-            updateNotificationCustomLayout()
+        serviceScope.launch(Dispatchers.Main.immediate) {
+            if (player.currentMediaItem?.mediaId == trackPath) {
+                currentTrackIsFavorite = isFavorite
+                updateNotificationCustomLayout()
+            }
         }
     }
 

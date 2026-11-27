@@ -370,14 +370,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleFavorite(track: TrackEntity) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             val next = !track.isFavorite
-            if (SubsonicUri.isTrackUri(track.path)) {
-                app.subsonicRepo.toggleRemoteFavorite(track.path, next)
-            } else {
-                app.db.trackDao().setFavorite(track.path, next)
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                if (SubsonicUri.isTrackUri(track.path)) {
+                    app.subsonicRepo.toggleRemoteFavorite(track.path, next)
+                } else {
+                    app.db.trackDao().setFavorite(track.path, next)
+                }
             }
-            HiFiPlaybackService.instance?.notifyFavoriteChanged(track.path, next)
             activeQueueByPath = activeQueueByPath.toMutableMap().apply {
                 this[track.path] = track.copy(isFavorite = next)
             }
@@ -386,6 +387,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     st.copy(currentTrack = st.currentTrack.copy(isFavorite = next))
                 } else st
             }
+            HiFiPlaybackService.instance?.notifyFavoriteChanged(track.path, next)
         }
     }
 
