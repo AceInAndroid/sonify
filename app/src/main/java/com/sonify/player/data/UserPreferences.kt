@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import org.json.JSONArray
 
 private val Context.dataStore by preferencesDataStore(name = "sonify_settings")
 
@@ -278,6 +279,13 @@ data class AppSettings(
     val wifiTransferPort: Int = 8088,
     val wifiTransferPinEnabled: Boolean = false,
     val wifiTransferAutoSkipDuplicate: Boolean = true,
+    // 应用更新、崩溃诊断与全局搜索
+    val autoCheckUpdate: Boolean = true,
+    val lastUpdateCheckAt: Long = 0L,
+    val ignoredUpdateVersionCode: Int = 0,
+    val customUpdateBaseUrl: String = "",
+    val autoUploadCrashLogs: Boolean = true,
+    val searchHistory: List<String> = emptyList(),
     val lastLibrarySource: String = "local",
     val lastTrackPath: String? = null,
     val lastPositionMs: Long = 0L,
@@ -354,6 +362,12 @@ class UserPreferences(private val context: Context) {
         val WIFI_TRANSFER_PORT = intPreferencesKey("wifi_transfer_port")
         val WIFI_TRANSFER_PIN_ENABLED = booleanPreferencesKey("wifi_transfer_pin_enabled")
         val WIFI_TRANSFER_AUTO_SKIP_DUP = booleanPreferencesKey("wifi_transfer_auto_skip_dup")
+        val AUTO_CHECK_UPDATE = booleanPreferencesKey("auto_check_update")
+        val LAST_UPDATE_CHECK_AT = longPreferencesKey("last_update_check_at")
+        val IGNORED_UPDATE_VERSION_CODE = intPreferencesKey("ignored_update_version_code")
+        val CUSTOM_UPDATE_BASE_URL = stringPreferencesKey("custom_update_base_url")
+        val AUTO_UPLOAD_CRASH_LOGS = booleanPreferencesKey("auto_upload_crash_logs")
+        val SEARCH_HISTORY_JSON = stringPreferencesKey("search_history_json")
         val LAST_LIBRARY_SOURCE = stringPreferencesKey("last_library_source")
         val LAST_TRACK_PATH = stringPreferencesKey("last_track_path")
         val LAST_POSITION_MS = longPreferencesKey("last_position_ms")
@@ -470,6 +484,12 @@ class UserPreferences(private val context: Context) {
                 wifiTransferPort = (p[Keys.WIFI_TRANSFER_PORT] ?: 8088).coerceIn(1024, 65500),
                 wifiTransferPinEnabled = p[Keys.WIFI_TRANSFER_PIN_ENABLED] ?: false,
                 wifiTransferAutoSkipDuplicate = p[Keys.WIFI_TRANSFER_AUTO_SKIP_DUP] ?: true,
+                autoCheckUpdate = p[Keys.AUTO_CHECK_UPDATE] ?: true,
+                lastUpdateCheckAt = p[Keys.LAST_UPDATE_CHECK_AT] ?: 0L,
+                ignoredUpdateVersionCode = p[Keys.IGNORED_UPDATE_VERSION_CODE] ?: 0,
+                customUpdateBaseUrl = p[Keys.CUSTOM_UPDATE_BASE_URL] ?: "",
+                autoUploadCrashLogs = p[Keys.AUTO_UPLOAD_CRASH_LOGS] ?: true,
+                searchHistory = parseHistoryJson(p[Keys.SEARCH_HISTORY_JSON]),
                 lastLibrarySource = p[Keys.LAST_LIBRARY_SOURCE] ?: "local",
                 lastTrackPath = p[Keys.LAST_TRACK_PATH],
                 lastPositionMs = p[Keys.LAST_POSITION_MS] ?: 0L,
@@ -750,6 +770,50 @@ class UserPreferences(private val context: Context) {
         context.dataStore.edit { it[Keys.WIFI_TRANSFER_AUTO_SKIP_DUP] = enabled }
     }
 
+    suspend fun setAutoCheckUpdate(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.AUTO_CHECK_UPDATE] = enabled }
+    }
+
+    suspend fun setLastUpdateCheckAt(timestampMs: Long) {
+        context.dataStore.edit { it[Keys.LAST_UPDATE_CHECK_AT] = timestampMs }
+    }
+
+    suspend fun setIgnoredUpdateVersionCode(versionCode: Int) {
+        context.dataStore.edit { it[Keys.IGNORED_UPDATE_VERSION_CODE] = versionCode.coerceAtLeast(0) }
+    }
+
+    suspend fun setCustomUpdateBaseUrl(url: String) {
+        context.dataStore.edit { it[Keys.CUSTOM_UPDATE_BASE_URL] = url.trim().trimEnd('/') }
+    }
+
+    suspend fun setAutoUploadCrashLogs(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.AUTO_UPLOAD_CRASH_LOGS] = enabled }
+    }
+
+    suspend fun addSearchHistory(query: String) {
+        val cleaned = query.trim()
+        if (cleaned.isEmpty()) return
+        context.dataStore.edit { prefs ->
+            val current = parseHistoryJson(prefs[Keys.SEARCH_HISTORY_JSON]).toMutableList()
+            current.removeAll { it.equals(cleaned, ignoreCase = true) }
+            current.add(0, cleaned)
+            val trimmed = current.take(MAX_SEARCH_HISTORY)
+            prefs[Keys.SEARCH_HISTORY_JSON] = encodeHistoryJson(trimmed)
+        }
+    }
+
+    suspend fun removeSearchHistory(query: String) {
+        context.dataStore.edit { prefs ->
+            val current = parseHistoryJson(prefs[Keys.SEARCH_HISTORY_JSON]).toMutableList()
+            current.removeAll { it.equals(query, ignoreCase = true) }
+            prefs[Keys.SEARCH_HISTORY_JSON] = encodeHistoryJson(current)
+        }
+    }
+
+    suspend fun clearSearchHistory() {
+        context.dataStore.edit { it[Keys.SEARCH_HISTORY_JSON] = "[]" }
+    }
+
     suspend fun setLastLibrarySource(source: String) {
         context.dataStore.edit { it[Keys.LAST_LIBRARY_SOURCE] = source }
     }
@@ -758,6 +822,29 @@ class UserPreferences(private val context: Context) {
         context.dataStore.edit {
             it[Keys.LAST_TRACK_PATH] = trackPath
             it[Keys.LAST_POSITION_MS] = positionMs.coerceAtLeast(0L)
+        }
+    }
+
+    companion object {
+        private const val MAX_SEARCH_HISTORY = 12
+
+        private fun parseHistoryJson(raw: String?): List<String> {
+            if (raw.isNullOrBlank()) return emptyList()
+            return runCatching {
+                val arr = JSONArray(raw)
+                val out = ArrayList<String>(arr.length())
+                for (i in 0 until arr.length()) {
+                    val v = arr.optString(i).trim()
+                    if (v.isNotEmpty()) out.add(v)
+                }
+                out.take(MAX_SEARCH_HISTORY)
+            }.getOrDefault(emptyList())
+        }
+
+        private fun encodeHistoryJson(items: List<String>): String {
+            val arr = JSONArray()
+            items.take(MAX_SEARCH_HISTORY).forEach { arr.put(it) }
+            return arr.toString()
         }
     }
 }

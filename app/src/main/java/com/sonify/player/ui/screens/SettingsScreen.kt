@@ -24,8 +24,10 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BatteryChargingFull
+import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
@@ -39,6 +41,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Shield
@@ -79,6 +82,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.BuildConfig
 import com.sonify.player.data.AccentStyle
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.AudioFocusPolicy
@@ -107,6 +111,7 @@ import com.sonify.player.ui.theme.CoverArtSupport
 import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.usb.UsbVolumeController
 import com.sonify.player.usb.VolumeMath
+import com.sonify.player.update.ReleaseInfo
 import com.sonify.player.wifi.WifiTransferState
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -159,11 +164,17 @@ fun SettingsScreen(
     downloadedTotalBytes: Long,
     wifiTransferState: WifiTransferState,
     nativeBuildTime: String,
+    updateAvailableBadge: ReleaseInfo?,
+    activeUpdateBaseUrl: String,
+    crashReportCount: Int,
     onRebindRoute: () -> Unit,
     onScanNow: () -> Unit,
     onOpenSubsonicAccounts: () -> Unit,
     onOpenDownloadManager: () -> Unit,
     onOpenWifiTransfer: () -> Unit,
+    onCheckUpdate: () -> Unit,
+    onOpenCrashLogs: () -> Unit,
+    onSimulateCrash: () -> Unit,
     bottomPadding: Dp,
 ) {
     val colors = LocalHiFiColors.current
@@ -173,6 +184,8 @@ fun SettingsScreen(
     var activeSheet by remember { mutableStateOf(ActiveSheet.NONE) }
     var showDirsDialog by remember { mutableStateOf(false) }
     var showKeepAliveDialog by remember { mutableStateOf(false) }
+    var showUpdateServerDialog by remember { mutableStateOf(false) }
+    var showSimulateCrashConfirm by remember { mutableStateOf(false) }
     var highVolConfirm by remember { mutableStateOf<HighVolumeConfirm?>(null) }
     var coverCacheBytes by remember { mutableStateOf(CoverArtSupport.getCoverCacheSizeBytes(context)) }
     val appRef = remember { com.sonify.player.HiFiApp.from(context) }
@@ -731,6 +744,59 @@ fun SettingsScreen(
             onCheckedChange = { scope.launch { prefs.setWakeLock(it) } },
         )
 
+        // ==================== 分组 6：应用更新与崩溃诊断 ====================
+        SettingsGroupHeader("应用更新与崩溃诊断")
+
+        SettingsSelectItem(
+            icon = Icons.Rounded.NewReleases,
+            title = "检查应用更新",
+            subtitle = if (updateAvailableBadge != null) {
+                "发现新版本 v${updateAvailableBadge.versionName} · 点击查看日志并安全升级"
+            } else {
+                "当前版本 v${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE}) · SHA-256 校验"
+            },
+            badgeText = updateAvailableBadge?.let { "v${it.versionName}" },
+            onClick = onCheckUpdate,
+        )
+        SettingsSwitchItem(
+            icon = Icons.Rounded.Download,
+            title = "自动检查更新",
+            subtitle = "启动时按 12 小时节流静默检查，不打扰听音",
+            checked = settings.autoCheckUpdate,
+            onCheckedChange = { scope.launch { prefs.setAutoCheckUpdate(it) } },
+        )
+        SettingsSwitchItem(
+            icon = Icons.Rounded.CloudUpload,
+            title = "自动上报脱敏崩溃日志",
+            subtitle = "发生闪退后仅上报异常堆栈与设备型号，自动剥离路径与账号信息",
+            checked = settings.autoUploadCrashLogs,
+            onCheckedChange = { scope.launch { prefs.setAutoUploadCrashLogs(it) } },
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.BugReport,
+            title = "查看本地崩溃记录",
+            subtitle = if (crashReportCount > 0) {
+                "已保存 $crashReportCount 条脱敏诊断记录 · 支持复制或手动补报"
+            } else {
+                "当前无本地崩溃记录 · 独立进程恢复守护运行中"
+            },
+            onClick = onOpenCrashLogs,
+        )
+        SettingsSelectItem(
+            icon = Icons.Rounded.Cloud,
+            title = "更新与诊断服务地址",
+            subtitle = activeUpdateBaseUrl,
+            onClick = { showUpdateServerDialog = true },
+        )
+        if (BuildConfig.DEBUG) {
+            SettingsSelectItem(
+                icon = Icons.Rounded.Warning,
+                title = "模拟一次测试崩溃（Debug）",
+                subtitle = "用于真机验证独立 :crash 进程恢复页、3 秒自动重启与日志上报",
+                onClick = { showSimulateCrashConfirm = true },
+            )
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -745,7 +811,11 @@ fun SettingsScreen(
             )
             Spacer(Modifier.width(16.dp))
             Column {
-                Text("Sonify v0.2.0", fontSize = 14.sp, color = colors.textPrimary)
+                Text(
+                    text = "Sonify v${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
+                    fontSize = 14.sp,
+                    color = colors.textPrimary,
+                )
                 Text(
                     text = "libusb 1.0.27 · UAC1/2 Native (${nativeBuildTime.ifBlank { "ready" }})",
                     fontSize = 11.sp,
@@ -1151,6 +1221,97 @@ fun SettingsScreen(
             },
         )
     }
+
+    if (showUpdateServerDialog) {
+        var urlInput by remember { mutableStateOf(settings.customUpdateBaseUrl.ifBlank { BuildConfig.UPDATE_BASE_URL }) }
+        AlertDialog(
+            onDismissRequest = { showUpdateServerDialog = false },
+            containerColor = colors.surface1,
+            title = { Text("更新与诊断服务地址", color = colors.textPrimary) },
+            text = {
+                Column {
+                    Text(
+                        text = "默认对接官方自建服务 ${BuildConfig.UPDATE_BASE_URL}；如需切换局域网测试或私有镜像，可在此填写以 http:// 或 https:// 开头的根地址。",
+                        fontSize = 12.sp,
+                        color = colors.textSecondary,
+                        lineHeight = 17.sp,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = urlInput,
+                        onValueChange = { urlInput = it },
+                        singleLine = true,
+                        label = { Text("Base URL") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val cleaned = urlInput.trim().trimEnd('/')
+                        scope.launch {
+                            if (cleaned.isEmpty() || cleaned == BuildConfig.UPDATE_BASE_URL.trimEnd('/')) {
+                                prefs.setCustomUpdateBaseUrl("")
+                            } else if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) {
+                                prefs.setCustomUpdateBaseUrl(cleaned)
+                            }
+                        }
+                        showUpdateServerDialog = false
+                    }
+                ) {
+                    Text("保存", color = colors.accent, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Row {
+                    if (settings.customUpdateBaseUrl.isNotBlank()) {
+                        TextButton(
+                            onClick = {
+                                scope.launch { prefs.setCustomUpdateBaseUrl("") }
+                                showUpdateServerDialog = false
+                            }
+                        ) {
+                            Text("恢复默认", color = colors.textSecondary)
+                        }
+                    }
+                    TextButton(onClick = { showUpdateServerDialog = false }) {
+                        Text("取消", color = colors.textSecondary)
+                    }
+                }
+            },
+        )
+    }
+
+    if (showSimulateCrashConfirm) {
+        AlertDialog(
+            onDismissRequest = { showSimulateCrashConfirm = false },
+            containerColor = colors.surface1,
+            title = { Text("模拟一次测试崩溃？", color = colors.textPrimary) },
+            text = {
+                Text(
+                    "将在主线程抛出测试异常以验证 SonifyCrashHandler 拦截、独立 :crash 进程恢复页、3 秒自动重启及脱敏日志保存/上报流程。",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSimulateCrashConfirm = false
+                        onSimulateCrash()
+                    }
+                ) {
+                    Text("立即模拟", color = colors.danger, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSimulateCrashConfirm = false }) {
+                    Text("取消", color = colors.textSecondary)
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -1170,6 +1331,7 @@ private fun SettingsSelectItem(
     icon: ImageVector,
     title: String,
     subtitle: String,
+    badgeText: String? = null,
     onClick: () -> Unit,
 ) {
     val colors = LocalHiFiColors.current
@@ -1183,16 +1345,32 @@ private fun SettingsSelectItem(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = colors.textSecondary,
+            tint = if (badgeText != null) colors.accent else colors.textSecondary,
             modifier = Modifier.size(22.dp),
         )
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 15.sp,
-                color = colors.textPrimary,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    fontSize = 15.sp,
+                    color = colors.textPrimary,
+                )
+                if (!badgeText.isNullOrBlank()) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = badgeText,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color.Black,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(colors.accent)
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                    )
+                }
+            }
             Spacer(Modifier.height(2.dp))
             Text(
                 text = subtitle,

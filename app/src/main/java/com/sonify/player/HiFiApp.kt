@@ -2,8 +2,10 @@ package com.sonify.player
 
 import android.app.Application
 import android.content.Context
+import android.os.Build
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import com.sonify.player.crash.SonifyCrashHandler
 import com.sonify.player.data.LibraryDatabase
 import com.sonify.player.data.UserPreferences
 import com.sonify.player.download.SonifyDownloadManager
@@ -13,6 +15,7 @@ import com.sonify.player.lyrics.LyricsRepository
 import com.sonify.player.subsonic.SubsonicRepository
 import com.sonify.player.ui.theme.AmbientColorExtractor
 import com.sonify.player.ui.theme.SubsonicCoverFetcher
+import com.sonify.player.update.AppUpdateManager
 import com.sonify.player.usb.UsbAudioManager
 import com.sonify.player.usb.UsbVolumeController
 import com.sonify.player.wifi.WifiTransferManager
@@ -20,9 +23,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
- * 轻量级应用级依赖容器，统一管理跨界面/跨 Service 共享的 USB、音量护耳、数据库、设置、扫描器与 Subsonic 仓库。
+ * 轻量级应用级依赖容器，统一管理跨界面/跨 Service 共享的 USB、音量护耳、数据库、设置、扫描器、Subsonic、更新与崩溃保护。
  */
 class HiFiApp : Application(), ImageLoaderFactory {
 
@@ -48,9 +52,16 @@ class HiFiApp : Application(), ImageLoaderFactory {
         private set
     lateinit var lyricsRepo: LyricsRepository
         private set
+    lateinit var updateManager: AppUpdateManager
+        private set
 
     override fun onCreate() {
         super.onCreate()
+        // 独立 `:crash` 崩溃恢复进程跳过重量级初始化，确保秒启且不受主进程受损状态牵连
+        if (isCrashProcess()) return
+
+        SonifyCrashHandler.install(this)
+
         prefs = UserPreferences(this)
         db = LibraryDatabase.get(this)
         volumeController = UsbVolumeController(prefs)
@@ -61,11 +72,21 @@ class HiFiApp : Application(), ImageLoaderFactory {
         downloadManager = SonifyDownloadManager(this, db, prefs, subsonicRepo)
         wifiTransferManager = WifiTransferManager(this, db, prefs, usbManager)
         lyricsRepo = LyricsRepository(this, prefs, subsonicRepo)
+        updateManager = AppUpdateManager(this, prefs)
         AmbientColorExtractor.init(this, subsonicRepo)
 
         appScope.launch {
             subsonicRepo.preloadCredentials()
         }
+    }
+
+    private fun isCrashProcess(): Boolean {
+        val procName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            getProcessName()
+        } else {
+            runCatching { File("/proc/self/cmdline").readText().trim('\u0000', ' ', '\n') }.getOrDefault("")
+        }
+        return procName.endsWith(":crash")
     }
 
     override fun newImageLoader(): ImageLoader =

@@ -1,0 +1,14 @@
+[Unit]
+Description=Sonify Update & Crash Diagnostics Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+ExecStart=/usr/bin/python3 /opt/sonify-server/sonify_server.py --host 127.0.0.1 --port 8090 --data-dir /var/lib/sonify-server --releases-dir /var/lib/sonify-server/releases
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.sonify.player.crash.CrashReporter
 import com.sonify.player.data.PlaylistEntity
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.library.PlaylistSorter
@@ -84,14 +85,17 @@ import com.sonify.player.ui.SubsonicDrillState
 import com.sonify.player.ui.SubsonicViewModel
 import com.sonify.player.ui.components.AddToPlaylistSheet
 import com.sonify.player.ui.components.AddTracksPickerSheet
+import com.sonify.player.ui.components.CrashLogsSheet
 import com.sonify.player.ui.components.DownloadQueueSheet
 import com.sonify.player.ui.components.MiniPlayerBar
 import com.sonify.player.ui.components.OutputDeviceSheet
 import com.sonify.player.ui.components.PlaylistEditorDialog
 import com.sonify.player.ui.components.SubsonicAccountsSheet
 import com.sonify.player.ui.components.TrackActionSheet
+import com.sonify.player.ui.components.UpdateDialog
 import com.sonify.player.ui.components.VolumeHudOverlay
 import com.sonify.player.ui.components.WifiTransferSheet
+import com.sonify.player.ui.screens.GlobalSearchScreen
 import com.sonify.player.ui.screens.LibraryScreen
 import com.sonify.player.ui.screens.NowPlayingScreen
 import com.sonify.player.ui.screens.PlaylistDetailScreen
@@ -249,14 +253,20 @@ private fun HiFiRootScreen(
 
     val wifiTransferState by app.wifiTransferManager.state.collectAsState()
     val wifiUploadHistory by app.wifiTransferManager.history.collectAsState()
+    val updateState by app.updateManager.state.collectAsState()
+    val updateAvailableBadge by app.updateManager.availableBadge.collectAsState()
+    val showUpdateDialog by app.updateManager.showDialog.collectAsState()
 
     var currentTab by remember { mutableStateOf(MainTab.LIBRARY) }
     var showNowPlaying by remember { mutableStateOf(false) }
+    var showGlobalSearch by remember { mutableStateOf(false) }
     var showOutputSheet by remember { mutableStateOf(false) }
     var showSubsonicSheet by remember { mutableStateOf(false) }
     var subsonicSheetInitialAdd by remember { mutableStateOf(false) }
     var showDownloadSheet by remember { mutableStateOf(false) }
     var showWifiTransferSheet by remember { mutableStateOf(false) }
+    var showCrashLogsSheet by remember { mutableStateOf(false) }
+    var crashReportCount by remember { mutableStateOf(CrashReporter.listReports(context).size) }
     var hasStoragePermission by remember { mutableStateOf(checkStoragePermission(context)) }
 
     // 歌单 & 歌曲操作状态
@@ -337,10 +347,17 @@ private fun HiFiRootScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        app.updateManager.checkForUpdates(manual = false)
+    }
+
     BackHandler(enabled = showNowPlaying) {
         showNowPlaying = false
     }
-    BackHandler(enabled = !showNowPlaying && currentTab == MainTab.LIBRARY && openLocalPlaylistId != null) {
+    BackHandler(enabled = !showNowPlaying && showGlobalSearch) {
+        showGlobalSearch = false
+    }
+    BackHandler(enabled = !showNowPlaying && !showGlobalSearch && currentTab == MainTab.LIBRARY && openLocalPlaylistId != null) {
         openLocalPlaylistId = null
     }
 
@@ -368,7 +385,49 @@ private fun HiFiRootScreen(
             when (currentTab) {
                 MainTab.LIBRARY -> {
                     val activeLocalPlId = openLocalPlaylistId
-                    if (activeLocalPlId != null && selectedSubsonicServer == null) {
+                    if (showGlobalSearch) {
+                        GlobalSearchScreen(
+                            tracks = tracks,
+                            playlists = localPlaylists,
+                            activeSubsonicServer = activeSubsonicServer,
+                            searchHistory = settings.searchHistory,
+                            currentTrackPath = playback.currentTrack?.path,
+                            onBack = { showGlobalSearch = false },
+                            onAddSearchHistory = { q -> scope.launch { app.prefs.addSearchHistory(q) } },
+                            onRemoveSearchHistory = { q -> scope.launch { app.prefs.removeSearchHistory(q) } },
+                            onClearSearchHistory = { scope.launch { app.prefs.clearSearchHistory() } },
+                            onSearchRemote = { srvId, q ->
+                                runCatching {
+                                    val creds = app.subsonicRepo.getCredentials(srvId) ?: return@runCatching null
+                                    val res = app.subsonicRepo.client.search3(creds, q)
+                                    app.subsonicRepo.cacheSongs(srvId, res.songs)
+                                    res
+                                }.getOrNull()
+                            },
+                            onPlayTracks = { list, idx, ctxLabel -> vm.playTracks(list, idx, ctxLabel) },
+                            onPlayLyricHit = { track, timeMs ->
+                                vm.playTracks(listOf(track), 0, "歌词搜索")
+                                if (timeMs > 0L) vm.seekTo(timeMs)
+                            },
+                            onOpenLocalPlaylist = { summary ->
+                                showGlobalSearch = false
+                                scope.launch { app.prefs.setLastLibrarySource(SubsonicRepository.LOCAL_SOURCE_KEY) }
+                                openLocalPlaylistId = summary.playlist.id
+                            },
+                            onOpenRemoteAlbum = { album ->
+                                showGlobalSearch = false
+                                activeSubsonicServer?.let { srv ->
+                                    openLocalPlaylistId = null
+                                    subsonicVm.switchActiveServer(srv)
+                                    subsonicVm.openAlbum(album)
+                                }
+                            },
+                            onTrackMenu = { track ->
+                                trackMenuCtx = TrackMenuContext(track = track)
+                            },
+                            bottomPadding = bottomClearance,
+                        )
+                    } else if (activeLocalPlId != null && selectedSubsonicServer == null) {
                         val cachedPl = remember(activeLocalPlId, localPlaylists) {
                             localPlaylists.firstOrNull { it.playlist.id == activeLocalPlId }?.playlist
                         }
@@ -540,6 +599,7 @@ private fun HiFiRootScreen(
                                     subsonicVm.openPlaylist(pl)
                                 }
                             },
+                            onOpenGlobalSearch = { showGlobalSearch = true },
                             bottomPadding = bottomClearance,
                         )
                     }
@@ -575,6 +635,9 @@ private fun HiFiRootScreen(
                     downloadedTotalBytes = downloadedList.sumOf { it.fileSize.coerceAtLeast(0L) },
                     wifiTransferState = wifiTransferState,
                     nativeBuildTime = usbState.stats.buildTime,
+                    updateAvailableBadge = updateAvailableBadge,
+                    activeUpdateBaseUrl = app.updateManager.activeBaseUrl(),
+                    crashReportCount = crashReportCount,
                     onRebindRoute = vm::rebindAudioRoute,
                     onScanNow = {
                         if (hasStoragePermission) vm.startScan() else requestStorageAccess()
@@ -586,6 +649,14 @@ private fun HiFiRootScreen(
                     },
                     onOpenDownloadManager = { showDownloadSheet = true },
                     onOpenWifiTransfer = { showWifiTransferSheet = true },
+                    onCheckUpdate = { app.updateManager.checkForUpdates(manual = true) },
+                    onOpenCrashLogs = {
+                        crashReportCount = CrashReporter.listReports(context).size
+                        showCrashLogsSheet = true
+                    },
+                    onSimulateCrash = {
+                        throw RuntimeException("Sonify QA Simulated Crash (Debug Verification)")
+                    },
                     bottomPadding = bottomClearance,
                 )
             }
@@ -633,7 +704,10 @@ private fun HiFiRootScreen(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { currentTab = tab }
+                            .clickable {
+                                if (tab != MainTab.LIBRARY) showGlobalSearch = false
+                                currentTab = tab
+                            }
                             .padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
@@ -651,6 +725,14 @@ private fun HiFiRootScreen(
                                         .size(7.dp)
                                         .clip(CircleShape)
                                         .background(colors.exclusiveGreen)
+                                )
+                            } else if (tab == MainTab.SETTINGS && updateAvailableBadge != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(colors.accent)
                                 )
                             }
                         }
@@ -1041,6 +1123,30 @@ private fun HiFiRootScreen(
             },
             onShowToast = libraryVm::showToast,
             onDismiss = { showWifiTransferSheet = false },
+        )
+    }
+
+    // 应用内更新弹窗（含更新日志、进度与速度、SHA-256 校验状态）
+    if (showUpdateDialog) {
+        UpdateDialog(
+            state = updateState,
+            onStartDownload = { release -> app.updateManager.startDownload(release) },
+            onCancelDownload = { app.updateManager.cancelDownload() },
+            onIgnoreVersion = { verCode -> app.updateManager.ignoreVersion(verCode) },
+            onRetryCheck = { app.updateManager.checkForUpdates(manual = true) },
+            onDismiss = { app.updateManager.dismissDialog() },
+        )
+    }
+
+    // 本地崩溃诊断日志管理 Sheet
+    if (showCrashLogsSheet) {
+        CrashLogsSheet(
+            baseUrl = app.updateManager.activeBaseUrl(),
+            onShowToast = libraryVm::showToast,
+            onDismiss = {
+                showCrashLogsSheet = false
+                crashReportCount = CrashReporter.listReports(context).size
+            },
         )
     }
 

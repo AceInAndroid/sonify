@@ -163,6 +163,7 @@ fun LibraryScreen(
     onDeleteRemotePlaylist: (SubsonicPlaylist) -> Unit,
     onAddTracksToRemotePlaylist: (SubsonicPlaylist, Set<String>) -> Unit,
     onRemoveRemotePlaylistIndexes: (SubsonicPlaylist, List<Int>) -> Unit,
+    onOpenGlobalSearch: () -> Unit,
     bottomPadding: Dp,
 ) {
     val colors = LocalHiFiColors.current
@@ -307,11 +308,11 @@ fun LibraryScreen(
                     }
 
                     if (selectedSubsonicServer != null) {
-                        IconButton(onClick = { onSubsonicToggleSearch(!subsonicState.searchActive) }) {
+                        IconButton(onClick = onOpenGlobalSearch) {
                             Icon(
-                                imageVector = if (subsonicState.searchActive) Icons.Rounded.Close else Icons.Rounded.Search,
-                                contentDescription = "搜索服务器",
-                                tint = if (subsonicState.searchActive) colors.accent else colors.textPrimary,
+                                imageVector = Icons.Rounded.Search,
+                                contentDescription = "全局搜索",
+                                tint = colors.textPrimary,
                             )
                         }
                         IconButton(onClick = onSubsonicRefresh) {
@@ -321,14 +322,11 @@ fun LibraryScreen(
                             Icon(Icons.Rounded.Cloud, contentDescription = "管理 Subsonic 账号", tint = colors.exclusiveGreen)
                         }
                     } else {
-                        IconButton(onClick = {
-                            localSearchActive = !localSearchActive
-                            if (!localSearchActive) localSearchQuery = ""
-                        }) {
+                        IconButton(onClick = onOpenGlobalSearch) {
                             Icon(
-                                imageVector = if (localSearchActive) Icons.Rounded.Close else Icons.Rounded.Search,
-                                contentDescription = "搜索本地音乐库",
-                                tint = if (localSearchActive) colors.accent else colors.textPrimary,
+                                imageVector = Icons.Rounded.Search,
+                                contentDescription = "全局搜索",
+                                tint = colors.textPrimary,
                             )
                         }
                         IconButton(

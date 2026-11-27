@@ -1,8 +1,18 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
 }
+
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.isFile) f.inputStream().use { load(it) }
+}
+val updateBaseUrl = (localProps.getProperty("sonify.updateBaseUrl") ?: "https://sonify.zhangbing.tech")
+    .trim()
+    .trimEnd('/')
 
 android {
     namespace = "com.sonify.player"
@@ -15,6 +25,8 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "0.2.0"
+
+        buildConfigField("String", "UPDATE_BASE_URL", "\"$updateBaseUrl\"")
 
         ndk {
             abiFilters += listOf("arm64-v8a")
@@ -38,6 +50,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
