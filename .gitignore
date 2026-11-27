@@ -14,3 +14,4 @@ app/.cxx/
 *.keystore
 *.jks
 docs/screenshots/tmp_*.png
+server/__pycache__/
