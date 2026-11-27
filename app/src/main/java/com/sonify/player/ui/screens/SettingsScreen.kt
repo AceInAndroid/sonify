@@ -782,13 +782,13 @@ fun SettingsScreen(
             },
             onClick = onOpenCrashLogs,
         )
-        SettingsSelectItem(
-            icon = Icons.Rounded.Cloud,
-            title = "更新与诊断服务地址",
-            subtitle = activeUpdateBaseUrl,
-            onClick = { showUpdateServerDialog = true },
-        )
         if (BuildConfig.DEBUG) {
+            SettingsSelectItem(
+                icon = Icons.Rounded.Cloud,
+                title = "更新与诊断服务地址（Debug）",
+                subtitle = activeUpdateBaseUrl,
+                onClick = { showUpdateServerDialog = true },
+            )
             SettingsSelectItem(
                 icon = Icons.Rounded.Warning,
                 title = "模拟一次测试崩溃（Debug）",
@@ -1222,7 +1222,7 @@ fun SettingsScreen(
         )
     }
 
-    if (showUpdateServerDialog) {
+    if (BuildConfig.DEBUG && showUpdateServerDialog) {
         var urlInput by remember { mutableStateOf(settings.customUpdateBaseUrl.ifBlank { BuildConfig.UPDATE_BASE_URL }) }
         AlertDialog(
             onDismissRequest = { showUpdateServerDialog = false },
@@ -1283,7 +1283,7 @@ fun SettingsScreen(
         )
     }
 
-    if (showSimulateCrashConfirm) {
+    if (BuildConfig.DEBUG && showSimulateCrashConfirm) {
         AlertDialog(
             onDismissRequest = { showSimulateCrashConfirm = false },
             containerColor = colors.surface1,

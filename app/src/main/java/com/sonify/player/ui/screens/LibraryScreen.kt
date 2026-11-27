@@ -100,7 +100,7 @@ import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.ui.theme.formatDuration
 import java.io.File
 
-private enum class LibraryFilter(val label: String) {
+enum class LibraryFilter(val label: String) {
     SONGS("歌曲"),
     PLAYLISTS("歌单"),
     ALBUMS("专辑"),
@@ -164,10 +164,12 @@ fun LibraryScreen(
     onAddTracksToRemotePlaylist: (SubsonicPlaylist, Set<String>) -> Unit,
     onRemoveRemotePlaylistIndexes: (SubsonicPlaylist, List<Int>) -> Unit,
     onOpenGlobalSearch: () -> Unit,
+    selectedFilter: LibraryFilter = LibraryFilter.SONGS,
+    onSelectFilter: (LibraryFilter) -> Unit = {},
     bottomPadding: Dp,
 ) {
     val colors = LocalHiFiColors.current
-    var filter by remember { mutableStateOf(LibraryFilter.SONGS) }
+    val filter = selectedFilter
     var drillGroup by remember { mutableStateOf<DrillDownGroup?>(null) }
     var localSearchActive by remember { mutableStateOf(false) }
     var localSearchQuery by remember { mutableStateOf("") }
@@ -610,7 +612,7 @@ fun LibraryScreen(
                         modifier = Modifier
                             .clip(RoundedCornerShape(999.dp))
                             .background(if (selected) colors.accent else colors.surface2)
-                            .clickable { filter = item }
+                            .clickable { onSelectFilter(item) }
                             .padding(horizontal = 15.dp, vertical = 7.dp),
                         contentAlignment = Alignment.Center,
                     ) {

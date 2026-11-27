@@ -1,7 +1,7 @@
 # Sonify 端到端测试用例库（Test Cases）
 
-> 覆盖范围：沉浸音乐模式、Subsonic/OpenSubsonic 媒体服务器、音乐库歌单与离线下载、WiFi 局域网传歌、同步歌词 V1、沉浸式歌词样式与设置页重构、核心稳定性回归。
-> 总用例数：**52 条**（模块 A–G）。
+> 覆盖范围：沉浸音乐模式、Subsonic/OpenSubsonic 媒体服务器、音乐库歌单与离线下载、WiFi 局域网传歌、同步歌词 V1、沉浸式歌词样式与设置页重构、核心稳定性回归、崩溃拦截与安全重启、应用内更新、全屏跨源全局搜索。
+> 总用例数：**70 条**（模块 A–J）。
 
 ---
 
@@ -128,7 +128,7 @@
 | `TC-UPD-03` | P0 | `FileProvider` 拉起系统安装器 / 未知来源权限引导 | 已完成 `TC-UPD-02` 下载校验 | 在更新弹窗点击「立即安装」 | API 29 真机成功拉起系统安装包确认页（或引导开启未知来源安装权限），无 `FileUriExposedException` 崩溃 | 真机实测 + 截图 + `logcat` |
 | `TC-UPD-04` | P1 | 跳过该版本与「已是最新版本」反馈 | 更新源可用 | 点击「忽略此版本」后重启不自动弹窗；手动点击检查仍可重新触发；当服务端版本 `<=` 当前版本时提示「已是最新版本」 | 策略行为与提示文案准确无误 | 真机实测 + 单测 |
 | `TC-UPD-05` | P1 | 自建云服务端脚本与发布工具链路验证 | 本地/云端 Python 3 环境 | 启动 `server/sonify_server.py` 校验 `/api/v1/health`、`/api/v1/update/latest`、`/api/v1/crash/report` 与 `/releases/*.apk` HTTP `Range`；运行 `scripts/publish_release.sh --dry-run` | 所有接口状态码、JSON 结构、速率限制与脚本 SHA-256 生成逻辑完全正确 | 本地服务端实测 + CLI 验证 |
-| `TC-UPD-06` | P2 | 自定义更新源切换与恢复官方默认地址 | 设置页 | 在「更新与诊断服务地址」切换局域网源，测完后点「恢复默认」 | 恢复为 `https://sonify.zhangbing.tech` 并持久化生效 | 真机实测 |
+| `TC-UPD-06` | P1 | Release 正式包隐藏 Debug 诊断项且锁定官方更新源 | Debug vs Release 构建 | 1. 核验 `SettingsScreen` 与 `AppUpdateManager.activeBaseUrl()` 仅在 `BuildConfig.DEBUG` 暴露「更新与诊断服务地址（Debug）」与「模拟一次测试崩溃（Debug）」<br>2. 编译验证 `:app:compileReleaseKotlin` 零错误 | Release 正式包不显示服务地址切换和模拟崩溃入口，且强制锁定官方源 `https://sonify.zhangbing.tech` | Release 编译校验 + 代码审查 |
 
 ---
 

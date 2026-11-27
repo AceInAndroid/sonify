@@ -55,9 +55,11 @@ class AppUpdateManager(
     private var downloadJob: Job? = null
 
     fun activeBaseUrl(): String {
-        val custom = prefs.current.customUpdateBaseUrl.trim().trimEnd('/')
-        return if (custom.startsWith("http://") || custom.startsWith("https://")) custom
-        else BuildConfig.UPDATE_BASE_URL.trimEnd('/')
+        if (BuildConfig.DEBUG) {
+            val custom = prefs.current.customUpdateBaseUrl.trim().trimEnd('/')
+            if (custom.startsWith("http://") || custom.startsWith("https://")) return custom
+        }
+        return BuildConfig.UPDATE_BASE_URL.trimEnd('/')
     }
 
     fun dismissDialog() {

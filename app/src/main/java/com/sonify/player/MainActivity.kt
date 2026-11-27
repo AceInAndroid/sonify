@@ -96,6 +96,7 @@ import com.sonify.player.ui.components.UpdateDialog
 import com.sonify.player.ui.components.VolumeHudOverlay
 import com.sonify.player.ui.components.WifiTransferSheet
 import com.sonify.player.ui.screens.GlobalSearchScreen
+import com.sonify.player.ui.screens.LibraryFilter
 import com.sonify.player.ui.screens.LibraryScreen
 import com.sonify.player.ui.screens.NowPlayingScreen
 import com.sonify.player.ui.screens.PlaylistDetailScreen
@@ -258,6 +259,7 @@ private fun HiFiRootScreen(
     val showUpdateDialog by app.updateManager.showDialog.collectAsState()
 
     var currentTab by remember { mutableStateOf(MainTab.LIBRARY) }
+    var libraryFilter by remember { mutableStateOf(LibraryFilter.SONGS) }
     var showNowPlaying by remember { mutableStateOf(false) }
     var showGlobalSearch by remember { mutableStateOf(false) }
     var showOutputSheet by remember { mutableStateOf(false) }
@@ -600,6 +602,8 @@ private fun HiFiRootScreen(
                                 }
                             },
                             onOpenGlobalSearch = { showGlobalSearch = true },
+                            selectedFilter = libraryFilter,
+                            onSelectFilter = { libraryFilter = it },
                             bottomPadding = bottomClearance,
                         )
                     }
