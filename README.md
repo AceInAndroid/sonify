@@ -4,36 +4,41 @@
 
 **Bit-Perfect USB Audio Class (UAC1/UAC2) Exclusive HiFi Player for Android**
 
+[![Release](https://img.shields.io/badge/Release-v1.0.0-E5A93C)](https://github.com/AceInAndroid/sonify/releases/tag/v1.0.0)
 [![Platform](https://img.shields.io/badge/Android-7.0%2B%20(API%2024%2B)-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
-[![ABI](https://img.shields.io/badge/ABI-arm64--v8a-blue)]()
+[![ABI](https://img.shields.io/badge/ABI-arm64--v8a%20%7C%20armeabi--v7a-blue)](https://github.com/AceInAndroid/sonify/releases/tag/v1.0.0)
 [![USB Audio](https://img.shields.io/badge/USB%20Audio-UAC1%20%2F%20UAC2%20Exclusive-1ED760)]()
 [![License](https://img.shields.io/badge/License-Non--Commercial%20Only-EF5350)](LICENSE)
 
-**English** | [简体中文](README_ZH.md)
+**English** | [简体中文](README_ZH.md) | [Download v1.0.0 APK](https://github.com/AceInAndroid/sonify/releases/tag/v1.0.0)
 
 </div>
 
 ---
 
-**Sonify** is an open-source, local-first Android HiFi audio player featuring a custom **userspace USB Audio Class (UAC1/UAC2) driver** built on `libusb`. By bypassing Android's `AudioFlinger` resampling pipeline entirely, Sonify delivers true **bit-perfect PCM audio (up to 384 kHz / 32-bit)** directly to external USB DACs—paired with a minimalist **Spotify-inspired dark vinyl UI** and hardware-backed **hearing protection**.
+**Sonify** is an open-source, local-first Android HiFi audio player featuring a custom **userspace USB Audio Class (UAC1/UAC2) driver** built on `libusb`. By bypassing Android's `AudioFlinger` resampling pipeline entirely, Sonify delivers true **bit-perfect PCM audio (up to 384 kHz / 32-bit)** directly to external USB DACs—paired with a minimalist **Spotify-inspired dark vinyl UI**, **fluid aurora synced lyrics**, **Subsonic & WiFi transfer**, and hardware-backed **hearing protection**.
 
-## Screenshots
+## Screenshots (English UI)
+
+> Looking for the Simplified Chinese UI screenshots? See [README_ZH.md](README_ZH.md).
 
 <p align="center">
-  <img src="docs/screenshots/now_playing.png" width="18%" alt="Now Playing Vinyl" />
-  <img src="docs/screenshots/volume_hud.png" width="18%" alt="Hearing Protection Volume HUD" />
-  <img src="docs/screenshots/library.png" width="18%" alt="Music Library" />
-  <img src="docs/screenshots/usb_dac.png" width="18%" alt="USB DAC & Telemetry" />
-  <img src="docs/screenshots/settings.png" width="18%" alt="Settings" />
+  <img src="docs/screenshots/en/now_playing.png" width="15.5%" alt="Now Playing Vinyl" />
+  <img src="docs/screenshots/en/lyrics.png" width="15.5%" alt="Immersive Aurora Lyrics" />
+  <img src="docs/screenshots/en/library.png" width="15.5%" alt="Music Library" />
+  <img src="docs/screenshots/en/global_search.png" width="15.5%" alt="Global Search" />
+  <img src="docs/screenshots/en/usb_dac.png" width="15.5%" alt="USB DAC Dashboard" />
+  <img src="docs/screenshots/en/settings.png" width="15.5%" alt="Settings & Language" />
 </p>
 
 | View | Highlights |
 |---|---|
-| **Now Playing (Vinyl)** | Spinning canvas vinyl disc with fixed specular sheen, dynamic album-art ambient gradient, live **Source → Negotiated Output** signal badge, and embedded hardware volume bar |
-| **Volume HUD & Ear Guard** | Physical volume buttons hijacked in USB exclusive mode, showing live dB attenuation and a red hearing-protection ceiling zone |
-| **Music Library** | Instant lossless header scanner (FLAC/WAV/MP3/M4A/OGG/OPUS), album cover grid, folder & artist drill-down, resume-last-session card |
-| **USB DAC Dashboard** | Real-time negotiated sample rate, bit depth, async feedback clock rate (`fbRate`), buffer depth, underrun counter, and built-in 440Hz/1kHz test tone diagnostics |
-| **Settings** | Minimalist dark grouped preferences for USB output policy, hearing protection ceiling, gapless playback, dark canvas & accent themes |
+| **Now Playing (Vinyl)** | Spinning canvas vinyl disc with fixed specular sheen, dynamic album-art ambient gradient, live **Source → Negotiated Output** signal badge, live single-line lyric preview, and one-tap **Zen Vinyl** mode |
+| **Immersive Aurora Lyrics** | Edge-to-edge **Fluid Multi-Color Aurora** backdrop, 60fps **Progressive Sweep** lyric highlight, 5-tier multi-source lyrics engine (Local LRC / Embedded / Subsonic / **LRCLIB Online**), live offset & style customizer |
+| **Music Library** | Instant lossless header scanner (FLAC/WAV/MP3/M4A/OGG/OPUS), album/artist/folder/playlist views, Subsonic multi-server quick switcher, and resume-last-session card |
+| **Global Search** | Full-screen cross-source search across local tracks, albums, artists, playlists, Subsonic remote (`search3`), and `.lrc` **search-by-lyrics** with Simplified ↔ Traditional Chinese normalization & Quick Discovery |
+| **USB DAC Dashboard** | Bit-Perfect USB Exclusive switch, real-time negotiated sample rate, bit depth, async feedback clock rate (`fbRate`), buffer depth, underrun counter, and built-in 440Hz/1kHz test tone diagnostics |
+| **Settings & Bilingual UI** | Minimalist dark grouped preferences for USB policy, 4-layer ear protection, WiFi LAN transfer, Subsonic, lyrics style, dark canvas & accent themes, and **zero-interruption English / Simplified Chinese switching** |
 
 ---
 
@@ -113,7 +118,7 @@ flowchart TD
 - **JDK 17**
 - **Android SDK** `compileSdk = 35`, `minSdk = 24`
 - **NDK** `28.2.13676358`, **CMake** `3.22.1`
-- Target ABI: `arm64-v8a` (`libusb 1.0.27` is compiled statically from `third_party/libusb/`)
+- Target ABIs: `arm64-v8a` & `armeabi-v7a` (+ `universal` fat APK; `libusb 1.0.27` is compiled statically from `third_party/libusb/`)
 
 ### Build Commands
 
@@ -123,12 +128,16 @@ export ANDROID_HOME=$HOME/Library/Android/sdk
 # Run unit tests & build debug APK
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 
+# Build signed multi-ABI release APKs (arm64-v8a, armeabi-v7a, universal)
+./gradlew :app:assembleRelease
+
 # Important: When modifying C++ native files, clear native caches to prevent stale .so packaging
 rm -rf app/build app/.cxx build
 ./gradlew :app:assembleDebug --no-daemon --no-build-cache
 ```
 
-APK output: `app/build/outputs/apk/debug/app-debug.apk`
+Release APK outputs: `app/build/outputs/apk/release/app-{arm64-v8a,armeabi-v7a,universal}-release.apk`
+Pre-built signed APKs & SHA-256 checksums are available on [GitHub Releases](https://github.com/AceInAndroid/sonify/releases).
 
 ### Quality Assurance & Real-Device Release Gate
 Every feature and modification must pass unit tests **and** real-device verification before release:

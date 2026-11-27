@@ -41,6 +41,18 @@ data class ChangelogEntry(
 object ReleaseNotesCatalog {
     val entriesZh: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            versionName = "1.0.0",
+            versionCode = 100,
+            releaseDate = "2026-11-27",
+            summary = "首个正式发行版 · 多架构正式包、中英双语与全功能闭环",
+            highlights = listOf(
+                "正式发布 arm64-v8a、armeabi-v7a 与全架构通用（universal）签名安装包",
+                "中英双语 1 帧零中断热切换（跟随系统 / 简体中文 / English），覆盖全部页面、弹窗、锁屏、:crash 恢复页与 WiFi 传歌 Web",
+                "完整集成 Bit-Perfect USB 独占引擎、四重护耳保护、流光同步歌词、Subsonic 无损直通、WiFi 传歌、全屏全局搜索、崩溃自愈与应用内 SHA-256 安全更新",
+                "采用 Sonify 非商用开源许可协议 v1.0（禁止商用），并配套多语言标准规范与字段字典",
+            ),
+        ),
+        ChangelogEntry(
             versionName = "0.2.0",
             versionCode = 2,
             releaseDate = "2026-11-27",
@@ -68,6 +80,18 @@ object ReleaseNotesCatalog {
     )
 
     val entriesEn: List<ChangelogEntry> = listOf(
+        ChangelogEntry(
+            versionName = "1.0.0",
+            versionCode = 100,
+            releaseDate = "2026-11-27",
+            summary = "Official 1.0 Release · Multi-ABI APKs, Bilingual UI & Full HiFi Suite",
+            highlights = listOf(
+                "Official signed release APKs for arm64-v8a (ARMv8), armeabi-v7a (ARMv7), and universal architectures",
+                "Zero-interruption English / Simplified Chinese 1-frame switching across all screens, dialogs, lockscreen, :crash recovery, and WiFi transfer Web UI",
+                "Complete HiFi suite: Bit-Perfect UAC1/UAC2 USB driver, 4-layer ear guard, aurora synced lyrics, Subsonic lossless streaming & downloads, global search, crash auto-restart & SHA-256 updates",
+                "Released under Sonify Non-Commercial License v1.0 with standardized i18n contributor docs & key catalog",
+            ),
+        ),
         ChangelogEntry(
             versionName = "0.2.0",
             versionCode = 2,

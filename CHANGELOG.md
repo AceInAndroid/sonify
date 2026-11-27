@@ -5,6 +5,16 @@
 
 ---
 
+## [v1.0.0] - 2026-11-27
+
+### 首个正式发行版（Official 1.0 Release）
+- **多架构正式安装包**：同时提供 `arm64-v8a`（ARMv8）、`armeabi-v7a`（ARMv7）与 `universal`（全架构通用）三个正式签名 APK。
+- **多语言国际化（中英双语）与零中断热切换**：完整支持跟随系统 / 简体中文 / English，1 帧即时切换不断流，兼容 Android 13+ 系统语言、独立 `:crash` 恢复页与 WiFi 局域网传歌 Web UI，并落地 `docs/i18n/I18N_STANDARD.md` 规范与 893 条字段字典。
+- **核心音频与听音体验全闭环**：自研 C++17 + `libusb 1.0.27` Bit-Perfect UAC1/UAC2 独占驱动、四重耳朵安全保护、黑胶沉浸播放与流光同步歌词、Subsonic 无损直通与离线下载、本地/远程歌单、双端 WiFi 传歌、全屏跨源全局搜索、独立 `:crash` 崩溃自动重启，以及应用内 SHA-256 校验与强制更新保护。
+- **开源许可协议**：采用 **Sonify Non-Commercial Source-Available License v1.0**（允许个人免费非商用与学习研究，严禁未经授权的商业用途；`third_party/libusb/` 保持原始 `LGPL-2.1`）。
+
+---
+
 ## [v0.2.0] - 2026-11-27
 
 ### 新增功能

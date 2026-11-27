@@ -4,36 +4,41 @@
 
 **开源 Android Bit-Perfect USB 独占（UAC1/UAC2）HiFi 音乐播放器**
 
+[![Release](https://img.shields.io/badge/Release-v1.0.0-E5A93C)](https://github.com/AceInAndroid/sonify/releases/tag/v1.0.0)
 [![Platform](https://img.shields.io/badge/Android-7.0%2B%20(API%2024%2B)-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
-[![ABI](https://img.shields.io/badge/ABI-arm64--v8a-blue)]()
+[![ABI](https://img.shields.io/badge/ABI-arm64--v8a%20%7C%20armeabi--v7a-blue)](https://github.com/AceInAndroid/sonify/releases/tag/v1.0.0)
 [![USB Audio](https://img.shields.io/badge/USB%20Audio-UAC1%20%2F%20UAC2%20Exclusive-1ED760)]()
 [![License](https://img.shields.io/badge/License-仅限非商用-EF5350)](LICENSE)
 
-[English](README.md) | **简体中文**
+[English](README.md) | **简体中文** | [下载 v1.0.0 正式版 APK](https://github.com/AceInAndroid/sonify/releases/tag/v1.0.0)
 
 </div>
 
 ---
 
-**Sonify** 是一款专注于本地无损听音体验的开源 Android HiFi 播放器。内置基于 `libusb` 自研的用户态 **USB Audio Class（UAC1/UAC2）独占驱动**，彻底绕过 Android `AudioFlinger` 强制重采样，将 **PCM 最高 384 kHz / 32-bit** 无损音频以真正的 **Bit-Perfect** 方式直送外接 USB DAC；搭配 **Spotify 极简深色 × 旋转黑胶唱片** 视觉设计与硬件级 **耳朵安全音量保护**。
+**Sonify** 是一款专注于本地无损听音体验的开源 Android HiFi 播放器。内置基于 `libusb` 自研的用户态 **USB Audio Class（UAC1/UAC2）独占驱动**，彻底绕过 Android `AudioFlinger` 强制重采样，将 **PCM 最高 384 kHz / 32-bit** 无损音频以真正的 **Bit-Perfect** 方式直送外接 USB DAC；搭配 **Spotify 极简深色 × 旋转黑胶唱片**、**流体多色光晕同步歌词**、**Subsonic 媒体库与 WiFi 局域网传歌** 及硬件级 **耳朵安全音量保护**。
 
-## 界面预览
+## 界面预览（简体中文界面）
+
+> 查看英文界面截图请访问 [README.md](README.md)。
 
 <p align="center">
-  <img src="docs/screenshots/now_playing.png" width="18%" alt="黑胶全屏播放页" />
-  <img src="docs/screenshots/volume_hud.png" width="18%" alt="护耳悬浮音量 HUD" />
-  <img src="docs/screenshots/library.png" width="18%" alt="本地无损音乐库" />
-  <img src="docs/screenshots/usb_dac.png" width="18%" alt="USB DAC 实时链路仪表" />
-  <img src="docs/screenshots/settings.png" width="18%" alt="设置页" />
+  <img src="docs/screenshots/zh/now_playing.png" width="15.5%" alt="黑胶全屏播放页" />
+  <img src="docs/screenshots/zh/lyrics.png" width="15.5%" alt="流体光晕沉浸歌词页" />
+  <img src="docs/screenshots/zh/library.png" width="15.5%" alt="本地无损音乐库" />
+  <img src="docs/screenshots/zh/global_search.png" width="15.5%" alt="全屏跨源全局搜索" />
+  <img src="docs/screenshots/zh/usb_dac.png" width="15.5%" alt="USB DAC 实时链路仪表" />
+  <img src="docs/screenshots/zh/settings.png" width="15.5%" alt="设置与双语热切换" />
 </p>
 
 | 页面 | 核心特性 |
 |---|---|
-| **黑胶全屏播放页** | 纯 Canvas 绘制旋转黑胶唱片与静止 45° 高光、封面主色暗调氛围渐变、实时 **源格式 → 实际协商输出** 双徽章胶囊、常驻硬件音量控制条 |
-| **护耳悬浮音量 HUD** | USB 独占模式下接管手机物理音量键，实时显示百分比、衰减 dB 以及右侧红色护耳上限锁定区 |
-| **本地无损音乐库** | 毫秒级无损头解析（FLAC/WAV/MP3/M4A/OGG/OPUS）、专辑封面网格、艺术家/文件夹钻取、首页「继续上次播放」断点卡片 |
-| **USB 设备与诊断页** | 实时展示实际协商采样率、位深、异步 Feedback 实测晶振频率（`fbRate`）、缓冲水位与欠载计数，内置可折叠 440Hz/1kHz 工程测试音工具 |
-| **设置页** | Spotify 风格极简深色分组设置，覆盖 USB 独占策略、耳朵安全保护上限、无缝播放、黑胶/方形封面与深色主题切换 |
+| **黑胶全屏播放页** | 纯 Canvas 绘制旋转黑胶唱片与静止 45° 高光、封面主色暗调氛围渐变、实时 **源格式 → 实际协商输出** 双徽章胶囊、单行实时歌词预览与一键 **纯享黑胶** |
+| **流体光晕沉浸歌词页** | 边到边 **流体多色氛围光晕** 背景、60fps **逐句流光扫色高亮**、五级歌词源自动匹配（本地 LRC / 内嵌 / Subsonic / **LRCLIB 在线**）、偏移微调与所见即所得样式面板 |
+| **本地无损音乐库** | 毫秒级无损头解析（FLAC/WAV/MP3/M4A/OGG/OPUS）、专辑/艺人/文件夹/歌单多维钻取、Subsonic 多服切换条与首页「继续上次播放」断点卡片 |
+| **全屏跨源全局搜索** | 聚合本地歌曲、专辑、艺人、歌单、Subsonic 远程曲库（`search3`）与 `.lrc` **歌词搜歌**，内置 **简繁互通归一化** 与快捷发现卡片 |
+| **USB 设备与诊断页** | USB Bit-Perfect 独占总开关、实时协商采样率、位深、异步 Feedback 晶振频率（`fbRate`）、缓冲水位与欠载计数，内置 440Hz/1kHz 工程测试音工具 |
+| **设置与双语热切换** | Spotify 风格极简深色分组设置，覆盖 USB 策略、四重护耳上限、WiFi 传歌、Subsonic、歌词样式、深色主题与 **零中断中英双语热切换** |
 
 ---
 
@@ -113,7 +118,7 @@ flowchart TD
 - **JDK 17**
 - **Android SDK**：`compileSdk = 35`、`minSdk = 24`
 - **NDK**：`28.2.13676358`、**CMake**：`3.22.1`
-- 目标架构：`arm64-v8a`（`third_party/libusb/` 内置 `libusb 1.0.27` 源码，自动静态编入）
+- 目标架构：`arm64-v8a` 与 `armeabi-v7a`（同时生成 `universal` 通用包；`third_party/libusb/` 内置 `libusb 1.0.27` 源码，自动静态编入）
 
 ### 构建与测试命令
 
@@ -123,12 +128,16 @@ export ANDROID_HOME=$HOME/Library/Android/sdk
 # 运行单元测试并构建 Debug APK
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 
+# 构建签名多架构 Release 正式包（arm64-v8a / armeabi-v7a / universal）
+./gradlew :app:assembleRelease
+
 # 提示：修改 C++ 原生代码后，建议彻底清理原生缓存避免旧 .so 残留
 rm -rf app/build app/.cxx build
 ./gradlew :app:assembleDebug --no-daemon --no-build-cache
 ```
 
-产物路径：`app/build/outputs/apk/debug/app-debug.apk`
+Release 产物路径：`app/build/outputs/apk/release/app-{arm64-v8a,armeabi-v7a,universal}-release.apk`
+预构建官方签名 APK 与 SHA-256 校验文件请前往 [GitHub Releases](https://github.com/AceInAndroid/sonify/releases) 下载。
 
 ### 质量保障与真机测试上线门禁
 所有新增功能与代码改动上线前必须先通过单元测试与真机功能/视觉验收：

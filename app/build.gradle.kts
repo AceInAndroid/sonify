@@ -14,6 +14,13 @@ val updateBaseUrl = (localProps.getProperty("sonify.updateBaseUrl") ?: "https://
     .trim()
     .trimEnd('/')
 
+val releaseStoreFile = (System.getenv("SONIFY_STORE_FILE") ?: localProps.getProperty("sonify.release.storeFile") ?: "").trim()
+val releaseStorePassword = (System.getenv("SONIFY_STORE_PASSWORD") ?: localProps.getProperty("sonify.release.storePassword") ?: "").trim()
+val releaseKeyAlias = (System.getenv("SONIFY_KEY_ALIAS") ?: localProps.getProperty("sonify.release.keyAlias") ?: "").trim()
+val releaseKeyPassword = (System.getenv("SONIFY_KEY_PASSWORD") ?: localProps.getProperty("sonify.release.keyPassword") ?: "").trim()
+val hasReleaseSigning = releaseStoreFile.isNotEmpty() && file(releaseStoreFile).isFile &&
+    releaseStorePassword.isNotEmpty() && releaseKeyAlias.isNotEmpty() && releaseKeyPassword.isNotEmpty()
+
 android {
     namespace = "com.sonify.player"
     compileSdk = 35
@@ -23,20 +30,39 @@ android {
         applicationId = "com.sonify.player"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 100
+        versionName = "1.0.0"
 
         buildConfigField("String", "UPDATE_BASE_URL", "\"$updateBaseUrl\"")
-
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
 
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
                 // 静态链接 STL：只有一个 .so，避免运行时依赖 libc++_shared.so
                 arguments += "-DANDROID_STL=c++_static"
+            }
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = true
+        }
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
@@ -70,6 +96,9 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
