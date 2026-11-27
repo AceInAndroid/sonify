@@ -279,12 +279,15 @@ data class AppSettings(
     val wifiTransferPort: Int = 8088,
     val wifiTransferPinEnabled: Boolean = false,
     val wifiTransferAutoSkipDuplicate: Boolean = true,
-    // 应用更新、崩溃诊断与全局搜索
+    // 应用更新、崩溃诊断、匿名日活统计与全局搜索
     val autoCheckUpdate: Boolean = true,
     val lastUpdateCheckAt: Long = 0L,
     val ignoredUpdateVersionCode: Int = 0,
     val customUpdateBaseUrl: String = "",
     val autoUploadCrashLogs: Boolean = true,
+    val analyticsEnabled: Boolean = true,
+    val analyticsInstallId: String = "",
+    val lastAnalyticsActiveDay: String = "",
     val searchHistory: List<String> = emptyList(),
     val lastLibrarySource: String = "local",
     val lastTrackPath: String? = null,
@@ -367,6 +370,9 @@ class UserPreferences(private val context: Context) {
         val IGNORED_UPDATE_VERSION_CODE = intPreferencesKey("ignored_update_version_code")
         val CUSTOM_UPDATE_BASE_URL = stringPreferencesKey("custom_update_base_url")
         val AUTO_UPLOAD_CRASH_LOGS = booleanPreferencesKey("auto_upload_crash_logs")
+        val ANALYTICS_ENABLED = booleanPreferencesKey("analytics_enabled")
+        val ANALYTICS_INSTALL_ID = stringPreferencesKey("analytics_install_id")
+        val LAST_ANALYTICS_ACTIVE_DAY = stringPreferencesKey("last_analytics_active_day")
         val SEARCH_HISTORY_JSON = stringPreferencesKey("search_history_json")
         val LAST_LIBRARY_SOURCE = stringPreferencesKey("last_library_source")
         val LAST_TRACK_PATH = stringPreferencesKey("last_track_path")
@@ -489,6 +495,9 @@ class UserPreferences(private val context: Context) {
                 ignoredUpdateVersionCode = p[Keys.IGNORED_UPDATE_VERSION_CODE] ?: 0,
                 customUpdateBaseUrl = p[Keys.CUSTOM_UPDATE_BASE_URL] ?: "",
                 autoUploadCrashLogs = p[Keys.AUTO_UPLOAD_CRASH_LOGS] ?: true,
+                analyticsEnabled = p[Keys.ANALYTICS_ENABLED] ?: true,
+                analyticsInstallId = p[Keys.ANALYTICS_INSTALL_ID] ?: "",
+                lastAnalyticsActiveDay = p[Keys.LAST_ANALYTICS_ACTIVE_DAY] ?: "",
                 searchHistory = parseHistoryJson(p[Keys.SEARCH_HISTORY_JSON]),
                 lastLibrarySource = p[Keys.LAST_LIBRARY_SOURCE] ?: "local",
                 lastTrackPath = p[Keys.LAST_TRACK_PATH],
@@ -788,6 +797,18 @@ class UserPreferences(private val context: Context) {
 
     suspend fun setAutoUploadCrashLogs(enabled: Boolean) {
         context.dataStore.edit { it[Keys.AUTO_UPLOAD_CRASH_LOGS] = enabled }
+    }
+
+    suspend fun setAnalyticsEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.ANALYTICS_ENABLED] = enabled }
+    }
+
+    suspend fun setAnalyticsInstallId(installId: String) {
+        context.dataStore.edit { it[Keys.ANALYTICS_INSTALL_ID] = installId.trim() }
+    }
+
+    suspend fun setLastAnalyticsActiveDay(day: String) {
+        context.dataStore.edit { it[Keys.LAST_ANALYTICS_ACTIVE_DAY] = day.trim() }
     }
 
     suspend fun addSearchHistory(query: String) {

@@ -1,7 +1,7 @@
 # Sonify 端到端测试用例库（Test Cases）
 
-> 覆盖范围：沉浸音乐模式、Subsonic/OpenSubsonic 媒体服务器、音乐库歌单与离线下载、WiFi 局域网传歌、同步歌词 V1、沉浸式歌词样式与设置页重构、核心稳定性回归、崩溃拦截与安全重启、应用内更新、全屏跨源全局搜索。
-> 总用例数：**70 条**（模块 A–J）。
+> 覆盖范围：沉浸音乐模式、Subsonic/OpenSubsonic 媒体服务器、音乐库歌单与离线下载、WiFi 局域网传歌、同步歌词 V1、沉浸式歌词样式与设置页重构、核心稳定性回归、崩溃拦截与安全重启、应用内更新与强制更新、全屏跨源全局搜索、匿名设备日活埋点与管理看板。
+> 总用例数：**76 条**（模块 A–K）。
 
 ---
 
@@ -142,3 +142,16 @@
 | `TC-SRC-04` | P0 | 搜索结果直达播放、专辑/艺人钻取与歌词跳转 | 存在歌曲、专辑与歌词命中 | 1. 点击搜索结果歌曲，验证播放启动与 MiniPlayer 同步<br>2. 点击专辑/艺人卡进入二级钻取再返回<br>3. 点击歌词命中卡片触发播歌并跳转对应时间点 | 播放队列正常切换、MiniPlayer 常驻可展开、钻取返回流畅无状态错乱 | 真机实测 + 截图 |
 | `TC-SRC-05` | P1 | 搜索历史持久化与单条/一键清空 | 已执行多次搜索 | 点击快捷探索或提交搜索词后返回再进入搜索页，验证历史记录展示、删除单条与清空全部 | 搜索历史持久化至 DataStore（最多 12 条去重），删除与清空即时生效 | 真机实测 + 截图 |
 | `TC-SRC-06` | P2 | Subsonic 远程曲库联合搜索（条件执行） | 已登录可用 Subsonic 服务器 | 在全局搜索页输入关键词并切换「远程」胶囊 | 防抖后并发调用 `search3` 并将远程歌曲/专辑融合展示，点击可播或直达远程专辑详情 | 真机实测（已登录时） / 代码审查 |
+
+---
+
+## 模块 K：匿名设备日活统计、埋点体系、管理看板与强制更新
+
+| 用例 ID | 级别 | 标题 | 前置条件 | 操作步骤 | 预期结果 | 验证手段 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `TC-ANA-01` | P0 | 埋点隐私剥离、事件名校验与批量/跨日判定单测 | 无 | 运行 `AnalyticsBatchPolicyTest` | `path/url/password/query/imei` 等隐私键与含本地路径的值 100% 自动剔除；北京时间跨零点准确识别新日活日 | JVM 单测 |
+| `TC-ANA-02` | P0 | 服务端 SQLite 日活去重、事件入库、`/admin` 鉴权与强更策略接口 | `server/sonify_server.py` 运行中 | 1. 未登录请求 `/api/v1/admin/overview` 返回 `401`<br>2. 同设备同日上报多次事件后校验 `dauToday=1`、`newToday=1` 与 `topEvents`<br>3. 鉴权调用 `POST /api/v1/admin/release/policy` 切换 `forceUpdate` | 鉴权严格拦截未授权访问，日活精确去重，策略即时落盘生效 | 自动化 API 验证 + 线上实测 |
+| `TC-ANA-03` | P0 | 真机冷启与核心操作实时上报至 `https://sonify.zhangbing.tech` 并在 `/admin` 可见 | 真机安装新版 APK 且开启「匿名日活与功能统计」 | 冷启 App → 播放本地无损 → 触发全局搜索 → 查询线上 `/api/v1/admin/overview` | 看板实时显示今日 DAU、机型、版本与 `app_launch`/`playback_start`/`global_search` 等事件，数据库零隐私字段 | 真机 + 线上看板实测 |
+| `TC-ANA-04` | P1 | 设置页「匿名日活与功能统计」开关关闭立即停报 | 设置页 | 关闭「匿名日活与功能统计」开关后操作应用，检查不再新增上报；测完恢复开启 | 关闭后客户端立即停止采集与网络发送 | 真机实测 |
+| `TC-FRC-01` | P0 | 强制更新穿透策略与全状态 `isForcedUpdate` 单测 | 无 | 运行 `UpdatePolicyTest` | `forceUpdate=true` 或 `versionCode < minSupportedVersionCode` 穿透 `autoCheckUpdate=false` 与 `ignoredVersionCode`，且 `Downloading`/`Verifying`/`ReadyToInstall`/`Error` 全程保持 `isForcedUpdate=true` | JVM 单测 |
+| `TC-FRC-02` | P0 | 线上真实普通更新 + 强制更新全链路真机验收 | 线上 `https://sonify.zhangbing.tech` 临时发布高版本 `v0.2.1 (code=3)` | 1. 普通更新态点击检查更新 → 验证可取消/跳过、下载与 SHA-256 校验<br>2. 通过 `/admin` 切换 `forceUpdate=true` → 冷启真机 → 验证启动即弹红色「重要版本升级（必须更新）」→ 按返回键与点外部均无法关闭、无「稍后/跳过」按钮 → 下载与校验态同样锁定强制状态并可调起安装器 | 普通更新与强制更新全链路闭环无漏洞，无崩溃/ANR；收尾恢复线上 `latest.json` | 线上真实域名 + `3917JR` 真机 + 截图 |

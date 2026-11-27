@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.sonify.player.crash.CrashReporter
+import com.sonify.player.ui.crash.CrashRecoveryActivity
 import com.sonify.player.data.PlaylistEntity
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.library.PlaylistSorter
@@ -157,6 +158,16 @@ class MainActivity : ComponentActivity() {
         SystemBarsController.enableEdgeToEdge(window)
         if (intent?.getBooleanExtra(HiFiPlaybackService.EXTRA_OPEN_NOW_PLAYING, false) == true) {
             openPlayerTrigger.value = System.currentTimeMillis()
+        }
+        if (intent?.getBooleanExtra(CrashRecoveryActivity.EXTRA_FROM_CRASH_RECOVERY, false) == true) {
+            HiFiApp.from(this).analytics.track(
+                name = "crash_recovered",
+                props = mapOf(
+                    "crashes_in_window" to intent.getIntExtra(CrashRecoveryActivity.EXTRA_CRASH_COUNT, 1),
+                    "loop_broken" to intent.getBooleanExtra(CrashRecoveryActivity.EXTRA_LOOP_BROKEN, false),
+                ),
+                flushNow = true,
+            )
         }
         setContent {
             val settings by vm.settings.collectAsState()
@@ -340,7 +351,16 @@ private fun HiFiRootScreen(
         if (grantedNow && tracks.isEmpty() && !scanState.isScanning) {
             vm.startScan()
         }
-        onPauseOrDispose { }
+        app.updateManager.onForegrounded()
+        app.analytics.trackAppLaunch(
+            hasUsbDac = usbState.isConnected,
+            localTrackCount = tracks.size,
+            subsonicAccountCount = subsonicServers.size,
+            immersiveMode = settings.immersiveMusicMode,
+        )
+        onPauseOrDispose {
+            app.analytics.flushAsync()
+        }
     }
 
     LaunchedEffect(hasStoragePermission) {
@@ -350,7 +370,45 @@ private fun HiFiRootScreen(
     }
 
     LaunchedEffect(Unit) {
-        app.updateManager.checkForUpdates(manual = false)
+        app.updateManager.checkForUpdates(manual = false, isColdStart = true)
+    }
+
+    // USB DAC 接入与当前 DAC 型号画像更新
+    LaunchedEffect(usbState.isConnected, usbState.deviceDisplayName) {
+        if (usbState.isConnected) {
+            val dacName = usbState.deviceDisplayName
+            app.analytics.updateCurrentUsbDac(dacName)
+            app.analytics.track(
+                name = "usb_dac_connected",
+                props = mapOf(
+                    "dac_name" to dacName,
+                    "uac_version" to "UAC${usbState.uacInfo?.uacVersion ?: 1}",
+                    "hw_volume" to (usbState.uacInfo?.hasHwVol == true),
+                ),
+            )
+        }
+    }
+
+    // 核心播放切歌埋点（仅记录音频规格与路由，零歌名/零路径）
+    LaunchedEffect(playback.currentTrack?.path, playback.isPlaying) {
+        val cur = playback.currentTrack ?: return@LaunchedEffect
+        if (!playback.isPlaying) return@LaunchedEffect
+        val src = when {
+            downloadsByPath.containsKey(cur.path) -> "offline"
+            SubsonicUri.isTrackUri(cur.path) -> "subsonic"
+            else -> "local"
+        }
+        app.analytics.track(
+            name = "playback_start",
+            props = mapOf(
+                "source" to src,
+                "route" to activeRoute.name.lowercase(),
+                "format" to cur.format,
+                "sample_rate" to cur.sampleRate,
+                "bit_depth" to cur.bitDepth,
+                "is_hires" to cur.isHiRes,
+            ),
+        )
     }
 
     BackHandler(enabled = showNowPlaying) {
@@ -395,7 +453,10 @@ private fun HiFiRootScreen(
                             searchHistory = settings.searchHistory,
                             currentTrackPath = playback.currentTrack?.path,
                             onBack = { showGlobalSearch = false },
-                            onAddSearchHistory = { q -> scope.launch { app.prefs.addSearchHistory(q) } },
+                            onAddSearchHistory = { q ->
+                                scope.launch { app.prefs.addSearchHistory(q) }
+                                app.analytics.track("global_search", mapOf("has_remote" to (activeSubsonicServer != null)))
+                            },
                             onRemoveSearchHistory = { q -> scope.launch { app.prefs.removeSearchHistory(q) } },
                             onClearSearchHistory = { scope.launch { app.prefs.clearSearchHistory() } },
                             onSearchRemote = { srvId, q ->
@@ -1130,14 +1191,20 @@ private fun HiFiRootScreen(
         )
     }
 
-    // 应用内更新弹窗（含更新日志、进度与速度、SHA-256 校验状态）
+    // 应用内更新弹窗（含普通更新、全生命周期锁定强制更新、进度速度与 SHA-256 校验）
     if (showUpdateDialog) {
         UpdateDialog(
             state = updateState,
-            onStartDownload = { release -> app.updateManager.startDownload(release) },
+            onStartDownload = { release, forced -> app.updateManager.startDownload(release, forced) },
             onCancelDownload = { app.updateManager.cancelDownload() },
             onIgnoreVersion = { verCode -> app.updateManager.ignoreVersion(verCode) },
             onRetryCheck = { app.updateManager.checkForUpdates(manual = true) },
+            onInstallTriggered = { release, forced, hadPerm ->
+                app.updateManager.recordInstallTriggered(release, forced, hadPerm)
+            },
+            onExitApp = {
+                (context as? ComponentActivity)?.finishAffinity()
+            },
             onDismiss = { app.updateManager.dismissDialog() },
         )
     }

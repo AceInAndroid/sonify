@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import com.sonify.player.analytics.SonifyAnalytics
 import com.sonify.player.crash.SonifyCrashHandler
 import com.sonify.player.data.LibraryDatabase
 import com.sonify.player.data.UserPreferences
@@ -54,6 +55,8 @@ class HiFiApp : Application(), ImageLoaderFactory {
         private set
     lateinit var updateManager: AppUpdateManager
         private set
+    lateinit var analytics: SonifyAnalytics
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -72,7 +75,12 @@ class HiFiApp : Application(), ImageLoaderFactory {
         downloadManager = SonifyDownloadManager(this, db, prefs, subsonicRepo)
         wifiTransferManager = WifiTransferManager(this, db, prefs, usbManager)
         lyricsRepo = LyricsRepository(this, prefs, subsonicRepo)
-        updateManager = AppUpdateManager(this, prefs)
+        analytics = SonifyAnalytics(this, prefs) { updateManager.activeBaseUrl() }
+        updateManager = AppUpdateManager(
+            context = this,
+            prefs = prefs,
+            onTrackEvent = { name, props, flushNow -> analytics.track(name, props, flushNow) },
+        )
         AmbientColorExtractor.init(this, subsonicRepo)
 
         appScope.launch {

@@ -84,6 +84,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             }.onSuccess { pl ->
                 val suffix = if (initialTracks.isNotEmpty()) "并加入 ${initialTracks.size} 首歌曲" else ""
                 showToast("已创建歌单「${pl.name}」$suffix")
+                app.analytics.track("playlist_action", mapOf("action" to "create", "scope" to "local"))
                 onCreated(pl)
             }.onFailure {
                 showToast(it.message ?: "创建歌单失败")
@@ -115,6 +116,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 playlistRepo.deletePlaylist(playlistId)
             }.onSuccess {
                 showToast("已删除歌单「$playlistName」")
+                app.analytics.track("playlist_action", mapOf("action" to "delete", "scope" to "local"))
                 onDeleted()
             }.onFailure {
                 showToast(it.message ?: "删除歌单失败")
@@ -136,6 +138,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                         "所选歌曲已在「$playlistName」中"
                 }
                 showToast(msg)
+                if (res.added > 0) {
+                    app.analytics.track("playlist_action", mapOf("action" to "add", "scope" to "local", "count" to res.added))
+                }
             }.onFailure {
                 showToast(it.message ?: "加入歌单失败")
             }

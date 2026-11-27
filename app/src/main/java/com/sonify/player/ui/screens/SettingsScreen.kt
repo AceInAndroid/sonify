@@ -772,6 +772,13 @@ fun SettingsScreen(
             checked = settings.autoUploadCrashLogs,
             onCheckedChange = { scope.launch { prefs.setAutoUploadCrashLogs(it) } },
         )
+        SettingsSwitchItem(
+            icon = Icons.Rounded.Info,
+            title = "匿名日活与功能统计",
+            subtitle = "仅统计匿名装机日活、版本与 USB DAC 型号，不含歌名、路径或个人隐私",
+            checked = settings.analyticsEnabled,
+            onCheckedChange = { scope.launch { prefs.setAnalyticsEnabled(it) } },
+        )
         SettingsSelectItem(
             icon = Icons.Rounded.BugReport,
             title = "查看本地崩溃记录",

@@ -68,7 +68,8 @@
 - **沉浸式同步歌词、多色流光背景与多源匹配引擎**：五级瀑布源自动解析（用户自选/导入缓存 → 同目录 `.lrc` 多编码防乱码、增强型 `<mm:ss.xx>` 逐字时间戳解析与双语合并 → FLAC/MP3/M4A 内嵌标签 → Subsonic/OpenSubsonic 同步歌词 → 开源免费 **LRCLIB** 自动匹配与手动搜词选候选）；全屏歌词采用边到边 **流体多色氛围光晕**（兼容全机型 60fps，另可选 **封面暗调虚化底图** 与 **极简深黑**）、60fps **逐句流光扫色高亮**（另可选 **柔光纯白 / 主题强调色 / 暗调玻璃聚焦条**）、距离景深衰减 + `DstIn` 上下真实 Alpha 羽化渐隐、前奏与长间奏 **呼吸三点律动**、5 秒无操作自动隐身 **纯享歌词态**、歌词页底部半透明「所见即所得」实时样式调参面板，以及设置页专属 **「歌词与沉浸样式」** 分组与顶部实时动态预览卡片（4 种字体风格、16–32sp 连续字号滑块、行距、对齐、加粗与译文独立开关）。
 - **全屏跨源全局搜索与简繁互通**：保持简洁 3-Tab 架构，点击音乐库顶部放大镜一键直达全屏聚合搜索页，覆盖本地歌曲、专辑、艺人、自建歌单、Subsonic 远程曲库（`search3`）与本地/缓存 `.lrc` **歌词搜歌**（点击歌词片段直达对应时间点播放）；内置 **简繁互通归一化**（搜简体 `周杰伦 叶惠美` 秒中繁体 `周杰倫 葉惠美`）、多词加权相关性排序、音质规格检索（如 `FLAC 96k`）、命中词暖金高亮、快捷发现卡片与持久化搜索历史（最近 12 条）。
 - **崩溃拦截、独立 `:crash` 进程自动重启与脱敏日志上报**：主进程 `SonifyCrashHandler` 在崩溃瞬间 160ms 非阻塞安全关闭 USB DAC 流、自动剥离本地私人路径与 Subsonic 凭据、落盘脱敏报告并执行 **30 秒 ≥ 3 次连崩熔断保护**，随即拉起独立 `:crash` 进程恢复页（`CrashRecoveryActivity`）提供 **3 秒倒计时自动冷重启**（可随时暂停查看/复制/手动上报堆栈；触发连崩熔断时自动停用倒计时并提供「清理缓存并重启」安全模式）。
-- **应用内安全更新与自建云服务分发**：支持启动 12 小时节流自动检查与设置页手动检查、版本日志与强制更新策略、带实时速度与进度的流式下载、**安装前强制 SHA-256 完整性校验**、Android 7–15 `FileProvider` 与未知来源权限引导；附带零依赖 Python 3 服务端（`server/sonify_server.py` + Nginx HTTPS + `systemd` 部署指南）与一键发版脚本（`scripts/publish_release.sh`）。
+- **应用内安全更新、全链路强制更新与自建云分发**：支持启动 12 小时节流自动检查与设置页手动检查、版本日志与 **全状态强制更新保护**（覆盖 `Available` / `Downloading` / `Verifying` / `ReadyToInstall` / `Error` 全阶段锁定，绕过关闭自动检查与忽略版本记录，屏蔽返回键与遮罩点击并提供「退出应用」）、HTTP/1.1 稳定流式下载与实时速度/进度、**安装前强制 SHA-256 完整性校验**、Android 7–15 `FileProvider` 与返回自动刷新未知来源权限引导；附带零依赖 Python 3 服务端（`server/sonify_server.py` + Caddy/Nginx HTTPS + `systemd`）与一键发版脚本（`scripts/publish_release.sh`）。
+- **隐私优先设备日活埋点与运营监控面板（`/admin`）**：客户端仅生成随机 UUIDv4 `installId`（零 IMEI/OAID/文件路径/歌名/搜索词采集），采用本地 JSONL 批量上报队列并在设置页提供透明的一键关闭开关（「匿名日活与功能统计」）；服务端基于 SQLite WAL 提供 `POST /api/v1/telemetry/events` 统计（按 UTC+8 汇总 DAU/WAU/MAU、新增设备、次日/七日留存、版本与 USB DAC 分布），并内置 Spotify Dark 风格认证运营面板（`/admin`，由 `/etc/sonify-server/admin.env` 独立令牌保护），支持日活趋势 SVG 图表、硬件排行、脱敏崩溃日志查看与线上强制更新策略实时切换。
 
 ---
 
@@ -132,7 +133,7 @@ rm -rf app/build app/.cxx build
 所有新增功能与代码改动上线前必须先通过单元测试与真机功能/视觉验收：
 - 强制门禁规范：[AGENTS.md](AGENTS.md) · [发布门禁清单](docs/testing/RELEASE_GATE.md)
 - 测试总方案：[docs/testing/TEST_PLAN.md](docs/testing/TEST_PLAN.md)
-- 端到端测试用例库（70 条）：[docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
+- 端到端测试用例库（76 条）：[docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
 - 真机测试验收报告：[docs/testing/reports/](docs/testing/reports/)
 
 ### 调试日志

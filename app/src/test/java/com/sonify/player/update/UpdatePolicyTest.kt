@@ -53,9 +53,32 @@ class UpdatePolicyTest {
         assertTrue("Manual check should still prompt even if ignored", eIgnoredManual.shouldPrompt)
 
         val belowMin = sampleRelease(versionCode = 4, minSupported = 3)
-        val eForced = UpdatePolicy.evaluate(2, belowMin, ignoredVersionCode = 4, isManualCheck = false)
+        val eForced = UpdatePolicy.evaluate(
+            currentVersionCode = 2,
+            release = belowMin,
+            ignoredVersionCode = 4,
+            isManualCheck = false,
+            allowNormalAutoPrompt = false,
+        )
         assertTrue(eForced.isForced)
-        assertTrue("Forced update ignores skip preference", eForced.shouldPrompt)
+        assertTrue("Forced update bypasses ignore and autoCheck=false", eForced.shouldPrompt)
+
+        val normalNoAuto = UpdatePolicy.evaluate(
+            currentVersionCode = 2,
+            release = newer,
+            ignoredVersionCode = 0,
+            isManualCheck = false,
+            allowNormalAutoPrompt = false,
+        )
+        assertTrue(normalNoAuto.hasUpdate)
+        assertFalse("Non-forced update should NOT prompt when allowNormalAutoPrompt=false", normalNoAuto.shouldPrompt)
+
+        // All UpdateState variants preserve isForcedUpdate flag
+        assertTrue(UpdateState.Downloading(belowMin, 100L, 1000L, 50L, isForced = true).isForcedUpdate)
+        assertTrue(UpdateState.Verifying(belowMin, isForced = true).isForcedUpdate)
+        assertTrue(UpdateState.ReadyToInstall(belowMin, java.io.File("/tmp/a.apk"), isForced = true).isForcedUpdate)
+        assertTrue(UpdateState.Error("net", belowMin, isForced = true).isForcedUpdate)
+        assertFalse(UpdateState.Downloading(newer, 100L, 1000L, 50L, isForced = false).isForcedUpdate)
     }
 
     @Test

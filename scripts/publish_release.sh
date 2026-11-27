@@ -8,7 +8,7 @@ VERSION_NAME=""
 NOTES=""
 FORCE_UPDATE="false"
 MIN_SUPPORTED="1"
-SSH_TARGET="root@43.142.250.231"
+SSH_TARGET="sonify-cloud"
 REMOTE_DIR="/var/lib/sonify-server"
 BASE_URL="https://sonify.zhangbing.tech"
 DRY_RUN="false"
@@ -21,7 +21,8 @@ while [[ $# -gt 0 ]]; do
     --notes) NOTES="$2"; shift 2 ;;
     --force) FORCE_UPDATE="true"; shift ;;
     --min-supported) MIN_SUPPORTED="$2"; shift 2 ;;
-    --ssh) SSH_TARGET="$2"; shift 2 ;;
+    --ssh|--ssh-target) SSH_TARGET="$2"; shift 2 ;;
+    --remote-dir) REMOTE_DIR="$2"; shift 2 ;;
     --dry-run) DRY_RUN="true"; shift ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac

@@ -17,6 +17,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
@@ -26,19 +27,32 @@ import java.util.concurrent.TimeUnit
 /**
  * Sonify 应用内更新管理器：
  * - 默认对接 https://sonify.zhangbing.tech/api/v1/update/latest；
- * - 支持自动节流静默检查、手动检查、跳过版本、流式进度下载（含实时速度与取消）与强制 SHA-256 校验；
- * - 若目标版本 APK 已完整下载并通过 SHA-256 校验，秒进 ReadyToInstall 不重复耗流量。
+ * - 支持常规自动更新（12h 节流 + 忽略版本）与全生命周期锁定「强制更新」（穿透自动开关与忽略版本）；
+ * - 流式进度下载（含实时速度与取消）+ 强制 SHA-256 校验；已校验缓存秒进 ReadyToInstall。
  */
 class AppUpdateManager(
     private val context: Context,
     private val prefs: UserPreferences,
+    private val onTrackEvent: (name: String, props: Map<String, Any?>, flushNow: Boolean) -> Unit = { _, _, _ -> },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val client by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(8, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(45, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .followRedirects(true)
+            .build()
+    }
+
+    /** 安装包大文件下载客户端：采用稳定 HTTP/1.1 避免部分 CDN/移动网络 HTTP/2 流重置 */
+    private val downloadClient by lazy {
+        OkHttpClient.Builder()
+            .protocols(listOf(Protocol.HTTP_1_1))
+            .connectTimeout(12, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .followRedirects(true)
             .build()
     }
@@ -53,6 +67,7 @@ class AppUpdateManager(
     val showDialog: StateFlow<Boolean> = _showDialog.asStateFlow()
 
     private var downloadJob: Job? = null
+    private var lastSilentCheckMs: Long = 0L
 
     fun activeBaseUrl(): String {
         if (BuildConfig.DEBUG) {
@@ -63,52 +78,51 @@ class AppUpdateManager(
     }
 
     fun dismissDialog() {
-        val cur = _state.value
-        if (cur is UpdateState.Available && cur.isForced) return
+        if (_state.value.isForcedUpdate) return
         _showDialog.value = false
     }
 
-    fun openDialogIfAvailable() {
-        val badge = _availableBadge.value
-        if (badge != null) {
-            val eval = UpdatePolicy.evaluate(
-                currentVersionCode = BuildConfig.VERSION_CODE,
-                release = badge,
-                ignoredVersionCode = prefs.current.ignoredUpdateVersionCode,
-                isManualCheck = true,
-            )
-            if (_state.value !is UpdateState.Downloading && _state.value !is UpdateState.ReadyToInstall) {
-                _state.value = UpdateState.Available(badge, eval.isForced)
-            }
-            _showDialog.value = true
-        } else {
-            checkForUpdates(manual = true)
-        }
-    }
-
     fun ignoreVersion(versionCode: Int) {
+        if (_state.value.isForcedUpdate) return
         scope.launch {
             prefs.setIgnoredUpdateVersionCode(versionCode)
             _showDialog.value = false
         }
     }
 
-    fun checkForUpdates(manual: Boolean) {
+    /** 回到前台时调用：若已在强更锁定态则确保弹窗常驻，否则按 30 分钟冷却静默复查是否开启紧急强更 */
+    fun onForegrounded() {
+        if (_state.value.isForcedUpdate) {
+            _showDialog.value = true
+            return
+        }
+        checkForUpdates(manual = false, isColdStart = false)
+    }
+
+    fun checkForUpdates(manual: Boolean, isColdStart: Boolean = false) {
         val settings = prefs.current
         val now = System.currentTimeMillis()
-        if (!manual && !UpdatePolicy.shouldRunAutoCheck(settings.autoCheckUpdate, settings.lastUpdateCheckAt, now)) {
+        if (!manual && !UpdatePolicy.shouldFetchManifestSilently(lastSilentCheckMs, now, isColdStart)) {
             return
         }
-        if (_state.value is UpdateState.Downloading) {
-            if (manual) _showDialog.value = true
+        if (_state.value is UpdateState.Downloading || _state.value is UpdateState.Verifying) {
+            if (manual || _state.value.isForcedUpdate) _showDialog.value = true
             return
         }
+
+        val allowNormalAutoPrompt = UpdatePolicy.shouldRunAutoCheck(
+            autoCheckEnabled = settings.autoCheckUpdate,
+            lastCheckMs = settings.lastUpdateCheckAt,
+            nowMs = now,
+        )
 
         scope.launch {
             if (manual) {
                 _state.value = UpdateState.Checking
                 _showDialog.value = true
             }
+            lastSilentCheckMs = System.currentTimeMillis()
+
             val abi = Build.SUPPORTED_ABIS.firstOrNull().orEmpty().ifBlank { "arm64-v8a" }
             val url = "${activeBaseUrl()}/api/v1/update/latest?channel=stable&abi=$abi&versionCode=${BuildConfig.VERSION_CODE}"
             val result = runCatching {
@@ -116,7 +130,7 @@ class AppUpdateManager(
                     .url(url)
                     .header("User-Agent", "Sonify/${BuildConfig.VERSION_NAME} (Android ${Build.VERSION.SDK_INT})")
                     .build()
-                client.newCall(req).execute().use { resp ->
+                downloadClient.newCall(req).execute().use { resp ->
                     if (!resp.isSuccessful) {
                         error("更新服务返回 HTTP ${resp.code}")
                     }
@@ -125,7 +139,9 @@ class AppUpdateManager(
                 }
             }
 
-            prefs.setLastUpdateCheckAt(System.currentTimeMillis())
+            if (manual || allowNormalAutoPrompt) {
+                prefs.setLastUpdateCheckAt(System.currentTimeMillis())
+            }
 
             result.onSuccess { release ->
                 val eval = UpdatePolicy.evaluate(
@@ -133,6 +149,17 @@ class AppUpdateManager(
                     release = release,
                     ignoredVersionCode = prefs.current.ignoredUpdateVersionCode,
                     isManualCheck = manual,
+                    allowNormalAutoPrompt = allowNormalAutoPrompt,
+                )
+                onTrackEvent(
+                    "update_check",
+                    mapOf(
+                        "manual" to manual,
+                        "has_update" to eval.hasUpdate,
+                        "is_forced" to eval.isForced,
+                        "target_version" to release.versionName,
+                    ),
+                    false,
                 )
                 if (eval.hasUpdate) {
                     _availableBadge.value = release
@@ -140,9 +167,9 @@ class AppUpdateManager(
                     if (cachedApk.isFile && release.sha256.length == 64 &&
                         UpdatePolicy.verifySha256(release.sha256, computeSha256(cachedApk))
                     ) {
-                        _state.value = UpdateState.ReadyToInstall(release, cachedApk)
+                        _state.value = UpdateState.ReadyToInstall(release, cachedApk, isForced = eval.isForced)
                     } else {
-                        _state.value = UpdateState.Available(release, eval.isForced)
+                        _state.value = UpdateState.Available(release, isForced = eval.isForced)
                     }
                     if (eval.shouldPrompt) {
                         _showDialog.value = true
@@ -153,36 +180,38 @@ class AppUpdateManager(
                 }
             }.onFailure { err ->
                 if (manual) {
-                    _state.value = UpdateState.Error("检查更新失败：${err.message ?: "网络连接异常"}")
+                    _state.value = UpdateState.Error(
+                        message = "检查更新失败：${err.message ?: "网络连接异常"}",
+                        isForced = _state.value.isForcedUpdate,
+                    )
                 }
             }
         }
     }
 
-    fun startDownload(release: ReleaseInfo) {
+    fun startDownload(release: ReleaseInfo, isForced: Boolean = _state.value.isForcedUpdate) {
         downloadJob?.cancel()
         downloadJob = scope.launch {
             val finalFile = targetApkFile(release.versionCode)
             val partFile = File(finalFile.parentFile, "${finalFile.name}.part")
             finalFile.parentFile?.mkdirs()
 
-            // 已完整缓存且校验通过时免重复下载
             if (finalFile.isFile && release.sha256.length == 64 &&
                 UpdatePolicy.verifySha256(release.sha256, computeSha256(finalFile))
             ) {
-                _state.value = UpdateState.ReadyToInstall(release, finalFile)
+                _state.value = UpdateState.ReadyToInstall(release, finalFile, isForced = isForced)
                 return@launch
             }
 
-            _state.value = UpdateState.Downloading(release, 0L, release.fileSize, 0L)
+            _state.value = UpdateState.Downloading(release, 0L, release.fileSize, 0L, isForced = isForced)
             try {
                 val req = Request.Builder()
                     .url(release.apkUrl)
                     .header("User-Agent", "Sonify/${BuildConfig.VERSION_NAME} (Android)")
                     .build()
-                client.newCall(req).execute().use { resp ->
+                downloadClient.newCall(req).execute().use { resp ->
                     if (!resp.isSuccessful) {
-                        error("下载安装包失败（HTTP ${resp.code}）")
+                        error("下载失败（HTTP ${resp.code}）")
                     }
                     val body = resp.body ?: error("安装包响应体为空")
                     val total = body.contentLength().takeIf { it > 0L } ?: release.fileSize
@@ -208,75 +237,101 @@ class AppUpdateManager(
                                     val speed = ((downloaded - lastTickBytes) * 1000L) / dt.coerceAtLeast(1L)
                                     lastTickMs = nowMs
                                     lastTickBytes = downloaded
-                                    _state.value = UpdateState.Downloading(release, downloaded, total, speed)
+                                    _state.value = UpdateState.Downloading(
+                                        release = release,
+                                        downloadedBytes = downloaded,
+                                        totalBytes = total,
+                                        bytesPerSecond = speed,
+                                        isForced = isForced,
+                                    )
                                 }
-                            }
-                            if (!isActive) {
-                                runCatching { partFile.delete() }
-                                _state.value = UpdateState.Available(release, release.forceUpdate)
-                                return@launch
                             }
                             out.flush()
                         }
                     }
 
-                    _state.value = UpdateState.Verifying(release)
-                    val actualSha = digest.digest().joinToString("") { "%02x".format(it) }
-                    if (release.sha256.isNotBlank() && !UpdatePolicy.verifySha256(release.sha256, actualSha)) {
+                    if (!isActive) {
                         runCatching { partFile.delete() }
+                        return@launch
+                    }
+
+                    _state.value = UpdateState.Verifying(release, isForced = isForced)
+                    val actualHex = digest.digest().joinToString("") { "%02x".format(it) }
+                    if (release.sha256.length == 64 && !UpdatePolicy.verifySha256(release.sha256, actualHex)) {
+                        runCatching { partFile.delete() }
+                        onTrackEvent(
+                            "update_download_result",
+                            mapOf("target_version" to release.versionName, "success" to false, "error_code" to "sha256_mismatch"),
+                            true,
+                        )
                         _state.value = UpdateState.Error(
-                            message = "安装包 SHA-256 完整性校验失败，已自动清理受损文件，请重试",
+                            message = "安装包 SHA-256 完整性校验未通过，已自动删除以策安全，请重试。",
                             release = release,
+                            isForced = isForced,
                         )
                         return@launch
                     }
 
                     if (finalFile.exists()) finalFile.delete()
-                    check(partFile.renameTo(finalFile)) { "保存更新包失败" }
-                    pruneOldApks(finalFile)
-                    _state.value = UpdateState.ReadyToInstall(release, finalFile)
+                    if (!partFile.renameTo(finalFile)) {
+                        partFile.copyTo(finalFile, overwrite = true)
+                        partFile.delete()
+                    }
+                    onTrackEvent(
+                        "update_download_result",
+                        mapOf("target_version" to release.versionName, "success" to true, "is_forced" to isForced),
+                        true,
+                    )
+                    _state.value = UpdateState.ReadyToInstall(release, finalFile, isForced = isForced)
                 }
-            } catch (t: Throwable) {
+            } catch (e: Throwable) {
                 runCatching { partFile.delete() }
-                if (isActive) {
+                if (e is kotlinx.coroutines.CancellationException) {
+                    _state.value = UpdateState.Available(release, isForced = isForced)
+                } else {
+                    onTrackEvent(
+                        "update_download_result",
+                        mapOf("target_version" to release.versionName, "success" to false, "error_code" to "network_error"),
+                        false,
+                    )
                     _state.value = UpdateState.Error(
-                        message = "下载失败：${t.message ?: "网络中断"}",
+                        message = "更新下载中断：${e.message ?: "网络异常"}",
                         release = release,
+                        isForced = isForced,
                     )
                 }
             }
         }
     }
 
+    fun recordInstallTriggered(release: ReleaseInfo, isForced: Boolean, hadPermission: Boolean) {
+        onTrackEvent(
+            "update_install_trigger",
+            mapOf("target_version" to release.versionName, "is_forced" to isForced, "had_permission" to hadPermission),
+            true,
+        )
+    }
+
     fun cancelDownload() {
+        val cur = _state.value as? UpdateState.Downloading
         downloadJob?.cancel()
-        downloadJob = null
-        val cur = _state.value
-        if (cur is UpdateState.Downloading) {
-            _state.value = UpdateState.Available(cur.release, cur.release.forceUpdate)
+        if (cur != null) {
+            _state.value = UpdateState.Available(cur.release, isForced = cur.isForced)
         }
     }
 
     private fun targetApkFile(versionCode: Int): File {
-        val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "updates")
-        dir.mkdirs()
-        return File(dir, "sonify_v${versionCode}.apk")
-    }
-
-    private fun pruneOldApks(keepFile: File) {
-        val dir = keepFile.parentFile ?: return
-        dir.listFiles()?.forEach { f ->
-            if (f.absolutePath != keepFile.absolutePath) runCatching { f.delete() }
-        }
+        val baseDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.cacheDir
+        return File(File(baseDir, "updates"), "sonify-update-$versionCode.apk")
     }
 
     private suspend fun computeSha256(file: File): String = withContext(Dispatchers.IO) {
         val md = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { ins ->
+        file.inputStream().use { input ->
             val buf = ByteArray(32 * 1024)
             while (true) {
-                val n = ins.read(buf)
-                if (n < 0) break
+                val n = input.read(buf)
+                if (n <= 0) break
                 md.update(buf, 0, n)
             }
         }

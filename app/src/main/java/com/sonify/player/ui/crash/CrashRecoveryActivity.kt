@@ -108,9 +108,9 @@ class CrashRecoveryActivity : ComponentActivity() {
                     onCopyLog = { copyToClipboard(report?.toShareableSummary().orEmpty()) },
                     onClearCacheAndRestart = {
                         runCatching { cacheDir.deleteRecursively() }
-                        restartMainApp()
+                        restartMainApp(crashCount, isLoopBroken)
                     },
-                    onRestartNow = { restartMainApp() },
+                    onRestartNow = { restartMainApp(crashCount, isLoopBroken) },
                 )
             }
         }
@@ -122,9 +122,12 @@ class CrashRecoveryActivity : ComponentActivity() {
         cm.setPrimaryClip(ClipData.newPlainText("Sonify Crash Report", text))
     }
 
-    private fun restartMainApp() {
+    private fun restartMainApp(crashCount: Int, isLoopBroken: Boolean) {
         val intent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            putExtra(EXTRA_FROM_CRASH_RECOVERY, true)
+            putExtra(EXTRA_CRASH_COUNT, crashCount)
+            putExtra(EXTRA_LOOP_BROKEN, isLoopBroken)
         }
         startActivity(intent)
         finish()
@@ -138,6 +141,7 @@ class CrashRecoveryActivity : ComponentActivity() {
         const val EXTRA_CRASH_COUNT = "extra_crash_count"
         const val EXTRA_AUTO_UPLOAD = "extra_auto_upload"
         const val EXTRA_BASE_URL = "extra_base_url"
+        const val EXTRA_FROM_CRASH_RECOVERY = "extra_from_crash_recovery"
     }
 }
 

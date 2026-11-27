@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.InstallMobile
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -45,34 +46,50 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.sonify.player.BuildConfig
 import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.update.ApkInstaller
 import com.sonify.player.update.ReleaseInfo
 import com.sonify.player.update.UpdatePolicy
 import com.sonify.player.update.UpdateState
+import com.sonify.player.update.isForcedUpdate
 import java.io.File
 
 /**
- * Spotify-Dark 风格应用内更新弹窗（支持更新日志、进度与速度、SHA-256 校验状态与未知来源权限引导）。
+ * Spotify-Dark 风格应用内更新弹窗：
+ * - 普通更新支持更新日志、进度与速度、SHA-256 校验、忽略版本与未知来源权限引导；
+ * - 强制更新（Force Update）在 Available / Downloading / Verifying / ReadyToInstall / Error 全生命周期锁死，
+ *   禁止返回键与点击外部关闭，隐藏跳过/稍后/关闭按钮，仅允许升级或退出应用。
  */
 @Composable
 fun UpdateDialog(
     state: UpdateState,
-    onStartDownload: (ReleaseInfo) -> Unit,
+    onStartDownload: (ReleaseInfo, Boolean) -> Unit,
     onCancelDownload: () -> Unit,
     onIgnoreVersion: (Int) -> Unit,
     onRetryCheck: () -> Unit,
+    onInstallTriggered: (ReleaseInfo, Boolean, Boolean) -> Unit,
+    onExitApp: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val colors = LocalHiFiColors.current
     val context = LocalContext.current
     var needUnknownSourcePermission by remember { mutableStateOf(false) }
 
-    val isForced = (state as? UpdateState.Available)?.isForced == true
+    val isForced = state.isForcedUpdate
 
-    fun triggerInstall(apkFile: File) {
+    // 从系统「允许安装未知应用」设置返回后自动检测权限并恢复「立即安装」按钮
+    LifecycleResumeEffect(Unit) {
+        if (needUnknownSourcePermission && ApkInstaller.canRequestPackageInstalls(context)) {
+            needUnknownSourcePermission = false
+        }
+        onPauseOrDispose { }
+    }
+
+    fun triggerInstall(release: ReleaseInfo, apkFile: File) {
         val launched = ApkInstaller.launchInstall(context, apkFile)
+        onInstallTriggered(release, isForced, launched)
         if (!launched) {
             needUnknownSourcePermission = true
         }
@@ -89,19 +106,48 @@ fun UpdateDialog(
         textContentColor = colors.textSecondary,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val (icon, tint, heading) = when (state) {
-                    is UpdateState.UpToDate -> Triple(Icons.Rounded.CheckCircle, colors.exclusiveGreen, "已是最新版本")
-                    is UpdateState.Error -> Triple(Icons.Rounded.ErrorOutline, colors.danger, "更新检查异常")
-                    is UpdateState.ReadyToInstall -> Triple(Icons.Rounded.InstallMobile, colors.exclusiveGreen, "安装包校验通过")
-                    else -> Triple(Icons.Rounded.NewReleases, colors.accent, "应用更新")
+                val (icon, tint, heading) = when {
+                    isForced && state is UpdateState.ReadyToInstall ->
+                        Triple(Icons.Rounded.InstallMobile, colors.exclusiveGreen, "重要更新校验通过")
+                    isForced ->
+                        Triple(Icons.Rounded.Warning, colors.danger, "重要版本升级（必须更新）")
+                    state is UpdateState.UpToDate ->
+                        Triple(Icons.Rounded.CheckCircle, colors.exclusiveGreen, "已是最新版本")
+                    state is UpdateState.Error ->
+                        Triple(Icons.Rounded.ErrorOutline, colors.danger, "更新检查异常")
+                    state is UpdateState.ReadyToInstall ->
+                        Triple(Icons.Rounded.InstallMobile, colors.exclusiveGreen, "安装包校验通过")
+                    else ->
+                        Triple(Icons.Rounded.NewReleases, colors.accent, "应用更新")
                 }
                 Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(heading, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                Text(heading, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
             }
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                if (isForced) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(colors.danger.copy(alpha = 0.14f))
+                            .border(1.dp, colors.danger.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "当前版本已停止兼容或包含关键安全修复，请完成升级后继续使用 Sonify。",
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                            color = colors.danger,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+
                 when (state) {
                     UpdateState.Idle, UpdateState.Checking -> {
                         Row(
@@ -146,7 +192,7 @@ fun UpdateDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Text(
-                                text = "${(state.progress * 100).toInt()}% · ${UpdatePolicy.formatSize(state.downloadedBytes)} / ${UpdatePolicy.formatSize(state.totalBytes)}",
+                                text = "${(state.progress * 100).toInt()}% · ${UpdatePolicy.formatProgressBytes(state.downloadedBytes)} / ${UpdatePolicy.formatSize(state.totalBytes)}",
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
                                 color = colors.textSecondary,
@@ -210,21 +256,30 @@ fun UpdateDialog(
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(999.dp))
-                            .background(colors.accent)
-                            .clickable { onStartDownload(state.release) }
+                            .background(if (isForced) colors.danger else colors.accent)
+                            .clickable { onStartDownload(state.release, state.isForced) }
                             .padding(horizontal = 16.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Rounded.Download, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(16.dp))
+                        Icon(
+                            imageVector = Icons.Rounded.Download,
+                            contentDescription = null,
+                            tint = if (isForced) Color.White else colors.onAccent,
+                            modifier = Modifier.size(16.dp),
+                        )
                         Spacer(Modifier.width(5.dp))
-                        Text("立即下载更新", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.onAccent)
+                        Text(
+                            text = "立即下载更新",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isForced) Color.White else colors.onAccent,
+                        )
                     }
                 }
 
                 is UpdateState.ReadyToInstall -> {
                     if (needUnknownSourcePermission) {
                         TextButton(onClick = {
-                            needUnknownSourcePermission = false
                             runCatching { context.startActivity(ApkInstaller.buildUnknownSourcesIntent(context)) }
                         }) {
                             Text("去开启安装权限", color = colors.accent, fontWeight = FontWeight.Bold)
@@ -234,7 +289,7 @@ fun UpdateDialog(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
                                 .background(colors.exclusiveGreen)
-                                .clickable { triggerInstall(state.apkFile) }
+                                .clickable { triggerInstall(state.release, state.apkFile) }
                                 .padding(horizontal = 16.dp, vertical = 9.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -247,14 +302,15 @@ fun UpdateDialog(
 
                 is UpdateState.Error -> {
                     TextButton(onClick = {
-                        if (state.release != null) onStartDownload(state.release) else onRetryCheck()
+                        if (state.release != null) onStartDownload(state.release, state.isForced)
+                        else onRetryCheck()
                     }) {
                         Text("重试", color = colors.accent, fontWeight = FontWeight.Bold)
                     }
                 }
 
                 else -> {
-                    if (state !is UpdateState.Downloading && state !is UpdateState.Verifying) {
+                    if (state !is UpdateState.Downloading && state !is UpdateState.Verifying && !isForced) {
                         TextButton(onClick = onDismiss) {
                             Text("知道了", color = colors.accent, fontWeight = FontWeight.SemiBold)
                         }
@@ -265,7 +321,11 @@ fun UpdateDialog(
         dismissButton = {
             when (state) {
                 is UpdateState.Available -> {
-                    if (!state.isForced) {
+                    if (state.isForced) {
+                        TextButton(onClick = onExitApp) {
+                            Text("退出应用", color = colors.textMuted, fontSize = 12.sp)
+                        }
+                    } else {
                         Row {
                             TextButton(onClick = { onIgnoreVersion(state.release.versionCode) }) {
                                 Text("跳过此版", color = colors.textMuted, fontSize = 12.sp)
@@ -284,8 +344,14 @@ fun UpdateDialog(
                 }
 
                 is UpdateState.ReadyToInstall, is UpdateState.Error -> {
-                    TextButton(onClick = onDismiss) {
-                        Text("关闭", color = colors.textSecondary)
+                    if (isForced) {
+                        TextButton(onClick = onExitApp) {
+                            Text("退出应用", color = colors.textMuted, fontSize = 12.sp)
+                        }
+                    } else {
+                        TextButton(onClick = onDismiss) {
+                            Text("关闭", color = colors.textSecondary)
+                        }
                     }
                 }
 

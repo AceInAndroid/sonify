@@ -51,12 +51,28 @@ sealed interface UpdateState {
         val downloadedBytes: Long,
         val totalBytes: Long,
         val bytesPerSecond: Long,
+        val isForced: Boolean = false,
     ) : UpdateState {
         val progress: Float
             get() = if (totalBytes > 0L) (downloadedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
     }
 
-    data class Verifying(val release: ReleaseInfo) : UpdateState
-    data class ReadyToInstall(val release: ReleaseInfo, val apkFile: File) : UpdateState
-    data class Error(val message: String, val release: ReleaseInfo? = null) : UpdateState
+    data class Verifying(val release: ReleaseInfo, val isForced: Boolean = false) : UpdateState
+    data class ReadyToInstall(val release: ReleaseInfo, val apkFile: File, val isForced: Boolean = false) : UpdateState
+    data class Error(
+        val message: String,
+        val release: ReleaseInfo? = null,
+        val isForced: Boolean = false,
+    ) : UpdateState
 }
+
+/** 统一判断任意更新状态是否处于不可跳过的「强制更新」锁定态 */
+val UpdateState.isForcedUpdate: Boolean
+    get() = when (this) {
+        is UpdateState.Available -> isForced
+        is UpdateState.Downloading -> isForced
+        is UpdateState.Verifying -> isForced
+        is UpdateState.ReadyToInstall -> isForced
+        is UpdateState.Error -> isForced
+        else -> false
+    }

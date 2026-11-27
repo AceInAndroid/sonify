@@ -1,14 +1,18 @@
 [Unit]
-Description=Sonify Update & Crash Diagnostics Server
-After=network.target
+Description=Sonify Update, Crash & Analytics Server
+After=network-online.target docker.service
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
-ExecStart=/usr/bin/python3 /opt/sonify-server/sonify_server.py --host 127.0.0.1 --port 8090 --data-dir /var/lib/sonify-server --releases-dir /var/lib/sonify-server/releases
+User=ubuntu
+Group=ubuntu
+EnvironmentFile=-/etc/sonify-server/admin.env
+ExecStart=/usr/bin/python3 /opt/sonify-server/sonify_server.py --host 172.18.0.1 --port 8090 --data-dir /var/lib/sonify-server --dashboard-html /opt/sonify-server/admin_dashboard.html
 Restart=always
 RestartSec=3
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
