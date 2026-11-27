@@ -25,7 +25,17 @@ object SubsonicAuth {
      */
     fun normalizeBaseUrl(raw: String): String {
         var s = raw.trim()
+            .replace('：', ':')
+            .replace('／', '/')
+            .replace('。', '.')
+            .replace('．', '.')
+            .replace(" ", "")
         require(s.isNotEmpty()) { "服务器地址不能为空" }
+        if (s.startsWith("http://", ignoreCase = true)) {
+            s = "http://" + s.substring(7)
+        } else if (s.startsWith("https://", ignoreCase = true)) {
+            s = "https://" + s.substring(8)
+        }
 
         if (!s.startsWith("http://", ignoreCase = true) && !s.startsWith("https://", ignoreCase = true)) {
             val hostPart = s.substringBefore('/').substringBefore(':')

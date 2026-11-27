@@ -28,10 +28,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -342,7 +345,12 @@ private fun HiFiRootScreen(
     }
 
     val hasMiniPlayer = playback.currentTrack != null
-    val bottomClearance = if (hasMiniPlayer) 132.dp else 68.dp
+    val navBarBottomDp = if (barsSpec.hideNavBar) {
+        4.dp
+    } else {
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    }
+    val bottomClearance = navBarBottomDp + if (hasMiniPlayer) 140.dp else 68.dp
 
     val topSafeModifier = if (barsSpec.hideStatusBar) Modifier.displayCutoutPadding() else Modifier.statusBarsPadding()
     val bottomSafeModifier = if (barsSpec.hideNavBar) Modifier.padding(bottom = 4.dp) else Modifier.navigationBarsPadding()
@@ -361,14 +369,17 @@ private fun HiFiRootScreen(
                 MainTab.LIBRARY -> {
                     val activeLocalPlId = openLocalPlaylistId
                     if (activeLocalPlId != null && selectedSubsonicServer == null) {
+                        val cachedPl = remember(activeLocalPlId, localPlaylists) {
+                            localPlaylists.firstOrNull { it.playlist.id == activeLocalPlId }?.playlist
+                        }
                         val plEntity by remember(activeLocalPlId) {
                             libraryVm.observeLocalPlaylist(activeLocalPlId)
-                        }.collectAsState(initial = null)
+                        }.collectAsState(initial = cachedPl)
                         val plItems by remember(activeLocalPlId) {
                             libraryVm.observeLocalPlaylistTracks(activeLocalPlId)
                         }.collectAsState(initial = emptyList())
 
-                        val currentPl = plEntity
+                        val currentPl = plEntity ?: cachedPl
                         if (currentPl != null) {
                             val autoCovers = remember(plItems) {
                                 plItems.mapNotNull { it.track.coverPath?.takeIf { c -> c.isNotBlank() } }

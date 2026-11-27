@@ -81,10 +81,10 @@ fun LyricsLiveStylePanel(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-            .background(Color(0xE8161619))
+            .background(Color(0xF7141417))
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.12f),
+                color = Color.White.copy(alpha = 0.14f),
                 shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
             )
             .padding(horizontal = 18.dp, vertical = 14.dp),
@@ -111,9 +111,10 @@ fun LyricsLiveStylePanel(
                     color = colors.textPrimary,
                 )
                 Text(
-                    text = "调节任意参数，上方歌词所见即所得实时生效",
+                    text = "调节参数，上方歌词实时生效",
                     fontSize = 11.sp,
                     color = colors.textSecondary,
+                    maxLines = 1,
                 )
             }
             Row(

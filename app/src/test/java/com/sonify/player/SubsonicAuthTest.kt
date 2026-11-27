@@ -43,6 +43,11 @@ class SubsonicAuthTest {
             "https://nas.home.io:8443",
             SubsonicAuth.normalizeBaseUrl("https://nas.home.io:8443///"),
         )
+        // 中文输入法全角标点自动容错规范化
+        assertEquals(
+            "http://192.168.31.141:4533",
+            SubsonicAuth.normalizeBaseUrl("HTTP：／／192。168．31.141：4533 "),
+        )
     }
 
     @Test

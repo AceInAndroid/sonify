@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -318,84 +320,92 @@ fun PlaylistDetailScreen(
 
                         Spacer(Modifier.height(14.dp))
 
-                        // 主控操作栏：添加歌曲 / 下载歌单 / 排序 / 随机播放 / 顺序播放
+                        // 主控操作栏：左侧胶囊区可横向轻滑，确保右侧随机键与 46dp 圆形播放键在任意屏宽下绝不被挤压变形
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            // + 添加歌曲
                             Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(colors.surface2)
-                                    .clickable { onOpenAddTracks() }
-                                    .padding(horizontal = 11.dp, vertical = 7.dp),
+                                    .weight(1f)
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(7.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Icon(Icons.Rounded.Add, contentDescription = null, tint = colors.accent, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(3.dp))
-                                Text("加歌", fontSize = 12.sp, color = colors.textPrimary)
-                            }
-
-                            Spacer(Modifier.width(8.dp))
-
-                            // 歌单排序胶囊
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(colors.surface2)
-                                    .clickable { showSortSheet = true }
-                                    .padding(horizontal = 11.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.Sort,
-                                    contentDescription = null,
-                                    tint = colors.textSecondary,
-                                    modifier = Modifier.size(15.dp),
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                val arrow = if (sortAscending) "↑" else "↓"
-                                Text("${sortField.label} $arrow", fontSize = 12.sp, color = colors.textPrimary)
-                            }
-
-                            // 歌单下载按钮（仅含 Subsonic 远程曲目时展示）
-                            if (remoteTracks.isNotEmpty()) {
-                                Spacer(Modifier.width(8.dp))
+                                // + 添加歌曲
                                 Row(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(999.dp))
-                                        .background(
-                                            if (allRemoteDownloaded) colors.exclusiveGreen.copy(alpha = 0.16f)
-                                            else colors.surface2
-                                        )
-                                        .clickable { onDownloadPlaylist(remoteTracks) }
+                                        .background(colors.surface2)
+                                        .clickable { onOpenAddTracks() }
+                                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(Icons.Rounded.Add, contentDescription = null, tint = colors.accent, modifier = Modifier.size(15.dp))
+                                    Spacer(Modifier.width(3.dp))
+                                    Text("加歌", fontSize = 12.sp, color = colors.textPrimary, maxLines = 1, softWrap = false)
+                                }
+
+                                // 歌单排序胶囊
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(colors.surface2)
+                                        .clickable { showSortSheet = true }
                                         .padding(horizontal = 10.dp, vertical = 7.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Icon(
-                                        imageVector = if (allRemoteDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
-                                        contentDescription = "下载歌单",
-                                        tint = if (allRemoteDownloaded) colors.exclusiveGreen else colors.textPrimary,
+                                        imageVector = Icons.AutoMirrored.Rounded.Sort,
+                                        contentDescription = null,
+                                        tint = colors.textSecondary,
                                         modifier = Modifier.size(15.dp),
                                     )
                                     Spacer(Modifier.width(4.dp))
-                                    Text(
-                                        text = if (allRemoteDownloaded) "已离线"
-                                        else if (downloadedRemoteCount > 0) "$downloadedRemoteCount/${remoteTracks.size}"
-                                        else "下载",
-                                        fontSize = 11.sp,
-                                        color = if (allRemoteDownloaded) colors.exclusiveGreen else colors.textPrimary,
-                                    )
+                                    val arrow = if (sortAscending) "↑" else "↓"
+                                    Text("${sortField.label} $arrow", fontSize = 12.sp, color = colors.textPrimary, maxLines = 1, softWrap = false)
+                                }
+
+                                // 歌单下载按钮（仅含 Subsonic 远程曲目时展示）
+                                if (remoteTracks.isNotEmpty()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(999.dp))
+                                            .background(
+                                                if (allRemoteDownloaded) colors.exclusiveGreen.copy(alpha = 0.16f)
+                                                else colors.surface2
+                                            )
+                                            .clickable { onDownloadPlaylist(remoteTracks) }
+                                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(
+                                            imageVector = if (allRemoteDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
+                                            contentDescription = "下载歌单",
+                                            tint = if (allRemoteDownloaded) colors.exclusiveGreen else colors.textPrimary,
+                                            modifier = Modifier.size(15.dp),
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            text = if (allRemoteDownloaded) "已离线"
+                                            else if (downloadedRemoteCount > 0) "$downloadedRemoteCount/${remoteTracks.size}"
+                                            else "下载",
+                                            fontSize = 11.sp,
+                                            color = if (allRemoteDownloaded) colors.exclusiveGreen else colors.textPrimary,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    }
                                 }
                             }
 
-                            Spacer(Modifier.weight(1f))
+                            Spacer(Modifier.width(6.dp))
 
                             // 歌单随机播放
                             IconButton(
                                 enabled = sortedTracks.isNotEmpty(),
                                 onClick = { onShufflePlay(sortedTracks, title) },
+                                modifier = Modifier.size(40.dp),
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Shuffle,
@@ -404,6 +414,8 @@ fun PlaylistDetailScreen(
                                     modifier = Modifier.size(22.dp),
                                 )
                             }
+
+                            Spacer(Modifier.width(4.dp))
 
                             // 歌单大圆播放键
                             Box(

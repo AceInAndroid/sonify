@@ -125,6 +125,13 @@ rm -rf app/build app/.cxx build
 
 APK output: `app/build/outputs/apk/debug/app-debug.apk`
 
+### Quality Assurance & Real-Device Release Gate
+Every feature and modification must pass unit tests **and** real-device verification before release:
+- Mandatory Gate Rule: [AGENTS.md](AGENTS.md) & [Release Gate SOP](docs/testing/RELEASE_GATE.md)
+- Master Test Plan: [docs/testing/TEST_PLAN.md](docs/testing/TEST_PLAN.md)
+- End-to-End Test Cases (52 cases): [docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
+- Device QA Reports: [docs/testing/reports/](docs/testing/reports/)
+
 ### Debugging USB Audio Logs
 
 ```bash

@@ -18,6 +18,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -194,9 +195,10 @@ fun LyricsOverlayView(
         } else com.sonify.player.lyrics.InterludeState(isActive = false)
     }
 
-    // 手指滑动歌词列表时唤醒控件并暂停自动居中 4 秒
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) {
+    // 仅检测真实手指拖拽（collectIsDraggedAsState 不会被程序自动滚屏误触发！）
+    val isUserDragging by listState.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(isUserDragging) {
+        if (isUserDragging) {
             userDraggingPause = true
             controlsHidden = false
             interactionNonce++
@@ -691,7 +693,7 @@ fun LyricsOverlayView(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (doc != null && doc.isSynced) {
@@ -721,7 +723,7 @@ fun LyricsOverlayView(
                         )
                         ToolPill(
                             icon = Icons.Rounded.Search,
-                            label = "搜词/换词",
+                            label = "搜词",
                             active = false,
                             onClick = {
                                 wakeControls()
@@ -734,7 +736,9 @@ fun LyricsOverlayView(
                             text = "${formatDuration(smoothPositionMs)} / ${formatDuration(playback.durationMs)}",
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = Color.White.copy(alpha = 0.62f),
+                            maxLines = 1,
+                            softWrap = false,
+                            color = Color.White.copy(alpha = 0.68f),
                         )
                     }
                 }

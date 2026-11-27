@@ -125,6 +125,13 @@ rm -rf app/build app/.cxx build
 
 产物路径：`app/build/outputs/apk/debug/app-debug.apk`
 
+### 质量保障与真机测试上线门禁
+所有新增功能与代码改动上线前必须先通过单元测试与真机功能/视觉验收：
+- 强制门禁规范：[AGENTS.md](AGENTS.md) · [发布门禁清单](docs/testing/RELEASE_GATE.md)
+- 测试总方案：[docs/testing/TEST_PLAN.md](docs/testing/TEST_PLAN.md)
+- 端到端测试用例库（52 条）：[docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
+- 真机测试验收报告：[docs/testing/reports/](docs/testing/reports/)
+
 ### 调试日志
 
 ```bash

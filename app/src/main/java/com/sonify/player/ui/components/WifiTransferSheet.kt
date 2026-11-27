@@ -235,29 +235,32 @@ fun WifiTransferSheet(
                                 copyToClipboard(context, state.primaryUrl)
                                 onShowToast("已复制链接：${state.primaryUrl}")
                             }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                            .padding(horizontal = 10.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
                             text = state.primaryUrl,
-                            fontSize = 15.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
+                            letterSpacing = (-0.2).sp,
                             color = colors.accent,
                             maxLines = 1,
+                            softWrap = false,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
+                        Spacer(Modifier.width(6.dp))
                         Icon(
                             imageVector = Icons.Rounded.ContentCopy,
                             contentDescription = "复制链接",
                             tint = colors.textSecondary,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(16.dp),
                         )
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(4.dp))
                         IconButton(
                             onClick = onRefreshNetwork,
-                            modifier = Modifier.size(28.dp),
+                            modifier = Modifier.size(26.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Refresh,
