@@ -1,9 +1,11 @@
 package com.sonify.player.ui
 
 import android.app.Application
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sonify.player.HiFiApp
+import com.sonify.player.R
 import com.sonify.player.data.SubsonicServerEntity
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.subsonic.SubsonicAlbum
@@ -20,13 +22,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class SubsonicTab(val label: String) {
-    NEWEST("最新专辑"),
-    ALL_ALBUMS("全部专辑"),
-    ARTISTS("艺术家"),
-    PLAYLISTS("歌单"),
-    STARRED("已收藏"),
-    RANDOM("随机发现"),
+enum class SubsonicTab(@StringRes val labelRes: Int) {
+    NEWEST(R.string.subsonic_sec_newest),
+    ALL_ALBUMS(R.string.subsonic_sec_albums),
+    ARTISTS(R.string.subsonic_sec_artists),
+    PLAYLISTS(R.string.subsonic_sec_playlists),
+    STARRED(R.string.subsonic_sec_starred),
+    RANDOM(R.string.subsonic_sec_random),
 }
 
 sealed interface SubsonicDrillState {
@@ -90,6 +92,11 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
 
     private val app = HiFiApp.from(application)
     private val repo = app.subsonicRepo
+
+    private fun s(@StringRes id: Int, vararg args: Any): String {
+        val ctx = app.localizedContext()
+        return if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    }
 
     val servers: StateFlow<List<SubsonicServerEntity>> = repo.servers
     val activeServer: StateFlow<SubsonicServerEntity?> = repo.activeServer
@@ -163,7 +170,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             _browse.update { it.copy(isLoadingMoreAlbums = true) }
             runCatching {
-                val creds = repo.getCredentials(srvId) ?: error("找不到服务器凭据")
+                val creds = repo.getCredentials(srvId) ?: error(s(R.string.err_subsonic_no_creds))
                 repo.client.getAlbumList2(
                     creds = creds,
                     type = listType,
@@ -215,7 +222,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
                 )
             }
             runCatching {
-                val creds = repo.getCredentials(serverId) ?: throw IllegalStateException("服务器账号凭据不可用，请重新登录")
+                val creds = repo.getCredentials(serverId) ?: throw IllegalStateException(s(R.string.err_subsonic_creds_invalid))
                 when (tab) {
                     SubsonicTab.NEWEST -> {
                         val albums = repo.client.getAlbumList2(creds, "newest", PAGE_SIZE, 0, folderId)
@@ -257,7 +264,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
                 }
             }.onFailure { err ->
                 _browse.update {
-                    it.copy(isLoading = false, error = err.message ?: "加载远程曲库失败")
+                    it.copy(isLoading = false, error = err.message ?: s(R.string.err_subsonic_load_lib))
                 }
             }
         }
@@ -269,7 +276,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
         _browse.update { it.copy(drill = SubsonicDrillState.AlbumDetail(album, isLoading = true)) }
         drillJob = viewModelScope.launch {
             runCatching {
-                val creds = repo.getCredentials(srvId) ?: throw IllegalStateException("未找到服务器凭据")
+                val creds = repo.getCredentials(srvId) ?: throw IllegalStateException(s(R.string.err_subsonic_no_creds))
                 val (detail, songs) = repo.client.getAlbum(creds, album.id)
                 val tracks = repo.cacheSongs(srvId, songs)
                 detail to tracks
@@ -283,7 +290,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
                         drill = SubsonicDrillState.AlbumDetail(
                             album = album,
                             isLoading = false,
-                            error = err.message ?: "加载专辑曲目失败",
+                            error = err.message ?: s(R.string.err_subsonic_load_album),
                         )
                     )
                 }
@@ -297,7 +304,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
         _browse.update { it.copy(drill = SubsonicDrillState.ArtistDetail(artist, isLoading = true)) }
         drillJob = viewModelScope.launch {
             runCatching {
-                val creds = repo.getCredentials(srvId) ?: throw IllegalStateException("未找到服务器凭据")
+                val creds = repo.getCredentials(srvId) ?: throw IllegalStateException(s(R.string.err_subsonic_no_creds))
                 repo.client.getArtist(creds, artist.id)
             }.onSuccess { (detail, albums) ->
                 _browse.update {
@@ -309,7 +316,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
                         drill = SubsonicDrillState.ArtistDetail(
                             artist = artist,
                             isLoading = false,
-                            error = err.message ?: "加载艺术家专辑失败",
+                            error = err.message ?: s(R.string.err_subsonic_load_artist),
                         )
                     )
                 }
@@ -323,7 +330,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
         _browse.update { it.copy(drill = SubsonicDrillState.PlaylistDetail(playlist, isLoading = true)) }
         drillJob = viewModelScope.launch {
             runCatching {
-                val creds = repo.getCredentials(srvId) ?: throw IllegalStateException("未找到服务器凭据")
+                val creds = repo.getCredentials(srvId) ?: throw IllegalStateException(s(R.string.err_subsonic_no_creds))
                 val (detail, songs) = repo.client.getPlaylist(creds, playlist.id)
                 val tracks = repo.cacheSongs(srvId, songs)
                 detail to tracks
@@ -337,7 +344,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
                         drill = SubsonicDrillState.PlaylistDetail(
                             playlist = playlist,
                             isLoading = false,
-                            error = err.message ?: "加载歌单曲目失败",
+                            error = err.message ?: s(R.string.err_subsonic_load_playlist),
                         )
                     )
                 }
@@ -383,7 +390,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
             delay(350)
             _browse.update { it.copy(isSearching = true, searchError = null) }
             runCatching {
-                val creds = repo.getCredentials(srvId) ?: throw IllegalStateException("未找到服务器凭据")
+                val creds = repo.getCredentials(srvId) ?: throw IllegalStateException(s(R.string.err_subsonic_no_creds))
                 val res = repo.client.search3(creds, trimmed, musicFolderId = _browse.value.selectedFolderId)
                 val tracks = repo.cacheSongs(srvId, res.songs)
                 res to tracks
@@ -393,7 +400,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
                 }
             }.onFailure { err ->
                 _browse.update {
-                    it.copy(isSearching = false, searchError = err.message ?: "远程搜索失败")
+                    it.copy(isSearching = false, searchError = err.message ?: s(R.string.err_subsonic_search))
                 }
             }
         }
@@ -431,7 +438,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
             }.onSuccess { (entity, ping) ->
                 _accountAction.value = AccountActionState(
                     isSubmitting = false,
-                    statusMessage = "已连接并保存 · ${ping.displayBadge()}",
+                    statusMessage = s(R.string.toast_subsonic_saved, ping.displayBadge()),
                     isError = false,
                 )
                 ensureLoadedFor(entity)
@@ -439,7 +446,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
             }.onFailure { err ->
                 _accountAction.value = AccountActionState(
                     isSubmitting = false,
-                    statusMessage = err.message ?: "连接服务器失败",
+                    statusMessage = err.message ?: s(R.string.err_subsonic_connect),
                     isError = true,
                 )
             }
@@ -453,12 +460,12 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
                 repo.testExistingServer(serverId)
             }.onSuccess { ping ->
                 _accountAction.value = AccountActionState(
-                    statusMessage = "连接正常 · ${ping.displayBadge()}",
+                    statusMessage = s(R.string.toast_subsonic_ok, ping.displayBadge()),
                     isError = false,
                 )
             }.onFailure { err ->
                 _accountAction.value = AccountActionState(
-                    statusMessage = err.message ?: "测试连接失败",
+                    statusMessage = err.message ?: s(R.string.err_subsonic_test),
                     isError = true,
                 )
             }
@@ -478,7 +485,7 @@ class SubsonicViewModel(application: Application) : AndroidViewModel(application
             if (_browse.value.serverId == serverId) {
                 _browse.value = SubsonicBrowseUiState()
             }
-            _accountAction.value = AccountActionState(statusMessage = "已退出并删除该服务器账号", isError = false)
+            _accountAction.value = AccountActionState(statusMessage = s(R.string.toast_subsonic_removed), isError = false)
         }
     }
 

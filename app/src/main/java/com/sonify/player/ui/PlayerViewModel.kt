@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ComponentName
 import android.net.Uri
 import android.os.Bundle
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -14,6 +15,7 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.sonify.player.HiFiApp
+import com.sonify.player.R
 import com.sonify.player.audio.ActiveOutputRoute
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.TrackEntity
@@ -47,7 +49,7 @@ data class PlaybackUiState(
     val durationMs: Long = 0L,
     val shuffleEnabled: Boolean = false,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
-    val contextLabel: String = "音乐库",
+    val contextLabel: String = "",
 )
 
 data class LyricsUiState(
@@ -62,6 +64,11 @@ data class LyricsUiState(
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = HiFiApp.from(application)
+
+    private fun s(@StringRes id: Int, vararg args: Any): String {
+        val ctx = app.localizedContext()
+        return if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    }
 
     val settings: StateFlow<AppSettings> = app.prefs.settings
     val usbState: StateFlow<UsbConnectionState> = app.usbManager.state
@@ -78,7 +85,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private var activeQueueByPath: Map<String, TrackEntity> = emptyMap()
 
-    private val _playback = MutableStateFlow(PlaybackUiState())
+    private val _playback = MutableStateFlow(PlaybackUiState(contextLabel = s(R.string.lib_title)))
     val playback: StateFlow<PlaybackUiState> = _playback.asStateFlow()
 
     private val _lyrics = MutableStateFlow(LyricsUiState())
@@ -151,9 +158,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     add(
                         TrackEntity(
                             path = item.mediaId,
-                            title = item.mediaMetadata.title?.toString() ?: "未知歌曲",
-                            artist = item.mediaMetadata.artist?.toString() ?: "未知艺术家",
-                            album = item.mediaMetadata.albumTitle?.toString() ?: "未知专辑",
+                            title = item.mediaMetadata.title?.toString() ?: s(R.string.common_unknown_track),
+                            artist = item.mediaMetadata.artist?.toString() ?: s(R.string.common_unknown_artist),
+                            album = item.mediaMetadata.albumTitle?.toString() ?: s(R.string.common_unknown_album),
                             durationMs = player.duration.takeIf { it > 0 } ?: 0L,
                         )
                     )
@@ -219,7 +226,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         it.copy(
                             isSearchingOnline = false,
                             searchResults = emptyList(),
-                            searchError = err.message ?: "在线搜词失败，请检查网络连接",
+                            searchError = err.message ?: s(R.string.err_lyrics_search_fail),
                         )
                     }
                 }
@@ -231,7 +238,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val doc = app.lyricsRepo.applyOnlineCandidate(track, candidate)
             if (doc != null && _lyrics.value.trackPath == track.path) {
                 _lyrics.update { it.copy(document = doc, isLoading = false) }
-                onDone("已应用在线歌词（${if (doc.isSynced) "同步" else "纯文本"}）")
+                val modeTag = s(if (doc.isSynced) R.string.lyrics_tag_synced else R.string.lyrics_tag_plain)
+                onDone(s(R.string.toast_lyrics_applied, modeTag))
             }
         }
     }
@@ -241,9 +249,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val doc = app.lyricsRepo.importLocalLrc(track, uri)
             if (doc != null && _lyrics.value.trackPath == track.path) {
                 _lyrics.update { it.copy(document = doc, isLoading = false) }
-                onDone("已导入本地歌词（${doc.lines.size} 句）")
+                onDone(s(R.string.toast_lyrics_imported, doc.lines.size))
             } else {
-                onDone("无法解析所选歌词文件")
+                onDone(s(R.string.err_lyrics_parse_fail))
             }
         }
     }
@@ -277,14 +285,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (_lyrics.value.trackPath == track.path) {
                 _lyrics.update { it.copy(document = doc, isLoading = false) }
             }
-            onDone("已恢复自动匹配歌词")
+            onDone(s(R.string.toast_lyrics_restored))
         }
     }
 
     fun playTracks(
         queue: List<TrackEntity>,
         startIndex: Int,
-        contextLabel: String = "音乐库",
+        contextLabel: String = s(R.string.lib_title),
         startPositionMs: Long = 0L,
     ) {
         if (queue.isEmpty()) return
@@ -309,7 +317,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val idx = allTracks.indexOfFirst { it.path == lastPath }
         if (idx < 0) return
         val pos = settings.value.lastPositionMs
-        playTracks(allTracks, idx, contextLabel = "继续聆听", startPositionMs = pos)
+        playTracks(allTracks, idx, contextLabel = s(R.string.lib_continue_listening), startPositionMs = pos)
     }
 
     fun togglePlayPause() {

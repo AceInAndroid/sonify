@@ -19,8 +19,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.sonify.player.R
 import com.sonify.player.ui.theme.CoverArtSupport
 import com.sonify.player.ui.theme.LocalHiFiColors
 
@@ -60,7 +62,7 @@ fun PlaylistCoverArt(
             customModel != null -> {
                 AsyncImage(
                     model = customModel,
-                    contentDescription = "歌单自定义封面",
+                    contentDescription = stringResource(R.string.playlist_cover_custom_desc),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -90,7 +92,7 @@ fun PlaylistCoverArt(
             resolvedAutos.isNotEmpty() -> {
                 AsyncImage(
                     model = resolvedAutos.first(),
-                    contentDescription = "歌单封面",
+                    contentDescription = stringResource(R.string.playlist_cover_desc),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )

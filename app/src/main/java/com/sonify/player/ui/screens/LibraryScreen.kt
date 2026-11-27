@@ -1,6 +1,7 @@
 package com.sonify.player.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -67,6 +68,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,6 +77,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.sonify.player.R
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.DownloadedTrackEntity
 import com.sonify.player.data.SubsonicServerEntity
@@ -100,14 +104,14 @@ import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.ui.theme.formatDuration
 import java.io.File
 
-enum class LibraryFilter(val label: String) {
-    SONGS("歌曲"),
-    PLAYLISTS("歌单"),
-    ALBUMS("专辑"),
-    ARTISTS("艺术家"),
-    FOLDERS("文件夹"),
-    FAVORITES("已收藏"),
-    DOWNLOADS("已下载"),
+enum class LibraryFilter(@StringRes val labelRes: Int) {
+    SONGS(R.string.lib_filter_songs),
+    PLAYLISTS(R.string.lib_filter_playlists),
+    ALBUMS(R.string.lib_filter_albums),
+    ARTISTS(R.string.lib_filter_artists),
+    FOLDERS(R.string.lib_filter_folders),
+    FAVORITES(R.string.lib_filter_favorites),
+    DOWNLOADS(R.string.lib_filter_downloads),
 }
 
 private data class DrillDownGroup(
@@ -169,6 +173,7 @@ fun LibraryScreen(
     bottomPadding: Dp,
 ) {
     val colors = LocalHiFiColors.current
+    val ctx = LocalContext.current
     val filter = selectedFilter
     var drillGroup by remember { mutableStateOf<DrillDownGroup?>(null) }
     var localSearchActive by remember { mutableStateOf(false) }
@@ -279,7 +284,7 @@ fun LibraryScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = selectedSubsonicServer?.name ?: "音乐库",
+                        text = selectedSubsonicServer?.name ?: stringResource(R.string.lib_title),
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = colors.textPrimary,
@@ -293,7 +298,7 @@ fun LibraryScreen(
                             Box {
                                 Icon(
                                     imageVector = Icons.Rounded.Download,
-                                    contentDescription = "下载管理",
+                                    contentDescription = stringResource(R.string.lib_action_downloads),
                                     tint = if (downloadQueue.activeCount > 0) colors.exclusiveGreen else colors.textPrimary,
                                 )
                                 if (downloadQueue.activeCount > 0) {
@@ -313,21 +318,21 @@ fun LibraryScreen(
                         IconButton(onClick = onOpenGlobalSearch) {
                             Icon(
                                 imageVector = Icons.Rounded.Search,
-                                contentDescription = "全局搜索",
+                                contentDescription = stringResource(R.string.lib_action_global_search),
                                 tint = colors.textPrimary,
                             )
                         }
                         IconButton(onClick = onSubsonicRefresh) {
-                            Icon(Icons.Rounded.Refresh, contentDescription = "刷新远程曲库", tint = colors.textPrimary)
+                            Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.lib_action_refresh_remote), tint = colors.textPrimary)
                         }
                         IconButton(onClick = { onOpenSubsonicAccounts(false) }) {
-                            Icon(Icons.Rounded.Cloud, contentDescription = "管理 Subsonic 账号", tint = colors.exclusiveGreen)
+                            Icon(Icons.Rounded.Cloud, contentDescription = stringResource(R.string.lib_action_manage_subsonic), tint = colors.exclusiveGreen)
                         }
                     } else {
                         IconButton(onClick = onOpenGlobalSearch) {
                             Icon(
                                 imageVector = Icons.Rounded.Search,
-                                contentDescription = "全局搜索",
+                                contentDescription = stringResource(R.string.lib_action_global_search),
                                 tint = colors.textPrimary,
                             )
                         }
@@ -340,12 +345,14 @@ fun LibraryScreen(
                         ) {
                             Icon(
                                 imageVector = if (scanState.isScanning) Icons.Rounded.Close else Icons.Rounded.Refresh,
-                                contentDescription = if (scanState.isScanning) "取消扫描" else "扫描本地音乐",
+                                contentDescription = stringResource(
+                                    if (scanState.isScanning) R.string.lib_action_cancel_scan else R.string.lib_action_scan_local
+                                ),
                                 tint = if (scanState.isScanning) colors.accent else colors.textPrimary,
                             )
                         }
                         IconButton(onClick = onImportFiles) {
-                            Icon(Icons.Rounded.Add, contentDescription = "导入音频文件", tint = colors.textPrimary)
+                            Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.lib_action_import_audio), tint = colors.textPrimary)
                         }
                     }
                 }
@@ -378,7 +385,7 @@ fun LibraryScreen(
                             )
                             Spacer(Modifier.width(5.dp))
                             Text(
-                                text = "本地音乐",
+                                text = stringResource(R.string.lib_source_local),
                                 fontSize = 12.sp,
                                 fontWeight = if (localSelected) FontWeight.SemiBold else FontWeight.Normal,
                                 color = if (localSelected) colors.textPrimary else colors.textSecondary,
@@ -437,7 +444,9 @@ fun LibraryScreen(
                             )
                             Spacer(Modifier.width(4.dp))
                             Text(
-                                text = if (subsonicServers.isEmpty()) "登录 Subsonic" else "管理账号",
+                                text = stringResource(
+                                    if (subsonicServers.isEmpty()) R.string.lib_login_subsonic else R.string.lib_manage_accounts
+                                ),
                                 fontSize = 12.sp,
                                 color = colors.textSecondary,
                             )
@@ -484,12 +493,12 @@ fun LibraryScreen(
                 OutlinedTextField(
                     value = localSearchQuery,
                     onValueChange = { localSearchQuery = it },
-                    placeholder = { Text("搜索本地歌曲、歌单、专辑、艺人…", fontSize = 13.sp) },
+                    placeholder = { Text(stringResource(R.string.lib_search_local_hint), fontSize = 13.sp) },
                     leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = colors.textSecondary) },
                     trailingIcon = if (localSearchQuery.isNotEmpty()) {
                         {
                             IconButton(onClick = { localSearchQuery = "" }) {
-                                Icon(Icons.Rounded.Close, contentDescription = "清空", tint = colors.textSecondary)
+                                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_clear), tint = colors.textSecondary)
                             }
                         }
                     } else null,
@@ -522,7 +531,7 @@ fun LibraryScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            text = "正在扫描 ${scanState.scanned}/${scanState.total}",
+                            text = stringResource(R.string.lib_scanning_progress, scanState.scanned, scanState.total),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = colors.accent,
@@ -571,7 +580,7 @@ fun LibraryScreen(
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("继续上次播放", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = colors.accent)
+                        Text(stringResource(R.string.lib_resume_last), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = colors.accent)
                         Text(
                             text = lastTrack.title,
                             fontSize = 14.sp,
@@ -596,7 +605,7 @@ fun LibraryScreen(
                             .background(colors.textPrimary),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Rounded.PlayArrow, contentDescription = "继续播放", tint = Color.Black, modifier = Modifier.size(22.dp))
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = stringResource(R.string.lib_resume_play), tint = Color.Black, modifier = Modifier.size(22.dp))
                     }
                 }
             }
@@ -617,7 +626,7 @@ fun LibraryScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = item.label,
+                            text = stringResource(item.labelRes),
                             fontSize = 13.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                             color = if (selected) colors.onAccent else colors.textPrimary,
@@ -650,22 +659,30 @@ fun LibraryScreen(
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Row(
                                     modifier = Modifier
+                                        .weight(1f, fill = false)
                                         .clip(RoundedCornerShape(999.dp))
                                         .background(colors.surface2)
                                         .clickable { showLocalSortSheet = true }
-                                        .padding(horizontal = 11.dp, vertical = 6.dp),
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(14.dp))
                                     Spacer(Modifier.width(4.dp))
                                     val arrow = if (localSortAsc) "↑" else "↓"
-                                    Text("${localSortField.label} $arrow · ${sortedLocalSongs.size}", fontSize = 12.sp, color = colors.textPrimary)
+                                    Text(
+                                        text = "${stringResource(localSortField.labelRes)} $arrow · ${sortedLocalSongs.size}",
+                                        fontSize = 12.sp,
+                                        color = colors.textPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Spacer(Modifier.weight(0.01f))
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(999.dp))
@@ -674,24 +691,24 @@ fun LibraryScreen(
                                                 multiSelect = !multiSelect
                                                 if (!multiSelect) selectedPaths.clear()
                                             }
-                                            .padding(horizontal = 11.dp, vertical = 6.dp),
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Icon(Icons.Rounded.Checklist, contentDescription = null, tint = if (multiSelect) colors.accent else colors.textSecondary, modifier = Modifier.size(15.dp))
                                         Spacer(Modifier.width(4.dp))
-                                        Text("多选", fontSize = 12.sp, color = colors.textPrimary)
+                                        Text(stringResource(R.string.common_multi_select), fontSize = 12.sp, color = colors.textPrimary, maxLines = 1, softWrap = false)
                                     }
                                     Row(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(999.dp))
                                             .background(colors.surface2)
-                                            .clickable { onShufflePlay(sortedLocalSongs, "全部随机") }
-                                            .padding(horizontal = 11.dp, vertical = 6.dp),
+                                            .clickable { onShufflePlay(sortedLocalSongs, ctx.getString(R.string.lib_shuffle_all)) }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     ) {
                                         Icon(Icons.Rounded.Shuffle, contentDescription = null, tint = colors.accent, modifier = Modifier.size(15.dp))
-                                        Text("随机", fontSize = 12.sp, color = colors.textPrimary)
+                                        Text(stringResource(R.string.common_shuffle), fontSize = 12.sp, color = colors.textPrimary, maxLines = 1, softWrap = false)
                                     }
                                 }
                             }
@@ -707,7 +724,7 @@ fun LibraryScreen(
                                     if (multiSelect) {
                                         if (isSel) selectedPaths.remove(track.path) else selectedPaths.add(track.path)
                                     } else {
-                                        onPlayTracks(sortedLocalSongs, idx, "全部歌曲")
+                                        onPlayTracks(sortedLocalSongs, idx, ctx.getString(R.string.lib_all_songs))
                                     }
                                 },
                                 onLongClick = {
@@ -749,7 +766,7 @@ fun LibraryScreen(
                                 ) {
                                     Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(14.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("${playlistListSort.label} · ${sortedPlaylists.size}", fontSize = 12.sp, color = colors.textPrimary)
+                                    Text("${stringResource(playlistListSort.labelRes)} · ${sortedPlaylists.size}", fontSize = 12.sp, color = colors.textPrimary)
                                 }
                                 Row(
                                     modifier = Modifier
@@ -761,7 +778,7 @@ fun LibraryScreen(
                                 ) {
                                     Icon(Icons.Rounded.Add, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("新建歌单", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                                    Text(stringResource(R.string.lib_new_playlist), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
                                 }
                             }
                         }
@@ -776,10 +793,10 @@ fun LibraryScreen(
                                 ) {
                                     Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = colors.accent.copy(alpha = 0.7f), modifier = Modifier.size(46.dp))
                                     Spacer(Modifier.height(12.dp))
-                                    Text("还没有自建歌单", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                                    Text(stringResource(R.string.lib_empty_playlists_title), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
                                     Spacer(Modifier.height(6.dp))
                                     Text(
-                                        text = "支持混收本地无损与 Subsonic 曲目，自动拼出 2×2 专辑四宫格封面或自选相册封面",
+                                        text = stringResource(R.string.lib_empty_playlists_desc),
                                         fontSize = 12.sp,
                                         color = colors.textSecondary,
                                     )
@@ -791,7 +808,7 @@ fun LibraryScreen(
                                             .clickable { onOpenCreatePlaylist(false) }
                                             .padding(horizontal = 24.dp, vertical = 10.dp)
                                     ) {
-                                        Text("立即新建歌单", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                                        Text(stringResource(R.string.lib_create_playlist_now), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
                                     }
                                 }
                             }
@@ -822,9 +839,11 @@ fun LibraryScreen(
                                         )
                                         Spacer(Modifier.height(2.dp))
                                         val mins = (summary.totalDurationMs / 60_000L).coerceAtLeast(0L)
+                                        val countStr = stringResource(R.string.common_tracks_count, summary.trackCount)
+                                        val minsStr = if (mins > 0) stringResource(R.string.common_approx_mins, mins) else ""
                                         val sub = buildString {
-                                            append("${summary.trackCount} 首歌曲")
-                                            if (mins > 0) append(" · 约 $mins 分钟")
+                                            append(countStr)
+                                            if (minsStr.isNotEmpty()) append(minsStr)
                                             if (summary.playlist.description.isNotBlank()) append(" · ${summary.playlist.description}")
                                         }
                                         Text(
@@ -844,7 +863,7 @@ fun LibraryScreen(
                                                     .background(colors.surface2),
                                                 contentAlignment = Alignment.Center,
                                             ) {
-                                                Icon(Icons.Rounded.PlayArrow, contentDescription = "播放歌单", tint = colors.accent, modifier = Modifier.size(20.dp))
+                                                Icon(Icons.Rounded.PlayArrow, contentDescription = stringResource(R.string.lib_play_playlist), tint = colors.accent, modifier = Modifier.size(20.dp))
                                             }
                                         }
                                     }
@@ -906,7 +925,7 @@ fun LibraryScreen(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
-                                    text = "${group.subtitle} · ${group.tracks.size} 首",
+                                    text = stringResource(R.string.lib_album_meta, group.subtitle, group.tracks.size),
                                     fontSize = 12.sp,
                                     color = colors.textSecondary,
                                     maxLines = 1,
@@ -918,14 +937,14 @@ fun LibraryScreen(
                 }
 
                 LibraryFilter.ARTISTS -> {
-                    val artists = remember(filteredLocalTracks) {
+                    val artists = remember(filteredLocalTracks, ctx) {
                         filteredLocalTracks.groupBy { it.artist }
                             .entries
                             .sortedBy { it.key.lowercase() }
                             .map { (artist, list) ->
                                 DrillDownGroup(
                                     title = artist,
-                                    subtitle = "${list.map { it.album }.distinct().size} 张专辑 · ${list.size} 首",
+                                    subtitle = ctx.getString(R.string.lib_artist_meta, list.map { it.album }.distinct().size, list.size),
                                     coverPath = list.firstNotNullOfOrNull { it.coverPath },
                                     tracks = list,
                                 )
@@ -980,7 +999,7 @@ fun LibraryScreen(
                 }
 
                 LibraryFilter.FOLDERS -> {
-                    val folders = remember(filteredLocalTracks) {
+                    val folders = remember(filteredLocalTracks, ctx) {
                         filteredLocalTracks.groupBy { it.folderPath }
                             .entries
                             .sortedBy { it.key.lowercase() }
@@ -988,7 +1007,7 @@ fun LibraryScreen(
                                 val shortName = File(folder).name.ifBlank { folder }
                                 DrillDownGroup(
                                     title = shortName,
-                                    subtitle = "$folder · ${list.size} 首",
+                                    subtitle = ctx.getString(R.string.lib_folder_meta, folder, list.size),
                                     coverPath = list.firstNotNullOfOrNull { it.coverPath },
                                     tracks = list,
                                 )
@@ -1045,7 +1064,7 @@ fun LibraryScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Rounded.Favorite, contentDescription = null, tint = colors.textMuted, modifier = Modifier.size(42.dp))
                                 Spacer(Modifier.height(10.dp))
-                                Text("还没有收藏的本地歌曲", fontSize = 14.sp, color = colors.textSecondary)
+                                Text(stringResource(R.string.lib_empty_favorites), fontSize = 14.sp, color = colors.textSecondary)
                             }
                         }
                     } else {
@@ -1061,7 +1080,7 @@ fun LibraryScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
-                                    Text("共收藏 ${favoriteTracks.size} 首", fontSize = 12.sp, color = colors.textSecondary)
+                                    Text(stringResource(R.string.lib_favorites_count, favoriteTracks.size), fontSize = 12.sp, color = colors.textSecondary)
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Row(
                                             modifier = Modifier
@@ -1076,19 +1095,19 @@ fun LibraryScreen(
                                         ) {
                                             Icon(Icons.Rounded.Checklist, contentDescription = null, tint = if (multiSelect) colors.accent else colors.textSecondary, modifier = Modifier.size(15.dp))
                                             Spacer(Modifier.width(4.dp))
-                                            Text("多选", fontSize = 12.sp, color = colors.textPrimary)
+                                            Text(stringResource(R.string.common_multi_select), fontSize = 12.sp, color = colors.textPrimary)
                                         }
                                         Row(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(999.dp))
                                                 .background(colors.accent)
-                                                .clickable { onPlayTracks(favoriteTracks, 0, "已收藏") }
+                                                .clickable { onPlayTracks(favoriteTracks, 0, ctx.getString(R.string.lib_filter_favorites)) }
                                                 .padding(horizontal = 12.dp, vertical = 6.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(16.dp))
                                             Spacer(Modifier.width(3.dp))
-                                            Text("播放全部", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                                            Text(stringResource(R.string.common_play_all), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
                                         }
                                     }
                                 }
@@ -1104,7 +1123,7 @@ fun LibraryScreen(
                                         if (multiSelect) {
                                             if (isSel) selectedPaths.remove(track.path) else selectedPaths.add(track.path)
                                         } else {
-                                            onPlayTracks(favoriteTracks, idx, "已收藏")
+                                            onPlayTracks(favoriteTracks, idx, ctx.getString(R.string.lib_filter_favorites))
                                         }
                                     },
                                     onLongClick = {
@@ -1138,10 +1157,10 @@ fun LibraryScreen(
                         ) {
                             Icon(Icons.Rounded.Download, contentDescription = null, tint = colors.exclusiveGreen.copy(alpha = 0.7f), modifier = Modifier.size(46.dp))
                             Spacer(Modifier.height(12.dp))
-                            Text("还没有离线下载的歌曲", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                            Text(stringResource(R.string.lib_empty_downloads_title), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                text = "在 Subsonic 曲库点击单曲下载、歌单下载或专辑下载后，离线原盘无损文件将显示在这里，断网亦可 Bit-Perfect 直通播放",
+                                text = stringResource(R.string.lib_empty_downloads_desc),
                                 fontSize = 12.sp,
                                 color = colors.textSecondary,
                             )
@@ -1154,7 +1173,7 @@ fun LibraryScreen(
                                         .clickable { onOpenDownloadManager() }
                                         .padding(horizontal = 18.dp, vertical = 9.dp)
                                 ) {
-                                    Text("查看下载中（${downloadQueue.activeCount}）", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                                    Text(stringResource(R.string.lib_view_active_downloads, downloadQueue.activeCount), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
                                 }
                             }
                         }
@@ -1171,7 +1190,7 @@ fun LibraryScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
-                                    Text("已离线 ${downloadedTracks.size} 首 · $sizeLabel", fontSize = 12.sp, color = colors.exclusiveGreen)
+                                    Text(stringResource(R.string.lib_offline_summary, downloadedTracks.size, sizeLabel), fontSize = 12.sp, color = colors.exclusiveGreen)
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Row(
                                             modifier = Modifier
@@ -1181,19 +1200,19 @@ fun LibraryScreen(
                                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
-                                            Text("管理", fontSize = 12.sp, color = colors.textPrimary)
+                                            Text(stringResource(R.string.common_manage), fontSize = 12.sp, color = colors.textPrimary)
                                         }
                                         Row(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(999.dp))
                                                 .background(colors.accent)
-                                                .clickable { onPlayTracks(downloadedTracks, 0, "离线下载") }
+                                                .clickable { onPlayTracks(downloadedTracks, 0, ctx.getString(R.string.lib_offline_downloads_label)) }
                                                 .padding(horizontal = 12.dp, vertical = 6.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(16.dp))
                                             Spacer(Modifier.width(3.dp))
-                                            Text("播放", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                                            Text(stringResource(R.string.common_play), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
                                         }
                                     }
                                 }
@@ -1210,7 +1229,7 @@ fun LibraryScreen(
                                         if (multiSelect) {
                                             if (isSel) selectedPaths.remove(track.path) else selectedPaths.add(track.path)
                                         } else {
-                                            onPlayTracks(downloadedTracks, idx, "离线下载")
+                                            onPlayTracks(downloadedTracks, idx, ctx.getString(R.string.lib_offline_downloads_label))
                                         }
                                     },
                                     onLongClick = {
@@ -1270,7 +1289,7 @@ fun LibraryScreen(
 
     if (showLocalSortSheet) {
         TrackSortSheet(
-            title = "歌曲列表排序",
+            title = stringResource(R.string.lib_sort_songs_title),
             fields = listOf(
                 TrackSortField.TITLE,
                 TrackSortField.ALBUM,
@@ -1330,7 +1349,7 @@ private fun GroupDetailScreen(
                             },
                             modifier = Modifier.size(36.dp),
                         ) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = colors.textPrimary)
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = colors.textPrimary)
                         }
                         IconButton(
                             onClick = {
@@ -1340,7 +1359,7 @@ private fun GroupDetailScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Checklist,
-                                contentDescription = "批量加入歌单",
+                                contentDescription = stringResource(R.string.lib_batch_add_to_playlist),
                                 tint = if (multiSelect) colors.accent else colors.textPrimary,
                             )
                         }
@@ -1382,7 +1401,7 @@ private fun GroupDetailScreen(
                                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                                 ) {
                                     Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(18.dp))
-                                    Text("播放", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                                    Text(stringResource(R.string.common_play), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
                                 }
                                 Row(
                                     modifier = Modifier
@@ -1394,7 +1413,7 @@ private fun GroupDetailScreen(
                                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                                 ) {
                                     Icon(Icons.Rounded.Shuffle, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(17.dp))
-                                    Text("随机", fontSize = 13.sp, color = colors.textPrimary)
+                                    Text(stringResource(R.string.common_shuffle), fontSize = 13.sp, color = colors.textPrimary)
                                 }
                             }
                         }
@@ -1521,7 +1540,7 @@ fun TrackRowItem(
                 if (isDownloaded) {
                     Icon(
                         imageVector = Icons.Rounded.DownloadDone,
-                        contentDescription = "已离线下载",
+                        contentDescription = stringResource(R.string.common_downloaded_full),
                         tint = colors.exclusiveGreen,
                         modifier = Modifier
                             .padding(end = 4.dp)
@@ -1569,7 +1588,7 @@ fun TrackRowItem(
             IconButton(onClick = onMoreClick, modifier = Modifier.size(34.dp)) {
                 Icon(
                     imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = "更多操作",
+                    contentDescription = stringResource(R.string.common_more_actions),
                     tint = colors.textSecondary,
                     modifier = Modifier.size(18.dp),
                 )
@@ -1595,7 +1614,7 @@ fun CoverSquare(
         if (model != null) {
             AsyncImage(
                 model = model,
-                contentDescription = "封面",
+                contentDescription = stringResource(R.string.common_cover),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -1633,11 +1652,10 @@ private fun EmptyLibraryView(
             modifier = Modifier.size(56.dp),
         )
         Spacer(Modifier.height(14.dp))
-        Text("还没有本地无损音乐", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+        Text(stringResource(R.string.lib_empty_local_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
         Spacer(Modifier.height(6.dp))
         Text(
-            text = if (!hasPermission) "授予存储读取权限后，即可一键扫描 /sdcard/Music 中的 FLAC / WAV 无损专辑。"
-            else "点击下方按钮扫描本地目录，或直接从系统文件管理器导入歌曲。",
+            text = stringResource(if (!hasPermission) R.string.lib_empty_local_perm_desc else R.string.lib_empty_local_scan_desc),
             fontSize = 13.sp,
             color = colors.textSecondary,
         )
@@ -1654,7 +1672,7 @@ private fun EmptyLibraryView(
                 .padding(horizontal = 28.dp, vertical = 12.dp)
         ) {
             Text(
-                text = if (!hasPermission) "授予权限并扫描" else "扫描本地音乐",
+                text = stringResource(if (!hasPermission) R.string.lib_grant_and_scan else R.string.lib_action_scan_local),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.onAccent,
@@ -1662,7 +1680,7 @@ private fun EmptyLibraryView(
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "或通过文件选择器导入",
+            text = stringResource(R.string.lib_import_via_picker),
             fontSize = 13.sp,
             color = colors.textSecondary,
             modifier = Modifier

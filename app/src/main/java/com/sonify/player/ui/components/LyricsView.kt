@@ -87,6 +87,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -94,6 +95,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.LyricsAlignment
 import com.sonify.player.data.TrackEntity
@@ -312,7 +314,7 @@ fun LyricsOverlayView(
                             if (doc != null) {
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = doc.source.label,
+                                    text = stringResource(doc.source.labelRes),
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
                                     color = colors.accent,
@@ -336,7 +338,7 @@ fun LyricsOverlayView(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Fullscreen,
-                                contentDescription = "纯享歌词",
+                                contentDescription = stringResource(R.string.lyrics_zen_badge),
                                 tint = Color.White.copy(alpha = 0.78f),
                                 modifier = Modifier.size(20.dp),
                             )
@@ -353,7 +355,7 @@ fun LyricsOverlayView(
                     ) {
                         Icon(Icons.Rounded.Album, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("黑胶", fontSize = 12.sp, color = colors.textPrimary, fontWeight = FontWeight.Medium)
+                        Text(stringResource(R.string.lyrics_vinyl_btn), fontSize = 12.sp, color = colors.textPrimary, fontWeight = FontWeight.Medium)
                     }
                 }
             }
@@ -385,7 +387,7 @@ fun LyricsOverlayView(
                         ) {
                             CircularProgressIndicator(color = colors.accent, strokeWidth = 2.5.dp, modifier = Modifier.size(28.dp))
                             Spacer(Modifier.height(12.dp))
-                            Text("正在查找匹配歌词…", fontSize = 13.sp, color = colors.textSecondary)
+                            Text(stringResource(R.string.lyrics_searching), fontSize = 13.sp, color = colors.textSecondary)
                         }
                     }
 
@@ -404,14 +406,14 @@ fun LyricsOverlayView(
                             )
                             Spacer(Modifier.height(14.dp))
                             Text(
-                                text = "暂未找到歌词",
+                                text = stringResource(R.string.lyrics_empty_title),
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = colors.textPrimary,
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                text = "可在线检索免费开源歌词库（LRCLIB），或直接导入本地 .lrc 歌词文件",
+                                text = stringResource(R.string.lyrics_empty_desc),
                                 fontSize = 13.sp,
                                 color = Color.White.copy(alpha = 0.72f),
                                 textAlign = TextAlign.Center,
@@ -428,7 +430,7 @@ fun LyricsOverlayView(
                                 ) {
                                     Icon(Icons.Rounded.Search, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(17.dp))
                                     Spacer(Modifier.width(6.dp))
-                                    Text("在线搜词", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                                    Text(stringResource(R.string.lyrics_search_online), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
                                 }
                                 Row(
                                     modifier = Modifier
@@ -440,7 +442,7 @@ fun LyricsOverlayView(
                                 ) {
                                     Icon(Icons.Rounded.FileOpen, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(6.dp))
-                                    Text("导入 .lrc", fontSize = 13.sp, color = colors.textPrimary)
+                                    Text(stringResource(R.string.lyrics_import_lrc), fontSize = 13.sp, color = colors.textPrimary)
                                 }
                             }
                         }
@@ -483,9 +485,9 @@ fun LyricsOverlayView(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                     ) {
-                                        Text("纯文本歌词（无时间轴）", fontSize = 11.sp, color = colors.textSecondary)
+                                        Text(stringResource(R.string.lyrics_plain_notice), fontSize = 11.sp, color = colors.textSecondary)
                                         Text(
-                                            text = "搜同步词",
+                                            text = stringResource(R.string.lyrics_find_synced),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = colors.accent,
@@ -643,7 +645,7 @@ fun LyricsOverlayView(
                             ) {
                                 Icon(Icons.Rounded.MyLocation, contentDescription = null, tint = colors.accent, modifier = Modifier.size(15.dp))
                                 Spacer(Modifier.width(5.dp))
-                                Text("回到当前句", fontSize = 12.sp, color = colors.textPrimary, fontWeight = FontWeight.Medium)
+                                Text(stringResource(R.string.lyrics_back_to_active), fontSize = 12.sp, color = colors.textPrimary, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
@@ -698,7 +700,7 @@ fun LyricsOverlayView(
                     ) {
                         if (doc != null && doc.isSynced) {
                             val offsetActive = showOffsetPanel || doc.offsetMs != 0L
-                            val offsetLabel = if (doc.offsetMs == 0L) "偏移"
+                            val offsetLabel = if (doc.offsetMs == 0L) stringResource(R.string.lyrics_offset)
                             else "${if (doc.offsetMs > 0) "+" else ""}${"%.1f".format(doc.offsetMs / 1000.0)}s"
                             ToolPill(
                                 icon = Icons.Rounded.Timer,
@@ -713,7 +715,7 @@ fun LyricsOverlayView(
                         }
                         ToolPill(
                             icon = Icons.Rounded.FormatSize,
-                            label = "样式",
+                            label = stringResource(R.string.lyrics_style),
                             active = showStylePanel,
                             onClick = {
                                 wakeControls()
@@ -723,7 +725,7 @@ fun LyricsOverlayView(
                         )
                         ToolPill(
                             icon = Icons.Rounded.Search,
-                            label = "搜词",
+                            label = stringResource(R.string.lyrics_find),
                             active = false,
                             onClick = {
                                 wakeControls()
@@ -769,7 +771,7 @@ fun LyricsOverlayView(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = { wakeControls(); onSkipPrev() }) {
-                        Icon(Icons.Rounded.SkipPrevious, contentDescription = "上一曲", tint = colors.textPrimary, modifier = Modifier.size(30.dp))
+                        Icon(Icons.Rounded.SkipPrevious, contentDescription = stringResource(R.string.player_prev), tint = colors.textPrimary, modifier = Modifier.size(30.dp))
                     }
                     Box(
                         modifier = Modifier
@@ -781,13 +783,13 @@ fun LyricsOverlayView(
                     ) {
                         Icon(
                             imageVector = if (playback.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = if (playback.isPlaying) "暂停" else "播放",
+                            contentDescription = stringResource(if (playback.isPlaying) R.string.common_pause else R.string.common_play),
                             tint = Color.Black,
                             modifier = Modifier.size(30.dp),
                         )
                     }
                     IconButton(onClick = { wakeControls(); onSkipNext() }) {
-                        Icon(Icons.Rounded.SkipNext, contentDescription = "下一曲", tint = colors.textPrimary, modifier = Modifier.size(30.dp))
+                        Icon(Icons.Rounded.SkipNext, contentDescription = stringResource(R.string.player_next), tint = colors.textPrimary, modifier = Modifier.size(30.dp))
                     }
                 }
             }
@@ -903,8 +905,9 @@ fun LyricsSearchSheet(
 ) {
     val colors = LocalHiFiColors.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val defaultQuery = remember(track.path) {
-        listOf(track.title, track.artist.takeIf { it != "未知艺术家" }.orEmpty())
+    val unknownArtist = stringResource(R.string.common_unknown_artist)
+    val defaultQuery = remember(track.path, unknownArtist) {
+        listOf(track.title, track.artist.takeIf { !it.equals(unknownArtist, ignoreCase = true) }.orEmpty())
             .filter { it.isNotBlank() }
             .joinToString(" ")
     }
@@ -934,11 +937,11 @@ fun LyricsSearchSheet(
                 Icon(Icons.Rounded.Lyrics, contentDescription = null, tint = colors.accent, modifier = Modifier.size(21.dp))
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("搜索与更换歌词", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
-                    Text("数据源：LRCLIB 开源同步歌词库 / 本地 .lrc", fontSize = 11.sp, color = colors.textSecondary)
+                    Text(stringResource(R.string.lyrics_sheet_search_title), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                    Text(stringResource(R.string.lyrics_sheet_search_sub), fontSize = 11.sp, color = colors.textSecondary)
                 }
                 TextButton(onClick = onImportLocalLrc) {
-                    Text("导入 .lrc", color = colors.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.lyrics_import_lrc), color = colors.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -952,12 +955,12 @@ fun LyricsSearchSheet(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("输入歌名 / 艺人关键词…", fontSize = 13.sp) },
+                    placeholder = { Text(stringResource(R.string.lyrics_search_hint), fontSize = 13.sp) },
                     singleLine = true,
                     trailingIcon = if (query.isNotEmpty()) {
                         {
                             IconButton(onClick = { query = "" }) {
-                                Icon(Icons.Rounded.Close, contentDescription = "清空", tint = colors.textSecondary)
+                                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_clear), tint = colors.textSecondary)
                             }
                         }
                     } else null,
@@ -977,7 +980,7 @@ fun LyricsSearchSheet(
                         .clickable { onSearch(query) }
                         .padding(horizontal = 14.dp, vertical = 14.dp),
                 ) {
-                    Text("搜索", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                    Text(stringResource(R.string.common_search), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
                 }
             }
 
@@ -1007,7 +1010,7 @@ fun LyricsSearchSheet(
                         TextButton(onClick = { onSearch(query) }) {
                             Icon(Icons.Rounded.Refresh, contentDescription = null, tint = colors.accent, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("重试", color = colors.accent)
+                            Text(stringResource(R.string.common_retry), color = colors.accent)
                         }
                     }
                 }
@@ -1019,7 +1022,7 @@ fun LyricsSearchSheet(
                             .height(160.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("未搜到匹配候选，可尝试精简关键词或导入本地 .lrc", fontSize = 12.sp, color = colors.textSecondary)
+                        Text(stringResource(R.string.lyrics_no_candidates), fontSize = 12.sp, color = colors.textSecondary)
                     }
                 }
 
@@ -1059,7 +1062,7 @@ fun LyricsSearchSheet(
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = if (cand.hasSynced) "同步" else "纯文本",
+                                        text = stringResource(if (cand.hasSynced) R.string.lyrics_tag_synced else R.string.lyrics_tag_plain),
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (cand.hasSynced) colors.exclusiveGreen else colors.textSecondary,
@@ -1095,10 +1098,10 @@ fun LyricsSearchSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 TextButton(onClick = onRestoreAuto) {
-                    Text("恢复自动匹配", fontSize = 12.sp, color = colors.textSecondary)
+                    Text(stringResource(R.string.lyrics_restore_auto), fontSize = 12.sp, color = colors.textSecondary)
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("关闭", fontSize = 12.sp, color = colors.textPrimary)
+                    Text(stringResource(R.string.common_close), fontSize = 12.sp, color = colors.textPrimary)
                 }
             }
         }

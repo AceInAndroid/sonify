@@ -157,3 +157,15 @@
 | `TC-FRC-02` | P0 | 线上真实普通更新 + 强制更新全链路真机验收 | 线上 `https://sonify.zhangbing.tech` 临时发布高版本 `v0.2.1 (code=3)` | 1. 普通更新态点击检查更新 → 验证可取消/跳过、下载与 SHA-256 校验<br>2. 通过 `/admin` 切换 `forceUpdate=true` → 冷启真机 → 验证启动即弹红色「重要版本升级（必须更新）」→ 按返回键与点外部均无法关闭、无「稍后/跳过」按钮 → 下载与校验态同样锁定强制状态并可调起安装器 | 普通更新与强制更新全链路闭环无漏洞，无崩溃/ANR；收尾恢复线上 `latest.json` | 线上真实域名 + `3917JR` 真机 + 截图 |
 | `TC-UPD-05` | P0 | 更新内容展示、内置版本更新日志弹窗与 GitHub 跳转链接 | 真机已安装最新版 `v0.2.0` | 1. 进入设置 → 点击「检查应用更新」（`UpToDate` 态）<br>2. 验证展示当前版本号、发布日期、「当前版本更新内容」及「更新日志 / 发布页 / GitHub」快捷链接<br>3. 点击「版本更新日志」验证应用内展示 `v0.2.0` / `v0.1.0` 完整时间线与「GitHub 发布页」按钮<br>4. 验证新版本弹窗（`Available` 态）展示「本次更新内容」、日期与 GitHub 跳转芯片 | 更新内容、历史日志与 GitHub 仓库/发布页外链均排版清晰、可正常触发外部浏览器 Intent，零裁切零崩溃 | `3917JR` 真机 + 截图 |
 | `TC-UPD-06` | P1 | 禁止商用开源协议一致性核验 | 仓库根目录 `LICENSE`、`CHANGELOG.md`、`README.md`、`README_ZH.md` 及设置页底部 | 检查各处协议条款与 UI 文案 | 明确声明 `Sonify Non-Commercial v1.0`（仅限个人非商用，严禁未经授权商业用途），同时保留 `third_party/libusb/` 的 `LGPL-2.1` 声明 | 文件核对 + 真机设置页截图 |
+
+---
+
+## 模块 L：多语言国际化（i18n）与语言热切换（中英双语）
+
+| 用例 ID | 优先级 | 测试场景 | 前置条件 | 操作步骤 | 预期结果 | 验证方式 |
+|---|---|---|---|---|---|---|
+| `TC-I18N-01` | P0 | 资源 Key 与占位符一致性门禁 | 仓库已生成 `values/strings.xml` 与 `values-zh/strings.xml` | 运行 `python3 scripts/check_i18n.py --strict --scan-hardcoded` 与 `./gradlew :app:testDebugUnitTest` | Key 100% 齐平、占位符 0 偏差、UI 目录 0 硬编码中文、`SonifyLocaleManagerTest` 与 `I18nResourceConsistencyTest` 全部通过 | 命令行 + JVM 单测 |
+| `TC-I18N-02` | P0 | 默认「跟随系统」与中文系统自动匹配 | 物理机系统语言为简体中文 | 首次启动 App，进入设置 → 外观、语言与黑胶风格 → 应用语言 | 默认选中「跟随系统（当前：简体中文）」，全量页面展示完整简体中文 | `3917JR` 真机 |
+| `TC-I18N-03` | P0 | 播放中热切换至 English（零中断/零重建） | 正在播放本地无损音乐 | 进入设置 → 应用语言 → 选择 `English`，不重启 App 依次浏览 Settings / Library / Global Search / Now Playing / USB DAC / Update & Changelog | 1 帧内瞬时切为英文，**音乐播放不中断不断流**；所有核心页面、弹窗、更新日志均完整英文，无重叠、无截断 | `3917JR` 真机 + 截图 |
+| `TC-I18N-04` | P0 | 冷重启语言持久化 & 一键切回简体中文/跟随系统 | 已切换至 `English` | 执行 `am force-stop` 后重新冷启动，检查首页与设置页；再切回「Follow System」 | 冷启动后仍保持完整英文；切回跟随系统后立即恢复简体中文 | `3917JR` 真机 + 截图 |
+| `TC-I18N-05` | P1 | 跨进程 `:crash` 与 WiFi 传歌 Web 双语适配 | English 模式下开启 WiFi 传歌服务 | 1. 请求 `GET http://127.0.0.1:8088/` 检查 Web UI 默认语言与中英切换按钮<br>2. 确认 `filesDir/app_language.txt` 已同步写入 `en`，`:crash` 独立进程可读 | WiFi Web UI 自动同步当前 App 语言且支持网页右上角一键切换 `中 / EN`；`app_language.txt` 与 DataStore 一致 | 真机 HTTP + 文件检查 |

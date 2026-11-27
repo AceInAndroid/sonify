@@ -70,6 +70,7 @@
 - **崩溃拦截、独立 `:crash` 进程自动重启与脱敏日志上报**：主进程 `SonifyCrashHandler` 在崩溃瞬间 160ms 非阻塞安全关闭 USB DAC 流、自动剥离本地私人路径与 Subsonic 凭据、落盘脱敏报告并执行 **30 秒 ≥ 3 次连崩熔断保护**，随即拉起独立 `:crash` 进程恢复页（`CrashRecoveryActivity`）提供 **3 秒倒计时自动冷重启**（可随时暂停查看/复制/手动上报堆栈；触发连崩熔断时自动停用倒计时并提供「清理缓存并重启」安全模式）。
 - **应用内安全更新、全链路强制更新与自建云分发**：支持启动 12 小时节流自动检查与设置页手动检查、版本日志与 **全状态强制更新保护**（覆盖 `Available` / `Downloading` / `Verifying` / `ReadyToInstall` / `Error` 全阶段锁定，绕过关闭自动检查与忽略版本记录，屏蔽返回键与遮罩点击并提供「退出应用」）、HTTP/1.1 稳定流式下载与实时速度/进度、**安装前强制 SHA-256 完整性校验**、Android 7–15 `FileProvider` 与返回自动刷新未知来源权限引导；附带零依赖 Python 3 服务端（`server/sonify_server.py` + Caddy/Nginx HTTPS + `systemd`）与一键发版脚本（`scripts/publish_release.sh`）。
 - **隐私优先设备日活埋点与运营监控面板（`/admin`）**：客户端仅生成随机 UUIDv4 `installId`（零 IMEI/OAID/文件路径/歌名/搜索词采集），采用本地 JSONL 批量上报队列并在设置页提供透明的一键关闭开关（「匿名日活与功能统计」）；服务端基于 SQLite WAL 提供 `POST /api/v1/telemetry/events` 统计（按 UTC+8 汇总 DAU/WAU/MAU、新增设备、次日/七日留存、版本与 USB DAC 分布），并内置 Spotify Dark 风格认证运营面板（`/admin`，由 `/etc/sonify-server/admin.env` 独立令牌保护），支持日活趋势 SVG 图表、硬件排行、脱敏崩溃日志查看与线上强制更新策略实时切换。
+- **多语言国际化（中英双语）与零中断热切换**：完整支持 **跟随系统 / 简体中文 / English**（兼容 Android 13+ 系统应用语言），覆盖全部页面、设置枚举、通知栏、黑胶锁屏、独立 `:crash` 恢复页与 WiFi 传歌 Web 界面；切换语言 1 帧即时生效，不重建 Activity、不断开 USB DAC、不中断无损播放。配套落地标准规范文档与字段对照字典（[多语言规范](docs/i18n/I18N_STANDARD.md) · [字段对照字典](docs/i18n/STRING_KEY_CATALOG.md)），方便后续按标准快速扩展更多语种。
 
 ---
 
@@ -133,7 +134,8 @@ rm -rf app/build app/.cxx build
 所有新增功能与代码改动上线前必须先通过单元测试与真机功能/视觉验收：
 - 强制门禁规范：[AGENTS.md](AGENTS.md) · [发布门禁清单](docs/testing/RELEASE_GATE.md)
 - 测试总方案：[docs/testing/TEST_PLAN.md](docs/testing/TEST_PLAN.md)
-- 端到端测试用例库（78 条）：[docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
+- 端到端测试用例库（83 条）：[docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
+- 多语言规范与全量字段字典：[docs/i18n/I18N_STANDARD.md](docs/i18n/I18N_STANDARD.md) · [docs/i18n/STRING_KEY_CATALOG.md](docs/i18n/STRING_KEY_CATALOG.md)
 - 真机测试验收报告：[docs/testing/reports/](docs/testing/reports/)
 
 ### 调试日志

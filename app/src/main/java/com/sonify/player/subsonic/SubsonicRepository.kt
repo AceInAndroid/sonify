@@ -2,6 +2,8 @@ package com.sonify.player.subsonic
 
 import android.content.Context
 import android.util.Log
+import com.sonify.player.HiFiApp
+import com.sonify.player.R
 import com.sonify.player.data.LibraryDatabase
 import com.sonify.player.data.SubsonicServerEntity
 import com.sonify.player.data.SubsonicTrackCacheEntity
@@ -82,7 +84,8 @@ class SubsonicRepository(
     ): Pair<SubsonicServerEntity, SubsonicPingResult> = withContext(Dispatchers.IO) {
         val normalizedUrl = SubsonicAuth.normalizeBaseUrl(baseUrl)
         val cleanUser = username.trim()
-        require(cleanUser.isNotEmpty()) { "用户名不能为空" }
+        val locCtx = (context.applicationContext as? HiFiApp)?.localizedContext() ?: context
+        require(cleanUser.isNotEmpty()) { locCtx.getString(R.string.err_subsonic_user_empty) }
 
         val existing = editingId?.let { serverDao.findById(it) }
         val plainPassword = if (rawPassword.isNotEmpty()) {
@@ -90,7 +93,7 @@ class SubsonicRepository(
         } else if (existing != null) {
             CredentialCipher.decrypt(existing.encryptedPassword)
         } else {
-            throw IllegalArgumentException("密码不能为空")
+            throw IllegalArgumentException(locCtx.getString(R.string.err_subsonic_pass_empty))
         }
 
         val probeCreds = SubsonicCredentials(
@@ -149,7 +152,8 @@ class SubsonicRepository(
     }
 
     suspend fun testExistingServer(serverId: Long): SubsonicPingResult = withContext(Dispatchers.IO) {
-        val creds = getCredentials(serverId) ?: throw IllegalStateException("找不到已保存的服务器凭据")
+        val locCtx = (context.applicationContext as? HiFiApp)?.localizedContext() ?: context
+        val creds = getCredentials(serverId) ?: throw IllegalStateException(locCtx.getString(R.string.err_subsonic_no_creds))
         val ping = client.ping(creds)
         serverDao.updateConnectionInfo(
             serverId = serverId,

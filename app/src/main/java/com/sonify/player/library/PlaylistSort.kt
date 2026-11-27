@@ -1,14 +1,16 @@
 package com.sonify.player.library
 
+import androidx.annotation.StringRes
+import com.sonify.player.R
 import com.sonify.player.data.TrackEntity
 
 /** 歌单曲目与本地歌曲列表统一多维排序维度 */
-enum class TrackSortField(val label: String, val defaultAscending: Boolean) {
-    CUSTOM("默认顺序", true),
-    TITLE("标题", true),
-    ALBUM("专辑", true),
-    ARTIST("艺人", true),
-    RECENTLY_ADDED("最近添加", false);
+enum class TrackSortField(@StringRes val labelRes: Int, val defaultAscending: Boolean) {
+    CUSTOM(R.string.pref_sort_custom, true),
+    TITLE(R.string.pref_sort_title, true),
+    ALBUM(R.string.pref_sort_album, true),
+    ARTIST(R.string.pref_sort_artist, true),
+    RECENTLY_ADDED(R.string.pref_sort_recent_added, false);
 
     companion object {
         fun fromNameOrDefault(name: String?, fallback: TrackSortField = CUSTOM): TrackSortField =
@@ -17,10 +19,10 @@ enum class TrackSortField(val label: String, val defaultAscending: Boolean) {
 }
 
 /** 歌单列表排序维度 */
-enum class PlaylistListSort(val label: String) {
-    UPDATED("最近更新"),
-    NAME("歌单名称"),
-    COUNT("曲目数量"),
+enum class PlaylistListSort(@StringRes val labelRes: Int) {
+    UPDATED(R.string.pref_sort_recent_updated),
+    NAME(R.string.pref_sort_playlist_name),
+    COUNT(R.string.pref_sort_track_count),
 }
 
 data class SortableTrack(

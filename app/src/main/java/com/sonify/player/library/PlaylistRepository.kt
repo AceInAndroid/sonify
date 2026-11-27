@@ -2,6 +2,9 @@ package com.sonify.player.library
 
 import android.content.Context
 import android.net.Uri
+import androidx.annotation.StringRes
+import com.sonify.player.HiFiApp
+import com.sonify.player.R
 import com.sonify.player.data.LibraryDatabase
 import com.sonify.player.data.PlaylistEntity
 import com.sonify.player.data.PlaylistItemEntity
@@ -44,6 +47,11 @@ class PlaylistRepository(
     private val subsonicRepo: SubsonicRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private fun s(@StringRes id: Int, vararg args: Any): String {
+        val ctx = (context.applicationContext as? HiFiApp)?.localizedContext() ?: context
+        return if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    }
     private val playlistDao = db.playlistDao()
     private val trackDao = db.trackDao()
     private val remoteCacheDao = db.subsonicTrackCacheDao()
@@ -107,7 +115,7 @@ class PlaylistRepository(
         coverUri: Uri? = null,
     ): PlaylistEntity = withContext(Dispatchers.IO) {
         val cleanName = name.trim()
-        require(cleanName.isNotEmpty()) { "歌单名称不能为空" }
+        require(cleanName.isNotEmpty()) { s(R.string.err_playlist_name_empty) }
         val now = System.currentTimeMillis()
         val id = playlistDao.upsertPlaylist(
             PlaylistEntity(
@@ -141,7 +149,7 @@ class PlaylistRepository(
         clearCustomCover: Boolean = false,
     ) = withContext(Dispatchers.IO) {
         val cleanName = name.trim()
-        require(cleanName.isNotEmpty()) { "歌单名称不能为空" }
+        require(cleanName.isNotEmpty()) { s(R.string.err_playlist_name_empty) }
         val existing = playlistDao.findPlaylistById(playlistId) ?: return@withContext
         val oldCover = existing.customCoverPath
         val nextCover = when {
@@ -268,7 +276,7 @@ class PlaylistRepository(
         tracks: List<TrackEntity> = emptyList(),
     ): SubsonicPlaylist? = withContext(Dispatchers.IO) {
         val creds = subsonicRepo.getCredentials(serverId)
-            ?: throw IllegalStateException("找不到对应的 Subsonic 服务器凭据")
+            ?: throw IllegalStateException(s(R.string.err_subsonic_no_creds))
         val songIds = tracks.mapNotNull { t ->
             SubsonicUri.parseTrackUri(t.path)?.takeIf { it.serverId == serverId }?.songId
         }
@@ -282,7 +290,7 @@ class PlaylistRepository(
         comment: String,
     ) = withContext(Dispatchers.IO) {
         val creds = subsonicRepo.getCredentials(serverId)
-            ?: throw IllegalStateException("找不到对应的 Subsonic 服务器凭据")
+            ?: throw IllegalStateException(s(R.string.err_subsonic_no_creds))
         subsonicRepo.client.updatePlaylist(
             creds = creds,
             playlistId = playlistId,
@@ -297,7 +305,7 @@ class PlaylistRepository(
         tracks: List<TrackEntity>,
     ): Int = withContext(Dispatchers.IO) {
         val creds = subsonicRepo.getCredentials(serverId)
-            ?: throw IllegalStateException("找不到对应的 Subsonic 服务器凭据")
+            ?: throw IllegalStateException(s(R.string.err_subsonic_no_creds))
         val songIds = tracks.mapNotNull { t ->
             SubsonicUri.parseTrackUri(t.path)?.takeIf { it.serverId == serverId }?.songId
         }
@@ -317,7 +325,7 @@ class PlaylistRepository(
     ) = withContext(Dispatchers.IO) {
         if (indexes.isEmpty()) return@withContext
         val creds = subsonicRepo.getCredentials(serverId)
-            ?: throw IllegalStateException("找不到对应的 Subsonic 服务器凭据")
+            ?: throw IllegalStateException(s(R.string.err_subsonic_no_creds))
         subsonicRepo.client.updatePlaylist(
             creds = creds,
             playlistId = playlistId,

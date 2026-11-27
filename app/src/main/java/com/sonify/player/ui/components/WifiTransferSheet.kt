@@ -3,6 +3,7 @@ package com.sonify.player.ui.components
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,6 +57,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +67,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.common.BitMatrix
 import com.google.zxing.qrcode.QRCodeWriter
+import com.sonify.player.R
 import com.sonify.player.data.WifiUploadHistoryEntity
 import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.wifi.WifiTransferState
@@ -73,11 +76,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private enum class HistoryStatusFilter(val label: String, val raw: String) {
-    ALL("全部", "ALL"),
-    SUCCESS("成功", "SUCCESS"),
-    DUPLICATE("重复跳过", "SKIPPED_DUPLICATE"),
-    FAILED("失败", "FAILED"),
+private enum class HistoryStatusFilter(@StringRes val labelRes: Int, val raw: String) {
+    ALL(R.string.wifi_filter_all, "ALL"),
+    SUCCESS(R.string.wifi_filter_ok, "SUCCESS"),
+    DUPLICATE(R.string.wifi_filter_dup, "SKIPPED_DUPLICATE"),
+    FAILED(R.string.wifi_filter_fail, "FAILED"),
 }
 
 /**
@@ -160,16 +163,16 @@ fun WifiTransferSheet(
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = "WiFi 局域网传歌",
+                        text = stringResource(R.string.wifi_title),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = colors.textPrimary,
                     )
                     Text(
                         text = if (state.isRunning) {
-                            "服务运行中 · 本次成功 ${state.sessionUploadedCount} · 防重跳过 ${state.sessionSkippedCount}"
+                            stringResource(R.string.wifi_running_sub, state.sessionUploadedCount, state.sessionSkippedCount)
                         } else {
-                            "开启后可在手机或 PC 浏览器直接拖拽上传无损音频"
+                            stringResource(R.string.wifi_idle_sub)
                         },
                         fontSize = 11.sp,
                         color = if (state.isRunning) colors.exclusiveGreen else colors.textSecondary,
@@ -212,7 +215,7 @@ fun WifiTransferSheet(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        text = "同一 WiFi 下手机扫码或电脑浏览器打开以下地址",
+                        text = stringResource(R.string.wifi_qr_hint),
                         fontSize = 12.sp,
                         color = colors.textSecondary,
                     )
@@ -226,6 +229,7 @@ fun WifiTransferSheet(
 
                     Spacer(Modifier.height(12.dp))
 
+                    val copiedToast = stringResource(R.string.wifi_copied_url, state.primaryUrl)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -233,7 +237,7 @@ fun WifiTransferSheet(
                             .background(colors.canvas.copy(alpha = 0.7f))
                             .clickable {
                                 copyToClipboard(context, state.primaryUrl)
-                                onShowToast("已复制链接：${state.primaryUrl}")
+                                onShowToast(copiedToast)
                             }
                             .padding(horizontal = 10.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -253,7 +257,7 @@ fun WifiTransferSheet(
                         Spacer(Modifier.width(6.dp))
                         Icon(
                             imageVector = Icons.Rounded.ContentCopy,
-                            contentDescription = "复制链接",
+                            contentDescription = stringResource(R.string.wifi_copy_url),
                             tint = colors.textSecondary,
                             modifier = Modifier.size(16.dp),
                         )
@@ -264,7 +268,7 @@ fun WifiTransferSheet(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Refresh,
-                                contentDescription = "刷新 IP",
+                                contentDescription = stringResource(R.string.wifi_refresh_ip),
                                 tint = colors.textSecondary,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -283,7 +287,7 @@ fun WifiTransferSheet(
                         ) {
                             Icon(Icons.Rounded.Lock, contentDescription = null, tint = colors.accent, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("临时访问 PIN：", fontSize = 12.sp, color = colors.textSecondary)
+                            Text(stringResource(R.string.wifi_pin_label), fontSize = 12.sp, color = colors.textSecondary)
                             Text(
                                 text = state.pinCode.chunked(1).joinToString(" "),
                                 fontSize = 17.sp,
@@ -293,7 +297,7 @@ fun WifiTransferSheet(
                                 modifier = Modifier.weight(1f),
                             )
                             Text(
-                                text = "换一个",
+                                text = stringResource(R.string.wifi_pin_regen),
                                 fontSize = 12.sp,
                                 color = colors.textPrimary,
                                 modifier = Modifier
@@ -307,7 +311,11 @@ fun WifiTransferSheet(
 
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "接收目录：${state.storageDirPath} · 剩余 ${formatFreeBytes(state.freeSpaceBytes)}",
+                        text = stringResource(
+                            R.string.wifi_storage_info,
+                            state.storageDirPath,
+                            formatFreeBytes(state.freeSpaceBytes),
+                        ),
                         fontSize = 11.sp,
                         color = colors.textMuted,
                         maxLines = 1,
@@ -331,8 +339,8 @@ fun WifiTransferSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f).padding(end = 10.dp)) {
-                        Text("防重复上传自动跳过", fontSize = 13.sp, color = colors.textPrimary)
-                        Text("上传前先比对内容指纹与本地曲库，重复文件零流量跳过", fontSize = 11.sp, color = colors.textSecondary)
+                        Text(stringResource(R.string.wifi_dedup_title), fontSize = 13.sp, color = colors.textPrimary)
+                        Text(stringResource(R.string.wifi_dedup_sub), fontSize = 11.sp, color = colors.textSecondary)
                     }
                     Switch(
                         checked = autoSkipDuplicate,
@@ -346,8 +354,8 @@ fun WifiTransferSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f).padding(end = 10.dp)) {
-                        Text("启用 4 位临时 PIN 访问码", fontSize = 13.sp, color = colors.textPrimary)
-                        Text("在公共 WiFi 环境下防止他人误打开上传页面", fontSize = 11.sp, color = colors.textSecondary)
+                        Text(stringResource(R.string.wifi_pin_toggle_title), fontSize = 13.sp, color = colors.textPrimary)
+                        Text(stringResource(R.string.wifi_pin_toggle_sub), fontSize = 11.sp, color = colors.textSecondary)
                     }
                     Switch(
                         checked = state.pinEnabled,
@@ -365,7 +373,7 @@ fun WifiTransferSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "上传历史（${history.size}）",
+                    text = stringResource(R.string.wifi_history_header, history.size),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.textPrimary,
@@ -373,7 +381,7 @@ fun WifiTransferSheet(
                 )
                 if (history.isNotEmpty()) {
                     TextButton(onClick = { showClearDialog = true }) {
-                        Text("清空历史", fontSize = 12.sp, color = colors.danger)
+                        Text(stringResource(R.string.wifi_history_clear), fontSize = 12.sp, color = colors.danger)
                     }
                 }
             }
@@ -395,7 +403,7 @@ fun WifiTransferSheet(
                             .padding(horizontal = 12.dp, vertical = 5.dp),
                     ) {
                         Text(
-                            text = item.label,
+                            text = stringResource(item.labelRes),
                             fontSize = 12.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                             color = if (selected) colors.onAccent else colors.textSecondary,
@@ -411,7 +419,7 @@ fun WifiTransferSheet(
                         .padding(vertical = 26.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("暂无上传历史记录", fontSize = 13.sp, color = colors.textMuted)
+                    Text(stringResource(R.string.wifi_history_empty), fontSize = 13.sp, color = colors.textMuted)
                 }
             } else {
                 LazyColumn(
@@ -442,11 +450,11 @@ fun WifiTransferSheet(
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
             containerColor = colors.surface1,
-            title = { Text("删除上传记录", color = colors.textPrimary) },
+            title = { Text(stringResource(R.string.wifi_del_dialog_title), color = colors.textPrimary) },
             text = {
                 Text(
-                    text = if (hasFile) "请选择仅删除「${row.fileName}」的历史记录，或同时删除本地音频文件。"
-                    else "确定删除「${row.fileName}」的上传记录吗？",
+                    text = if (hasFile) stringResource(R.string.wifi_del_dialog_msg_with_file, row.fileName)
+                    else stringResource(R.string.wifi_del_dialog_msg_only, row.fileName),
                     fontSize = 13.sp,
                     color = colors.textSecondary,
                 )
@@ -458,20 +466,20 @@ fun WifiTransferSheet(
                             onDeleteHistoryItem(row.id, true)
                             deleteTarget = null
                         }) {
-                            Text("删记录并删文件", color = colors.danger)
+                            Text(stringResource(R.string.wifi_del_with_file), color = colors.danger)
                         }
                     }
                     TextButton(onClick = {
                         onDeleteHistoryItem(row.id, false)
                         deleteTarget = null
                     }) {
-                        Text("仅删记录", color = colors.accent, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.wifi_del_record_only), color = colors.accent, fontWeight = FontWeight.Bold)
                     }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { deleteTarget = null }) {
-                    Text("取消", color = colors.textSecondary)
+                    Text(stringResource(R.string.common_cancel), color = colors.textSecondary)
                 }
             },
         )
@@ -481,10 +489,10 @@ fun WifiTransferSheet(
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
             containerColor = colors.surface1,
-            title = { Text("清空上传历史", color = colors.textPrimary) },
+            title = { Text(stringResource(R.string.wifi_clear_dialog_title), color = colors.textPrimary) },
             text = {
                 Text(
-                    "仅清空全部历史记录（保留手机上已传好的无损音频文件），确认继续吗？",
+                    stringResource(R.string.wifi_clear_dialog_msg),
                     fontSize = 13.sp,
                     color = colors.textSecondary,
                 )
@@ -494,12 +502,12 @@ fun WifiTransferSheet(
                     showClearDialog = false
                     onClearHistory(false)
                 }) {
-                    Text("确认清空", color = colors.danger, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.playlist_dl_clear_confirm), color = colors.danger, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) {
-                    Text("取消", color = colors.textSecondary)
+                    Text(stringResource(R.string.common_cancel), color = colors.textSecondary)
                 }
             },
         )
@@ -520,9 +528,9 @@ private fun WifiHistoryRow(
         File(item.savedPath).isFile
 
     val (statusLabel, statusColor) = when (item.status) {
-        "SUCCESS" -> "成功" to colors.exclusiveGreen
-        "SKIPPED_DUPLICATE" -> "重复跳过" to colors.accent
-        else -> "失败" to colors.danger
+        "SUCCESS" -> stringResource(R.string.wifi_filter_ok) to colors.exclusiveGreen
+        "SKIPPED_DUPLICATE" -> stringResource(R.string.wifi_filter_dup) to colors.accent
+        else -> stringResource(R.string.wifi_filter_fail) to colors.danger
     }
     val timeStr = remember(item.uploadedAt) {
         SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(item.uploadedAt))
@@ -570,7 +578,7 @@ private fun WifiHistoryRow(
             )
             if (item.status == "SKIPPED_DUPLICATE" && item.duplicateOfName.isNotBlank()) {
                 Text(
-                    text = "与「${item.duplicateOfName}」内容重复",
+                    text = stringResource(R.string.wifi_dup_of, item.duplicateOfName),
                     fontSize = 10.sp,
                     color = colors.accent,
                     maxLines = 1,
@@ -592,11 +600,21 @@ private fun WifiHistoryRow(
         )
         if (canPlay) {
             IconButton(onClick = onPlay, modifier = Modifier.size(30.dp)) {
-                Icon(Icons.Rounded.PlayArrow, contentDescription = "播放", tint = colors.accent, modifier = Modifier.size(18.dp))
+                Icon(
+                    Icons.Rounded.PlayArrow,
+                    contentDescription = stringResource(R.string.common_play),
+                    tint = colors.accent,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
         IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) {
-            Icon(Icons.Rounded.Delete, contentDescription = "删除", tint = colors.textMuted, modifier = Modifier.size(16.dp))
+            Icon(
+                Icons.Rounded.Delete,
+                contentDescription = stringResource(R.string.common_delete),
+                tint = colors.textMuted,
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }

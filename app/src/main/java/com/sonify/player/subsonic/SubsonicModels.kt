@@ -233,16 +233,19 @@ class SubsonicException(
 ) : Exception(friendlyMessage(code, serverMessage), cause) {
 
     companion object {
-        fun friendlyMessage(code: Int, raw: String): String = when (code) {
-            10 -> "缺少必要请求参数（$code）"
-            20 -> "客户端协议版本过低，请更新 Sonify（$code）"
-            30 -> "服务器协议版本过旧，不支持当前请求（$code）"
-            40 -> "用户名或密码错误（40）"
-            41 -> "该服务器不支持 Token 认证，请在高级选项开启「旧版认证」（41）"
-            50 -> "当前账号无访问权限（50）"
-            60 -> "服务器试用期已结束（60）"
-            70 -> "请求的曲目或资源不存在（70）"
-            else -> raw.ifBlank { "服务器返回错误（code=$code）" }
+        fun friendlyMessage(code: Int, raw: String): String {
+            val isZh = java.util.Locale.getDefault().language.equals("zh", ignoreCase = true)
+            return when (code) {
+                10 -> if (isZh) "缺少必要请求参数（$code）" else "Missing required parameter ($code)"
+                20 -> if (isZh) "客户端协议版本过低，请更新 Sonify（$code）" else "Client protocol too old — please update Sonify ($code)"
+                30 -> if (isZh) "服务器协议版本过旧，不支持当前请求（$code）" else "Server protocol too old for this request ($code)"
+                40 -> if (isZh) "用户名或密码错误（40）" else "Wrong username or password (40)"
+                41 -> if (isZh) "该服务器不支持 Token 认证，请在高级选项开启「旧版认证」（41）" else "Token auth unsupported — enable Legacy Auth in Advanced Options (41)"
+                50 -> if (isZh) "当前账号无访问权限（50）" else "Account lacks permission for this action (50)"
+                60 -> if (isZh) "服务器试用期已结束（60）" else "Server trial period has ended (60)"
+                70 -> if (isZh) "请求的曲目或资源不存在（70）" else "Requested track or resource not found (70)"
+                else -> raw.ifBlank { if (isZh) "服务器返回错误（code=$code）" else "Server returned error (code=$code)" }
+            }
         }
     }
 }

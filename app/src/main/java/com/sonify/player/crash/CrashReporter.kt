@@ -2,6 +2,8 @@ package com.sonify.player.crash
 
 import android.content.Context
 import com.sonify.player.BuildConfig
+import com.sonify.player.HiFiApp
+import com.sonify.player.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -9,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 data class CrashUploadResult(
@@ -72,7 +75,10 @@ object CrashReporter {
         report: CrashReport,
         reportFile: File? = null,
         baseUrl: String = BuildConfig.UPDATE_BASE_URL,
+        context: Context? = null,
     ): CrashUploadResult = withContext(Dispatchers.IO) {
+        val localized = (context?.applicationContext as? HiFiApp)?.localizedContext() ?: context
+        val isZh = Locale.getDefault().language.equals("zh", ignoreCase = true)
         val endpoint = "${baseUrl.trimEnd('/')}/api/v1/crash/report"
         runCatching {
             val payload = report.copy(
@@ -91,13 +97,22 @@ object CrashReporter {
                             reportFile.writeText(report.copy(uploaded = true).toJson().toString(2), Charsets.UTF_8)
                         }
                     }
-                    CrashUploadResult(ok = true, message = "脱敏日志已上报")
+                    val okMsg = localized?.getString(R.string.crash_upload_ok)
+                        ?: if (isZh) "脱敏日志已上报" else "Sanitized crash log uploaded"
+                    CrashUploadResult(ok = true, message = okMsg)
                 } else {
-                    CrashUploadResult(ok = false, message = "上报失败（HTTP ${resp.code}）")
+                    val errMsg = localized?.getString(R.string.crash_upload_http_err, resp.code)
+                        ?: if (isZh) "上报失败（HTTP ${resp.code}）" else "Upload failed (HTTP ${resp.code})"
+                    CrashUploadResult(ok = false, message = errMsg)
                 }
             }
         }.getOrElse { err ->
-            CrashUploadResult(ok = false, message = "暂未连上服务器：${err.message ?: "网络不可达"}")
+            val netFallback = localized?.getString(R.string.err_network_generic)
+                ?: if (isZh) "网络连接异常" else "Network connection error"
+            val detail = err.message ?: netFallback
+            val netMsg = localized?.getString(R.string.crash_upload_net_err, detail)
+                ?: if (isZh) "暂未连上服务器：$detail" else "Unable to reach server: $detail"
+            CrashUploadResult(ok = false, message = netMsg)
         }
     }
 

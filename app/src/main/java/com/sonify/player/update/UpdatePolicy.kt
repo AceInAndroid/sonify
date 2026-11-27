@@ -1,5 +1,7 @@
 package com.sonify.player.update
 
+import java.util.Locale
+
 /**
  * 纯 Kotlin 版本升级策略、强制更新穿透与 SHA-256 完整性判定工具（100% JVM 可单测）。
  */
@@ -65,7 +67,9 @@ object UpdatePolicy {
     }
 
     fun formatSize(bytes: Long): String {
-        if (bytes <= 0L) return "未知大小"
+        if (bytes <= 0L) {
+            return if (Locale.getDefault().language.equals("zh", ignoreCase = true)) "未知大小" else "Unknown size"
+        }
         val mb = bytes / (1024.0 * 1024.0)
         return if (mb >= 1.0) "${"%.1f".format(mb)} MB" else "${(bytes / 1024L).coerceAtLeast(1L)} KB"
     }

@@ -82,12 +82,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
+import com.sonify.player.R
 import com.sonify.player.audio.ActiveOutputRoute
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.CoverStyle
@@ -160,6 +163,7 @@ fun NowPlayingScreen(
 ) {
     val track = playback.currentTrack ?: return
     val colors = LocalHiFiColors.current
+    val ctx = LocalContext.current
     var showLyrics by remember { mutableStateOf(false) }
 
     BackHandler(enabled = showLyrics) {
@@ -330,7 +334,7 @@ fun NowPlayingScreen(
                     IconButton(onClick = onCollapse) {
                         Icon(
                             imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "收起播放页",
+                            contentDescription = stringResource(R.string.player_collapse),
                             tint = colors.textPrimary,
                             modifier = Modifier.size(30.dp),
                         )
@@ -340,7 +344,7 @@ fun NowPlayingScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
-                            text = "正在播放自",
+                            text = stringResource(R.string.player_playing_from),
                             fontSize = 10.sp,
                             color = colors.textSecondary,
                             letterSpacing = 0.8.sp,
@@ -359,17 +363,15 @@ fun NowPlayingScreen(
                         onClick = {
                             val next = !settings.immersiveMusicMode
                             onToggleImmersiveMode(next)
-                            immersiveHintText = if (next) {
-                                "沉浸音乐模式已开启 · 轻点唱片可进入纯享摆台"
-                            } else {
-                                "已退出沉浸音乐模式"
-                            }
+                            immersiveHintText = ctx.getString(
+                                if (next) R.string.player_immersive_on_hint else R.string.player_immersive_off_hint
+                            )
                         }
                     ) {
                         Icon(
                             imageVector = if (settings.immersiveMusicMode) Icons.Rounded.FullscreenExit
                             else Icons.Rounded.Fullscreen,
-                            contentDescription = "沉浸音乐模式",
+                            contentDescription = stringResource(R.string.player_immersive_toggle),
                             tint = if (settings.immersiveMusicMode) colors.accent else colors.textSecondary,
                             modifier = Modifier.size(24.dp),
                         )
@@ -390,7 +392,7 @@ fun NowPlayingScreen(
                         if (settings.immersiveMusicMode) {
                             zenVinylMode = !zenVinylMode
                             if (zenVinylMode) {
-                                immersiveHintText = "纯享黑胶模式 · 轻点任意处恢复操控"
+                                immersiveHintText = ctx.getString(R.string.player_zen_vinyl_hint)
                             }
                         }
                     }
@@ -457,11 +459,11 @@ fun NowPlayingScreen(
                 val outLabel = if (isUsbExclusive && stats.rate > 0) {
                     val sr = if (stats.rate % 1000 == 0) "${stats.rate / 1000}k"
                     else "%.1fk".format(stats.rate / 1000.0)
-                    "USB 独占 $sr/${stats.bits}b"
+                    stringResource(R.string.player_usb_exclusive_spec, sr, stats.bits)
                 } else if (isUsbExclusive) {
-                    "USB 独占 · ${usbState.deviceDisplayName}"
+                    stringResource(R.string.player_usb_exclusive_dev, usbState.deviceDisplayName)
                 } else {
-                    "本机输出"
+                    stringResource(R.string.player_system_output)
                 }
                 Text(
                     text = outLabel,
@@ -473,7 +475,8 @@ fun NowPlayingScreen(
             }
 
             // 系统音频焦点交互状态提示（临时避让 / 通话等待 / 被其他应用抢占）
-            audioFocusState.bannerText?.let { focusTip ->
+            audioFocusState.bannerTextRes?.let { resId ->
+                val focusTip = stringResource(resId)
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = focusTip,
@@ -563,7 +566,7 @@ fun NowPlayingScreen(
                     IconButton(onClick = { onToggleFavorite(track) }) {
                         Icon(
                             imageVector = if (track.isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                            contentDescription = "收藏",
+                            contentDescription = stringResource(R.string.player_favorite),
                             tint = if (track.isFavorite) colors.exclusiveGreen else colors.textSecondary,
                             modifier = Modifier.size(26.dp),
                         )
@@ -623,7 +626,7 @@ fun NowPlayingScreen(
                     IconButton(onClick = onToggleShuffle) {
                         Icon(
                             imageVector = Icons.Rounded.Shuffle,
-                            contentDescription = "随机播放",
+                            contentDescription = stringResource(R.string.player_shuffle_mode),
                             tint = if (playback.shuffleEnabled) colors.exclusiveGreen else colors.textSecondary,
                             modifier = Modifier.size(24.dp),
                         )
@@ -631,7 +634,7 @@ fun NowPlayingScreen(
                     IconButton(onClick = onSkipPrev, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.Rounded.SkipPrevious,
-                            contentDescription = "上一曲",
+                            contentDescription = stringResource(R.string.player_prev),
                             tint = colors.textPrimary,
                             modifier = Modifier.size(36.dp),
                         )
@@ -646,7 +649,7 @@ fun NowPlayingScreen(
                     ) {
                         Icon(
                             imageVector = if (playback.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = if (playback.isPlaying) "暂停" else "播放",
+                            contentDescription = stringResource(if (playback.isPlaying) R.string.common_pause else R.string.common_play),
                             tint = Color.Black,
                             modifier = Modifier.size(38.dp),
                         )
@@ -654,7 +657,7 @@ fun NowPlayingScreen(
                     IconButton(onClick = onSkipNext, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.Rounded.SkipNext,
-                            contentDescription = "下一曲",
+                            contentDescription = stringResource(R.string.player_next),
                             tint = colors.textPrimary,
                             modifier = Modifier.size(36.dp),
                         )
@@ -668,7 +671,7 @@ fun NowPlayingScreen(
                         val active = playback.repeatMode != Player.REPEAT_MODE_OFF
                         Icon(
                             imageVector = icon,
-                            contentDescription = "循环模式",
+                            contentDescription = stringResource(R.string.player_repeat_mode),
                             tint = if (active) colors.exclusiveGreen else colors.textSecondary,
                             modifier = Modifier.size(24.dp),
                         )
@@ -695,7 +698,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(16.dp),
                             )
                             Text(
-                                text = "固定直通 0 dBFS（已绕过护耳上限，请用外接耳放调音量）",
+                                text = stringResource(R.string.player_fixed_direct_banner),
                                 fontSize = 11.sp,
                                 color = colors.danger,
                                 maxLines = 1,
@@ -708,6 +711,7 @@ fun NowPlayingScreen(
                         val volAccent = if (volumeState.engine == EffectiveVolumeEngine.HARDWARE_UAC) {
                             colors.exclusiveGreen
                         } else colors.accent
+                        val engineLabel = stringResource(volumeState.engine.shortLabelRes)
 
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(
@@ -721,7 +725,7 @@ fun NowPlayingScreen(
                                     Icon(
                                         imageVector = if (isMuted) Icons.AutoMirrored.Rounded.VolumeOff
                                         else Icons.AutoMirrored.Rounded.VolumeUp,
-                                        contentDescription = "静音切换",
+                                        contentDescription = stringResource(R.string.player_mute_toggle),
                                         tint = if (isMuted) colors.textMuted else volAccent,
                                         modifier = Modifier.size(20.dp),
                                     )
@@ -740,7 +744,7 @@ fun NowPlayingScreen(
                                         .padding(horizontal = 6.dp),
                                 )
                                 Text(
-                                    text = if (isMuted) "静音"
+                                    text = if (isMuted) stringResource(R.string.player_muted)
                                     else "${volumeState.volumePercent}%",
                                     fontSize = 11.sp,
                                     fontFamily = FontFamily.Monospace,
@@ -755,14 +759,15 @@ fun NowPlayingScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
                                 Text(
-                                    text = if (isMuted) "${volumeState.engine.shortLabel} · 静音"
-                                    else "${volumeState.engine.shortLabel} · %.1f dB".format(volumeState.effectiveDb),
+                                    text = if (isMuted) stringResource(R.string.player_engine_muted, engineLabel)
+                                    else "$engineLabel · %.1f dB".format(volumeState.effectiveDb),
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
                                     color = colors.textMuted,
                                 )
                                 Text(
-                                    text = if (volumeState.protectionEnabled) "护耳上限 $maxLimit%" else "护耳未开启",
+                                    text = if (volumeState.protectionEnabled) stringResource(R.string.player_ear_guard_on, maxLimit)
+                                    else stringResource(R.string.player_ear_guard_off),
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
                                     color = if (volumeState.protectionEnabled) colors.textSecondary else colors.danger,
@@ -792,12 +797,12 @@ fun NowPlayingScreen(
                     ) {
                         Icon(
                             imageVector = if (isUsbExclusive) Icons.Rounded.Usb else Icons.Rounded.Headphones,
-                            contentDescription = "输出设备",
+                            contentDescription = stringResource(R.string.player_output_device),
                             tint = if (isUsbExclusive) colors.exclusiveGreen else colors.textSecondary,
                             modifier = Modifier.size(20.dp),
                         )
                         Text(
-                            text = if (isUsbExclusive) usbState.deviceDisplayName else "本机输出",
+                            text = if (isUsbExclusive) usbState.deviceDisplayName else stringResource(R.string.player_system_output),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = if (isUsbExclusive) colors.exclusiveGreen else colors.textSecondary,
@@ -811,7 +816,7 @@ fun NowPlayingScreen(
                         IconButton(onClick = { showLyrics = true }) {
                             Icon(
                                 imageVector = Icons.Rounded.Lyrics,
-                                contentDescription = "歌词",
+                                contentDescription = stringResource(R.string.player_lyrics),
                                 tint = if (hasLyrics) colors.accent else colors.textSecondary,
                                 modifier = Modifier.size(22.dp),
                             )
@@ -822,7 +827,9 @@ fun NowPlayingScreen(
                             ) {
                                 Icon(
                                     imageVector = if (isCurrentTrackDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
-                                    contentDescription = if (isCurrentTrackDownloaded) "已离线下载" else "下载歌曲",
+                                    contentDescription = stringResource(
+                                        if (isCurrentTrackDownloaded) R.string.common_downloaded_full else R.string.player_download_track
+                                    ),
                                     tint = if (isCurrentTrackDownloaded) colors.exclusiveGreen else colors.textSecondary,
                                     modifier = Modifier.size(22.dp),
                                 )
@@ -831,7 +838,7 @@ fun NowPlayingScreen(
                         IconButton(onClick = { onAddCurrentToPlaylist(track) }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                                contentDescription = "加入歌单",
+                                contentDescription = stringResource(R.string.player_add_to_playlist),
                                 tint = colors.textSecondary,
                                 modifier = Modifier.size(23.dp),
                             )
@@ -839,7 +846,7 @@ fun NowPlayingScreen(
                         IconButton(onClick = { showQueue = true }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
-                                contentDescription = "播放队列",
+                                contentDescription = stringResource(R.string.player_queue),
                                 tint = colors.textSecondary,
                                 modifier = Modifier.size(24.dp),
                             )
@@ -904,7 +911,7 @@ fun NowPlayingScreen(
                     .height(420.dp)
             ) {
                 Text(
-                    text = "当前队列（${playback.queue.size} 首）",
+                    text = stringResource(R.string.player_queue_header, playback.queue.size),
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.textPrimary,

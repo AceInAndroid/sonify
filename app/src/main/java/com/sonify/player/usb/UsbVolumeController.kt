@@ -1,6 +1,8 @@
 package com.sonify.player.usb
 
 import android.util.Log
+import androidx.annotation.StringRes
+import com.sonify.player.R
 import com.sonify.player.data.UserPreferences
 import com.sonify.player.data.VolumeMode
 import kotlinx.coroutines.CoroutineScope
@@ -15,10 +17,10 @@ import kotlinx.coroutines.runBlocking
 import kotlin.math.max
 import kotlin.math.min
 
-enum class EffectiveVolumeEngine(val shortLabel: String) {
-    HARDWARE_UAC("硬件音量"),
-    SOFTWARE_LOG("对数软件音量"),
-    FIXED_DIRECT("直通 0 dBFS"),
+enum class EffectiveVolumeEngine(@StringRes val shortLabelRes: Int) {
+    HARDWARE_UAC(R.string.pref_vol_engine_hw),
+    SOFTWARE_LOG(R.string.pref_vol_engine_sw),
+    FIXED_DIRECT(R.string.pref_vol_engine_direct),
 }
 
 data class VolumeHudState(

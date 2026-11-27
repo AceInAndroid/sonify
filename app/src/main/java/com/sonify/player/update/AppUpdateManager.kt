@@ -4,7 +4,10 @@ import android.content.Context
 import android.os.Build
 import android.os.Environment
 import android.os.SystemClock
+import androidx.annotation.StringRes
 import com.sonify.player.BuildConfig
+import com.sonify.player.HiFiApp
+import com.sonify.player.R
 import com.sonify.player.data.UserPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +39,11 @@ class AppUpdateManager(
     private val onTrackEvent: (name: String, props: Map<String, Any?>, flushNow: Boolean) -> Unit = { _, _, _ -> },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private fun s(@StringRes id: Int, vararg args: Any): String {
+        val ctx = (context.applicationContext as? HiFiApp)?.localizedContext() ?: context
+        return if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    }
 
     private val client by lazy {
         OkHttpClient.Builder()
@@ -132,10 +140,10 @@ class AppUpdateManager(
                     .build()
                 downloadClient.newCall(req).execute().use { resp ->
                     if (!resp.isSuccessful) {
-                        error("更新服务返回 HTTP ${resp.code}")
+                        error(s(R.string.err_update_http, resp.code))
                     }
                     val body = resp.body?.string().orEmpty()
-                    ReleaseInfo.fromJson(body) ?: error("服务端返回的版本清单格式无效")
+                    ReleaseInfo.fromJson(body) ?: error(s(R.string.err_update_manifest))
                 }
             }
 
@@ -181,7 +189,7 @@ class AppUpdateManager(
             }.onFailure { err ->
                 if (manual) {
                     _state.value = UpdateState.Error(
-                        message = "检查更新失败：${err.message ?: "网络连接异常"}",
+                        message = s(R.string.err_update_check_fail, err.message ?: s(R.string.err_network_generic)),
                         isForced = _state.value.isForcedUpdate,
                     )
                 }
@@ -211,9 +219,9 @@ class AppUpdateManager(
                     .build()
                 downloadClient.newCall(req).execute().use { resp ->
                     if (!resp.isSuccessful) {
-                        error("下载失败（HTTP ${resp.code}）")
+                        error(s(R.string.err_update_dl_http, resp.code))
                     }
-                    val body = resp.body ?: error("安装包响应体为空")
+                    val body = resp.body ?: error(s(R.string.err_update_dl_empty))
                     val total = body.contentLength().takeIf { it > 0L } ?: release.fileSize
                     val digest = MessageDigest.getInstance("SHA-256")
 
@@ -265,7 +273,7 @@ class AppUpdateManager(
                             true,
                         )
                         _state.value = UpdateState.Error(
-                            message = "安装包 SHA-256 完整性校验未通过，已自动删除以策安全，请重试。",
+                            message = s(R.string.err_update_sha256),
                             release = release,
                             isForced = isForced,
                         )
@@ -295,7 +303,7 @@ class AppUpdateManager(
                         false,
                     )
                     _state.value = UpdateState.Error(
-                        message = "更新下载中断：${e.message ?: "网络异常"}",
+                        message = s(R.string.err_update_dl_interrupted, e.message ?: s(R.string.err_network_generic)),
                         release = release,
                         isForced = isForced,
                     )

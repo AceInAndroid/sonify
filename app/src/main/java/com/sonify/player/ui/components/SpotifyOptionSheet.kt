@@ -19,9 +19,11 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.ui.theme.LocalHiFiColors
 
 data class SheetOption<T>(
@@ -97,7 +99,7 @@ fun <T> SpotifyOptionSheet(
                     if (isSelected) {
                         Icon(
                             imageVector = Icons.Rounded.Check,
-                            contentDescription = "已选中",
+                            contentDescription = stringResource(R.string.common_checked),
                             tint = colors.accent,
                             modifier = Modifier.size(20.dp),
                         )

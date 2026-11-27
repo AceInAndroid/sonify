@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -62,6 +63,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.data.SubsonicServerEntity
 import com.sonify.player.ui.AccountActionState
 import com.sonify.player.ui.theme.LocalHiFiColors
@@ -167,15 +169,17 @@ fun SubsonicAccountsSheet(
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = if (!showForm) "Subsonic 媒体服务器"
-                        else if (editingServer != null) "编辑服务器账号"
-                        else "登录 Subsonic 媒体库",
+                        text = stringResource(
+                            if (!showForm) R.string.subsonic_sheet_title
+                            else if (editingServer != null) R.string.subsonic_sheet_edit
+                            else R.string.subsonic_sheet_login
+                        ),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = colors.textPrimary,
                     )
                     Text(
-                        text = "兼容 Navidrome / Subsonic / Airsonic / Gonic / OpenSubsonic",
+                        text = stringResource(R.string.subsonic_sheet_compat),
                         fontSize = 11.sp,
                         color = colors.textSecondary,
                     )
@@ -197,7 +201,7 @@ fun SubsonicAccountsSheet(
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = "添加账号",
+                            text = stringResource(R.string.subsonic_add_account),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.onAccent,
@@ -208,7 +212,7 @@ fun SubsonicAccountsSheet(
                         onClearMessage()
                         showForm = false
                     }) {
-                        Text("账号列表", color = colors.textSecondary, fontSize = 13.sp)
+                        Text(stringResource(R.string.subsonic_account_list), color = colors.textSecondary, fontSize = 13.sp)
                     }
                 }
             }
@@ -241,7 +245,7 @@ fun SubsonicAccountsSheet(
                 // ==================== 已保存账号列表 ====================
                 if (servers.isEmpty()) {
                     Text(
-                        text = "尚未登录任何 Subsonic 服务器账号",
+                        text = stringResource(R.string.subsonic_no_accounts),
                         fontSize = 13.sp,
                         color = colors.textSecondary,
                         modifier = Modifier.padding(vertical = 20.dp),
@@ -287,7 +291,7 @@ fun SubsonicAccountsSheet(
                                         if (srv.isActive) {
                                             Spacer(Modifier.width(8.dp))
                                             Text(
-                                                text = "当前使用",
+                                                text = stringResource(R.string.subsonic_active_badge),
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = colors.exclusiveGreen,
@@ -344,12 +348,12 @@ fun SubsonicAccountsSheet(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Rounded.NetworkCheck,
-                                            contentDescription = "测试连接",
+                                            contentDescription = stringResource(R.string.subsonic_test_conn),
                                             tint = colors.textSecondary,
                                             modifier = Modifier.size(15.dp),
                                         )
                                         Spacer(Modifier.width(4.dp))
-                                        Text("测试", fontSize = 12.sp, color = colors.textSecondary)
+                                        Text(stringResource(R.string.subsonic_test_short), fontSize = 12.sp, color = colors.textSecondary)
                                     }
                                 }
 
@@ -362,12 +366,12 @@ fun SubsonicAccountsSheet(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Rounded.Edit,
-                                        contentDescription = "编辑",
+                                        contentDescription = stringResource(R.string.common_edit),
                                         tint = colors.textSecondary,
                                         modifier = Modifier.size(15.dp),
                                     )
                                     Spacer(Modifier.width(4.dp))
-                                    Text("编辑", fontSize = 12.sp, color = colors.textSecondary)
+                                    Text(stringResource(R.string.common_edit), fontSize = 12.sp, color = colors.textSecondary)
                                 }
 
                                 Row(
@@ -379,12 +383,12 @@ fun SubsonicAccountsSheet(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Rounded.Delete,
-                                        contentDescription = "退出删除",
+                                        contentDescription = stringResource(R.string.subsonic_remove_desc),
                                         tint = colors.danger,
                                         modifier = Modifier.size(15.dp),
                                     )
                                     Spacer(Modifier.width(4.dp))
-                                    Text("移除", fontSize = 12.sp, color = colors.danger)
+                                    Text(stringResource(R.string.subsonic_remove_short), fontSize = 12.sp, color = colors.danger)
                                 }
                             }
                         }
@@ -405,8 +409,8 @@ fun SubsonicAccountsSheet(
                 OutlinedTextField(
                     value = urlInput,
                     onValueChange = { urlInput = it },
-                    label = { Text("服务器地址 *") },
-                    placeholder = { Text("https://music.example.com 或 http://192.168.1.10:4533", fontSize = 12.sp) },
+                    label = { Text(stringResource(R.string.subsonic_field_url)) },
+                    placeholder = { Text("https://music.example.com / http://192.168.1.10:4533", fontSize = 12.sp) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     colors = fieldColors,
@@ -417,7 +421,7 @@ fun SubsonicAccountsSheet(
                 OutlinedTextField(
                     value = userInput,
                     onValueChange = { userInput = it },
-                    label = { Text("用户名 *") },
+                    label = { Text(stringResource(R.string.subsonic_field_user)) },
                     singleLine = true,
                     colors = fieldColors,
                     modifier = Modifier.fillMaxWidth(),
@@ -429,8 +433,10 @@ fun SubsonicAccountsSheet(
                     onValueChange = { passInput = it },
                     label = {
                         Text(
-                            if (editingServer != null) "密码（留空保持原已保存密码）"
-                            else "密码 *"
+                            stringResource(
+                                if (editingServer != null) R.string.subsonic_field_pass_edit
+                                else R.string.subsonic_field_pass
+                            )
                         )
                     },
                     singleLine = true,
@@ -440,7 +446,9 @@ fun SubsonicAccountsSheet(
                         IconButton(onClick = { showPassword = !showPassword }) {
                             Icon(
                                 imageVector = if (showPassword) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                                contentDescription = if (showPassword) "隐藏密码" else "显示密码",
+                                contentDescription = stringResource(
+                                    if (showPassword) R.string.subsonic_hide_pass else R.string.subsonic_show_pass
+                                ),
                                 tint = colors.textSecondary,
                             )
                         }
@@ -453,8 +461,8 @@ fun SubsonicAccountsSheet(
                 OutlinedTextField(
                     value = nameInput,
                     onValueChange = { nameInput = it },
-                    label = { Text("显示名称（选填）") },
-                    placeholder = { Text("例如：家里 Navidrome / 私有云 NAS", fontSize = 12.sp) },
+                    label = { Text(stringResource(R.string.subsonic_field_name)) },
+                    placeholder = { Text(stringResource(R.string.subsonic_field_name_hint), fontSize = 12.sp) },
                     singleLine = true,
                     colors = fieldColors,
                     modifier = Modifier.fillMaxWidth(),
@@ -479,7 +487,7 @@ fun SubsonicAccountsSheet(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "密码将使用 Android Keystore AES-256-GCM 硬件密钥加密保存在本地，请求默认采用随机盐值 MD5 Token 签名。",
+                        text = stringResource(R.string.subsonic_keystore_note),
                         fontSize = 11.sp,
                         color = colors.textSecondary,
                         lineHeight = 15.sp,
@@ -498,7 +506,7 @@ fun SubsonicAccountsSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "高级协议与证书选项",
+                        text = stringResource(R.string.subsonic_advanced_opts),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = colors.textSecondary,
@@ -524,9 +532,9 @@ fun SubsonicAccountsSheet(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f).padding(end = 10.dp)) {
-                                Text("旧版认证兼容（p=enc:）", fontSize = 13.sp, color = colors.textPrimary)
+                                Text(stringResource(R.string.subsonic_legacy_auth_title), fontSize = 13.sp, color = colors.textPrimary)
                                 Text(
-                                    "仅当旧版 Subsonic 或 LDAP 账号拒绝随机盐 Token 时开启",
+                                    stringResource(R.string.subsonic_legacy_auth_sub),
                                     fontSize = 11.sp,
                                     color = colors.textSecondary,
                                 )
@@ -546,9 +554,9 @@ fun SubsonicAccountsSheet(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f).padding(end = 10.dp)) {
-                                Text("信任自签名 HTTPS 证书", fontSize = 13.sp, color = colors.textPrimary)
+                                Text(stringResource(R.string.subsonic_self_signed_title), fontSize = 13.sp, color = colors.textPrimary)
                                 Text(
-                                    "仅对该服务器生效，适用于自建 NAS 私有 HTTPS 反向代理",
+                                    stringResource(R.string.subsonic_self_signed_sub),
                                     fontSize = 11.sp,
                                     color = colors.textSecondary,
                                 )
@@ -605,7 +613,7 @@ fun SubsonicAccountsSheet(
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
-                                text = "正在校验连接并加密保存…",
+                                text = stringResource(R.string.subsonic_verifying_saving),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = colors.onAccent,
@@ -621,7 +629,10 @@ fun SubsonicAccountsSheet(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = if (editingServer != null) "校验并更新账号" else "测试连接并保存登录",
+                                text = stringResource(
+                                    if (editingServer != null) R.string.subsonic_btn_verify_update
+                                    else R.string.subsonic_btn_test_save
+                                ),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (canSubmit) colors.onAccent else colors.textMuted,
@@ -637,10 +648,10 @@ fun SubsonicAccountsSheet(
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
             containerColor = colors.surface1,
-            title = { Text("退出并移除账号", color = colors.textPrimary) },
+            title = { Text(stringResource(R.string.subsonic_delete_title), color = colors.textPrimary) },
             text = {
                 Text(
-                    "确定移除「${target.name}」（${target.username}）吗？这将清除本地已加密保存的凭据及该服务器的远程元数据与封面缓存，不影响服务器上的音乐文件。",
+                    stringResource(R.string.subsonic_delete_msg, target.name, target.username),
                     color = colors.textSecondary,
                     fontSize = 13.sp,
                 )
@@ -652,12 +663,12 @@ fun SubsonicAccountsSheet(
                         confirmDelete = null
                     }
                 ) {
-                    Text("确认移除", color = colors.danger, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.subsonic_delete_confirm), color = colors.danger, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDelete = null }) {
-                    Text("取消", color = colors.textSecondary)
+                    Text(stringResource(R.string.common_cancel), color = colors.textSecondary)
                 }
             },
         )

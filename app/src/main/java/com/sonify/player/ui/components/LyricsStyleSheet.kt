@@ -34,10 +34,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.LyricsAlignment
 import com.sonify.player.data.LyricsBackdropStyle
@@ -105,13 +107,13 @@ fun LyricsLiveStylePanel(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = "沉浸歌词样式",
+                    text = stringResource(R.string.lyrics_style_sheet_title),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.textPrimary,
                 )
                 Text(
-                    text = "调节参数，上方歌词实时生效",
+                    text = stringResource(R.string.lyrics_style_sheet_sub),
                     fontSize = 11.sp,
                     color = colors.textSecondary,
                     maxLines = 1,
@@ -127,11 +129,11 @@ fun LyricsLiveStylePanel(
             ) {
                 Icon(Icons.Rounded.Refresh, contentDescription = null, tint = colors.accent, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("默认", fontSize = 11.sp, color = colors.accent, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.common_default), fontSize = 11.sp, color = colors.accent, fontWeight = FontWeight.Medium)
             }
             Spacer(Modifier.width(4.dp))
             IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Rounded.Close, contentDescription = "关闭", tint = colors.textSecondary, modifier = Modifier.size(20.dp))
+                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_close), tint = colors.textSecondary, modifier = Modifier.size(20.dp))
             }
         }
 
@@ -145,7 +147,7 @@ fun LyricsLiveStylePanel(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             // 1. 沉浸背景氛围
-            StyleSection("氛围背景") {
+            StyleSection(stringResource(R.string.lyrics_style_backdrop)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -153,11 +155,13 @@ fun LyricsLiveStylePanel(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     LyricsBackdropStyle.entries.forEach { bg ->
-                        val shortLabel = when (bg) {
-                            LyricsBackdropStyle.FLUID_AURORA -> "流体多色光晕"
-                            LyricsBackdropStyle.COVER_BLUR -> "封面暗调虚化"
-                            LyricsBackdropStyle.MINIMAL_DARK -> "极简深黑"
-                        }
+                        val shortLabel = stringResource(
+                            when (bg) {
+                                LyricsBackdropStyle.FLUID_AURORA -> R.string.lyrics_backdrop_aurora_short
+                                LyricsBackdropStyle.COVER_BLUR -> R.string.lyrics_backdrop_blur_short
+                                LyricsBackdropStyle.MINIMAL_DARK -> R.string.lyrics_backdrop_dark_short
+                            }
+                        )
                         StyleOptionChip(
                             label = shortLabel,
                             selected = settings.lyricsBackdropStyle == bg,
@@ -168,7 +172,7 @@ fun LyricsLiveStylePanel(
             }
 
             // 2. 高亮动效
-            StyleSection("高亮动效") {
+            StyleSection(stringResource(R.string.lyrics_style_highlight)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -176,12 +180,14 @@ fun LyricsLiveStylePanel(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     LyricsHighlightStyle.entries.forEach { hl ->
-                        val shortLabel = when (hl) {
-                            LyricsHighlightStyle.PROGRESSIVE_SWEEP -> "逐句流光扫色"
-                            LyricsHighlightStyle.GLOW_PURE -> "柔光纯白"
-                            LyricsHighlightStyle.ACCENT_TINT -> "主题强调色"
-                            LyricsHighlightStyle.CAPSULE_FOCUS -> "玻璃聚焦条"
-                        }
+                        val shortLabel = stringResource(
+                            when (hl) {
+                                LyricsHighlightStyle.PROGRESSIVE_SWEEP -> R.string.lyrics_hl_sweep_short
+                                LyricsHighlightStyle.GLOW_PURE -> R.string.lyrics_hl_pure_short
+                                LyricsHighlightStyle.ACCENT_TINT -> R.string.lyrics_hl_accent_short
+                                LyricsHighlightStyle.CAPSULE_FOCUS -> R.string.lyrics_hl_capsule_short
+                            }
+                        )
                         StyleOptionChip(
                             label = shortLabel,
                             selected = settings.lyricsHighlightStyle == hl,
@@ -192,7 +198,7 @@ fun LyricsLiveStylePanel(
             }
 
             // 3. 字体风格（芯片本身即采用该字体族渲染）
-            StyleSection("歌词字体") {
+            StyleSection(stringResource(R.string.lyrics_style_font)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -200,12 +206,14 @@ fun LyricsLiveStylePanel(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     LyricsFontFamily.entries.forEach { ff ->
-                        val shortLabel = when (ff) {
-                            LyricsFontFamily.SANS_MODERN -> "现代无衬线"
-                            LyricsFontFamily.SERIF_EDITORIAL -> "文艺黑胶衬线"
-                            LyricsFontFamily.ROUNDED_SOFT -> "温润舒展"
-                            LyricsFontFamily.MONO_STUDIO -> "录音室等宽"
-                        }
+                        val shortLabel = stringResource(
+                            when (ff) {
+                                LyricsFontFamily.SANS_MODERN -> R.string.lyrics_font_sans_short
+                                LyricsFontFamily.SERIF_EDITORIAL -> R.string.lyrics_font_serif_short
+                                LyricsFontFamily.ROUNDED_SOFT -> R.string.lyrics_font_rounded_short
+                                LyricsFontFamily.MONO_STUDIO -> R.string.lyrics_font_mono_short
+                            }
+                        )
                         StyleOptionChip(
                             label = shortLabel,
                             selected = settings.lyricsFontFamily == ff,
@@ -217,7 +225,7 @@ fun LyricsLiveStylePanel(
             }
 
             // 4. 连续字号滑块（16..32sp）
-            StyleSection("字号大小", trailing = "${settings.lyricsFontSizeSp} sp") {
+            StyleSection(stringResource(R.string.lyrics_style_font_size), trailing = "${settings.lyricsFontSizeSp} sp") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -247,15 +255,17 @@ fun LyricsLiveStylePanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("行距留白", fontSize = 12.sp, color = colors.textSecondary, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.lyrics_style_spacing), fontSize = 12.sp, color = colors.textSecondary, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         LyricsLineSpacing.entries.forEach { sp ->
-                            val lbl = when (sp) {
-                                LyricsLineSpacing.COMPACT -> "紧凑"
-                                LyricsLineSpacing.COMFORTABLE -> "舒展"
-                                LyricsLineSpacing.RELAXED -> "宽松"
-                            }
+                            val lbl = stringResource(
+                                when (sp) {
+                                    LyricsLineSpacing.COMPACT -> R.string.lyrics_spacing_compact_short
+                                    LyricsLineSpacing.COMFORTABLE -> R.string.lyrics_spacing_comfort_short
+                                    LyricsLineSpacing.RELAXED -> R.string.lyrics_spacing_relaxed_short
+                                }
+                            )
                             StyleOptionChip(
                                 label = lbl,
                                 selected = settings.lyricsLineSpacing == sp,
@@ -266,7 +276,7 @@ fun LyricsLiveStylePanel(
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("排版对齐", fontSize = 12.sp, color = colors.textSecondary, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.lyrics_style_alignment), fontSize = 12.sp, color = colors.textSecondary, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         AlignIconChip(
@@ -286,17 +296,17 @@ fun LyricsLiveStylePanel(
             // 6. 精细开关组
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 CompactToggleRow(
-                    label = "当前演唱句加粗强调",
+                    label = stringResource(R.string.lyrics_style_bold_active),
                     checked = settings.lyricsBoldActive,
                     onCheckedChange = actions.onToggleBoldActive,
                 )
                 CompactToggleRow(
-                    label = "显示双语歌词译文",
+                    label = stringResource(R.string.lyrics_style_show_translation),
                     checked = settings.lyricsShowTranslation,
                     onCheckedChange = actions.onToggleShowTranslation,
                 )
                 CompactToggleRow(
-                    label = "沉浸纯享态（5 秒无操作隐藏控件）",
+                    label = stringResource(R.string.lyrics_style_auto_hide),
                     checked = settings.lyricsAutoHideControls,
                     onCheckedChange = actions.onToggleAutoHideControls,
                 )

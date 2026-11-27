@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,10 +63,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sonify.player.BuildConfig
 import com.sonify.player.MainActivity
+import com.sonify.player.R
 import com.sonify.player.crash.CrashReport
 import com.sonify.player.crash.CrashReporter
 import com.sonify.player.data.AccentStyle
 import com.sonify.player.data.DarkCanvasStyle
+import com.sonify.player.i18n.SonifyLocaleManager
 import com.sonify.player.ui.theme.HiFiPlayerTheme
 import com.sonify.player.ui.theme.LocalHiFiColors
 import kotlinx.coroutines.delay
@@ -79,6 +82,10 @@ import kotlin.system.exitProcess
  * - 30 秒内连崩 >= 3 次触发连崩熔断，停止自动拉起并提供「清理缓存并重启」安全选项。
  */
 class CrashRecoveryActivity : ComponentActivity() {
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(SonifyLocaleManager.wrapContext(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -224,7 +231,7 @@ private fun CrashRecoveryContent(
         Spacer(Modifier.height(18.dp))
 
         Text(
-            text = if (isLoopBroken) "检测到连续异常，已暂停自动重启" else "Sonify 遇到意外并已保护现场",
+            text = stringResource(if (isLoopBroken) R.string.crash_loop_title else R.string.crash_normal_title),
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = colors.textPrimary,
@@ -234,9 +241,9 @@ private fun CrashRecoveryContent(
 
         Text(
             text = if (isLoopBroken) {
-                "30 秒内连续触发 $crashCount 次异常，为防止无限闪退已进入安全恢复页。建议上报日志或清理临时缓存后重启。"
+                stringResource(R.string.crash_loop_desc, crashCount)
             } else {
-                "已安全释放音频输出并保存脱敏崩溃日志，即将自动为你重新拉起播放器。"
+                stringResource(R.string.crash_normal_desc)
             },
             fontSize = 13.sp,
             color = colors.textSecondary,
@@ -260,7 +267,11 @@ private fun CrashRecoveryContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text = if (autoRestartPaused) "已暂停自动拉起" else "${countdownSec} 秒后自动重新拉起…",
+                        text = if (autoRestartPaused) {
+                            stringResource(R.string.crash_countdown_paused)
+                        } else {
+                            stringResource(R.string.crash_countdown_running, countdownSec)
+                        },
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (autoRestartPaused) colors.textSecondary else colors.accent,
@@ -276,7 +287,7 @@ private fun CrashRecoveryContent(
                         ) {
                             Icon(Icons.Rounded.Pause, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("暂停查看", fontSize = 11.sp, color = colors.textPrimary)
+                            Text(stringResource(R.string.crash_btn_pause), fontSize = 11.sp, color = colors.textPrimary)
                         }
                     }
                 }
@@ -307,7 +318,7 @@ private fun CrashRecoveryContent(
         ) {
             Icon(Icons.Rounded.Refresh, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text("立即重启 Sonify", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = colors.onAccent)
+            Text(stringResource(R.string.crash_btn_restart), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = colors.onAccent)
         }
 
         if (isLoopBroken) {
@@ -324,7 +335,7 @@ private fun CrashRecoveryContent(
             ) {
                 Icon(Icons.Rounded.DeleteSweep, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("清理临时缓存并重启", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
+                Text(stringResource(R.string.crash_btn_clear_restart), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
             }
         }
 
@@ -357,7 +368,7 @@ private fun CrashRecoveryContent(
                 Icon(Icons.Rounded.CloudUpload, contentDescription = null, tint = colors.exclusiveGreen, modifier = Modifier.size(17.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = if (uploading) "上报中…" else "上报脱敏日志",
+                    text = stringResource(if (uploading) R.string.crash_btn_uploading else R.string.crash_btn_upload),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     color = colors.textPrimary,
@@ -381,7 +392,7 @@ private fun CrashRecoveryContent(
                 Icon(Icons.Rounded.ContentCopy, contentDescription = null, tint = colors.accent, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = if (copiedHint) "已复制堆栈" else "复制崩溃堆栈",
+                    text = stringResource(if (copiedHint) R.string.crash_btn_copied else R.string.crash_btn_copy),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     color = colors.textPrimary,
@@ -391,10 +402,11 @@ private fun CrashRecoveryContent(
 
         uploadStatus?.let { st ->
             Spacer(Modifier.height(10.dp))
+            val uploadedBadge = stringResource(R.string.crash_badge_uploaded)
             Text(
                 text = st,
                 fontSize = 12.sp,
-                color = if (st.contains("已上报")) colors.exclusiveGreen else colors.textSecondary,
+                color = if (st.contains(uploadedBadge, ignoreCase = true)) colors.exclusiveGreen else colors.textSecondary,
             )
         }
 

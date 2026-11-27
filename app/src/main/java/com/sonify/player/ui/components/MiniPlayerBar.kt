@@ -35,11 +35,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.audio.ActiveOutputRoute
 import com.sonify.player.ui.PlaybackUiState
 import com.sonify.player.ui.theme.AmbientColorExtractor
@@ -166,7 +168,7 @@ fun MiniPlayerBar(
             IconButton(onClick = onOpenOutputSheet) {
                 Icon(
                     imageVector = if (isUsbExclusive) Icons.Rounded.Usb else Icons.Rounded.Headphones,
-                    contentDescription = "输出设备",
+                    contentDescription = stringResource(R.string.player_output_device),
                     tint = if (isUsbExclusive) colors.exclusiveGreen else colors.textSecondary,
                     modifier = Modifier.size(22.dp),
                 )
@@ -175,7 +177,7 @@ fun MiniPlayerBar(
             IconButton(onClick = onTogglePlayPause) {
                 Icon(
                     imageVector = if (playback.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = if (playback.isPlaying) "暂停" else "播放",
+                    contentDescription = stringResource(if (playback.isPlaying) R.string.common_pause else R.string.common_play),
                     tint = colors.textPrimary,
                     modifier = Modifier.size(28.dp),
                 )

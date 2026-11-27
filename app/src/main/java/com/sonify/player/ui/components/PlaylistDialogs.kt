@@ -68,12 +68,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.sonify.player.R
 import com.sonify.player.data.DownloadedTrackEntity
 import com.sonify.player.data.SubsonicServerEntity
 import com.sonify.player.data.TrackEntity
@@ -139,7 +141,7 @@ fun PlaylistEditorDialog(
         containerColor = colors.surface1,
         title = {
             Text(
-                text = if (isEdit) "编辑歌单" else "新建歌单",
+                text = stringResource(if (isEdit) R.string.playlist_edit_title else R.string.playlist_create_title),
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary,
             )
@@ -162,7 +164,7 @@ fun PlaylistEditorDialog(
                             if (pickedCoverUri != null) {
                                 AsyncImage(
                                     model = pickedCoverUri,
-                                    contentDescription = "已选封面",
+                                    contentDescription = stringResource(R.string.playlist_cover_selected),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.size(76.dp),
                                 )
@@ -192,12 +194,12 @@ fun PlaylistEditorDialog(
                                     modifier = Modifier.size(16.dp),
                                 )
                                 Spacer(Modifier.width(6.dp))
-                                Text("从相册选择封面", fontSize = 12.sp, color = colors.textPrimary)
+                                Text(stringResource(R.string.playlist_cover_pick), fontSize = 12.sp, color = colors.textPrimary)
                             }
                             if (pickedCoverUri != null || (!clearCustomCover && !initialCustomCoverPath.isNullOrBlank())) {
                                 Spacer(Modifier.height(6.dp))
                                 Text(
-                                    text = "恢复自动四宫格封面",
+                                    text = stringResource(R.string.playlist_cover_reset),
                                     fontSize = 11.sp,
                                     color = colors.textSecondary,
                                     modifier = Modifier
@@ -210,7 +212,7 @@ fun PlaylistEditorDialog(
                             } else {
                                 Spacer(Modifier.height(4.dp))
                                 Text(
-                                    text = "未选择时自动拼出 2×2 专辑四宫格",
+                                    text = stringResource(R.string.playlist_cover_hint),
                                     fontSize = 11.sp,
                                     color = colors.textMuted,
                                 )
@@ -227,7 +229,7 @@ fun PlaylistEditorDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         TargetChip(
-                            label = "本地歌单（可混收）",
+                            label = stringResource(R.string.playlist_type_local),
                             selected = !createRemote,
                             onClick = { createRemote = false },
                             modifier = Modifier.weight(1f),
@@ -245,8 +247,8 @@ fun PlaylistEditorDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("歌单名称 *") },
-                    placeholder = { Text("例如：深夜爵士黑胶 / 无损试音精选", fontSize = 12.sp) },
+                    label = { Text(stringResource(R.string.playlist_name_label)) },
+                    placeholder = { Text(stringResource(R.string.playlist_name_hint), fontSize = 12.sp) },
                     singleLine = true,
                     colors = fieldColors,
                     modifier = Modifier.fillMaxWidth(),
@@ -255,7 +257,7 @@ fun PlaylistEditorDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("歌单简介（选填）") },
+                    label = { Text(stringResource(R.string.playlist_desc_label)) },
                     maxLines = 3,
                     colors = fieldColors,
                     modifier = Modifier.fillMaxWidth(),
@@ -270,7 +272,7 @@ fun PlaylistEditorDialog(
                 },
             ) {
                 Text(
-                    text = if (isEdit) "保存" else "创建",
+                    text = stringResource(if (isEdit) R.string.common_save else R.string.common_create),
                     color = if (name.trim().isNotEmpty()) colors.accent else colors.textMuted,
                     fontWeight = FontWeight.Bold,
                 )
@@ -278,7 +280,7 @@ fun PlaylistEditorDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = colors.textSecondary)
+                Text(stringResource(R.string.common_cancel), color = colors.textSecondary)
             }
         },
     )
@@ -369,7 +371,8 @@ fun AddToPlaylistSheet(
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = if (tracksToAdd.size == 1) "加入歌单" else "批量加入歌单（${tracksToAdd.size} 首）",
+                        text = if (tracksToAdd.size == 1) stringResource(R.string.playlist_add_title)
+                        else stringResource(R.string.playlist_batch_add_title, tracksToAdd.size),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = colors.textPrimary,
@@ -411,7 +414,7 @@ fun AddToPlaylistSheet(
                 }
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    text = "新建歌单并加入",
+                    text = stringResource(R.string.playlist_create_and_add),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = colors.accent,
@@ -427,7 +430,7 @@ fun AddToPlaylistSheet(
                 if (localPlaylists.isNotEmpty()) {
                     item(key = "local_pl_header") {
                         Text(
-                            text = "本地歌单（支持本地与远程混收）",
+                            text = stringResource(R.string.playlist_local_section),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.textMuted,
@@ -462,7 +465,7 @@ fun AddToPlaylistSheet(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
-                                    text = "${summary.trackCount} 首歌曲",
+                                    text = stringResource(R.string.common_tracks_count, summary.trackCount),
                                     fontSize = 12.sp,
                                     color = colors.textSecondary,
                                 )
@@ -474,7 +477,7 @@ fun AddToPlaylistSheet(
                 if (allBelongToRemote && remoteServer != null && remotePlaylists.isNotEmpty()) {
                     item(key = "remote_pl_header") {
                         Text(
-                            text = "服务器歌单 · ${remoteServer.name}",
+                            text = stringResource(R.string.playlist_remote_section, remoteServer.name),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.exclusiveGreen,
@@ -517,7 +520,7 @@ fun AddToPlaylistSheet(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
-                                    text = "${rpl.songCount} 首 · 服务器同步",
+                                    text = stringResource(R.string.playlist_remote_meta, rpl.songCount),
                                     fontSize = 12.sp,
                                     color = colors.textSecondary,
                                 )
@@ -534,7 +537,7 @@ fun AddToPlaylistSheet(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrackSortSheet(
-    title: String = "排序方式",
+    title: String = stringResource(R.string.playlist_sort_title),
     fields: List<TrackSortField>,
     selectedField: TrackSortField,
     ascending: Boolean,
@@ -577,7 +580,7 @@ fun TrackSortSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = field.label,
+                        text = stringResource(field.labelRes),
                         fontSize = 15.sp,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                         color = if (isSelected) colors.accent else colors.textPrimary,
@@ -586,7 +589,7 @@ fun TrackSortSheet(
                     if (isSelected) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = if (ascending) "升序" else "降序",
+                                text = stringResource(if (ascending) R.string.playlist_sort_asc else R.string.playlist_sort_desc),
                                 fontSize = 12.sp,
                                 color = colors.accent,
                             )
@@ -669,25 +672,25 @@ fun TrackActionSheet(
 
             ActionMenuRow(
                 icon = Icons.Rounded.PlayArrow,
-                label = "立即播放",
+                label = stringResource(R.string.common_play_now),
                 onClick = { onDismiss(); onPlayNow() },
             )
             ActionMenuRow(
                 icon = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                label = "加入歌单",
+                label = stringResource(R.string.playlist_add_title),
                 tint = colors.accent,
                 onClick = { onDismiss(); onAddToPlaylist() },
             )
             ActionMenuRow(
                 icon = if (track.isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                label = if (track.isFavorite) "取消收藏" else "收藏歌曲",
+                label = stringResource(if (track.isFavorite) R.string.player_unfavorite else R.string.player_favorite_song),
                 tint = if (track.isFavorite) colors.accent else colors.textPrimary,
                 onClick = { onDismiss(); onToggleFavorite() },
             )
             if (isRemote && !isDownloaded && onDownload != null) {
                 ActionMenuRow(
                     icon = Icons.Rounded.Download,
-                    label = "下载到本地（离线无损）",
+                    label = stringResource(R.string.playlist_action_download_offline),
                     tint = colors.exclusiveGreen,
                     onClick = { onDismiss(); onDownload() },
                 )
@@ -695,7 +698,7 @@ fun TrackActionSheet(
             if (isRemote && isDownloaded && onDeleteDownload != null) {
                 ActionMenuRow(
                     icon = Icons.Rounded.DownloadDone,
-                    label = "删除已下载离线文件",
+                    label = stringResource(R.string.playlist_action_delete_offline),
                     tint = colors.danger,
                     onClick = { onDismiss(); onDeleteDownload() },
                 )
@@ -703,7 +706,7 @@ fun TrackActionSheet(
             if (showRemoveFromPlaylist && onRemoveFromPlaylist != null) {
                 ActionMenuRow(
                     icon = Icons.Rounded.Delete,
-                    label = "从当前歌单移除",
+                    label = stringResource(R.string.playlist_action_remove_here),
                     tint = colors.danger,
                     onClick = { onDismiss(); onRemoveFromPlaylist() },
                 )
@@ -763,7 +766,7 @@ fun BatchSelectionBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "已选择 $selectedCount / $totalCount 首",
+                text = stringResource(R.string.playlist_selected_count, selectedCount, totalCount),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.textPrimary,
@@ -784,13 +787,13 @@ fun BatchSelectionBar(
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    text = if (allSelected) "取消全选" else "全选",
+                    text = stringResource(if (allSelected) R.string.common_deselect_all else R.string.common_select_all),
                     fontSize = 12.sp,
                     color = colors.accent,
                 )
             }
             IconButton(onClick = onExit, modifier = Modifier.size(30.dp)) {
-                Icon(Icons.Rounded.Close, contentDescription = "退出多选", tint = colors.textSecondary, modifier = Modifier.size(18.dp))
+                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.playlist_exit_multi), tint = colors.textSecondary, modifier = Modifier.size(18.dp))
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -800,7 +803,7 @@ fun BatchSelectionBar(
         ) {
             BatchActionButton(
                 icon = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                label = "加入歌单",
+                label = stringResource(R.string.playlist_add_title),
                 enabled = selectedCount > 0,
                 accentBg = true,
                 onClick = onBatchAddToPlaylist,
@@ -809,7 +812,7 @@ fun BatchSelectionBar(
             if (hasRemoteSelected && onBatchDownload != null) {
                 BatchActionButton(
                     icon = Icons.Rounded.Download,
-                    label = "下载",
+                    label = stringResource(R.string.common_download),
                     enabled = selectedCount > 0,
                     tint = colors.exclusiveGreen,
                     onClick = onBatchDownload,
@@ -819,7 +822,7 @@ fun BatchSelectionBar(
             if (showRemoveFromPlaylist && onBatchRemoveFromPlaylist != null) {
                 BatchActionButton(
                     icon = Icons.Rounded.Delete,
-                    label = "移出歌单",
+                    label = stringResource(R.string.playlist_remove_from),
                     enabled = selectedCount > 0,
                     tint = colors.danger,
                     onClick = onBatchRemoveFromPlaylist,
@@ -911,7 +914,7 @@ fun AddTracksPickerSheet(
                 .padding(bottom = 18.dp),
         ) {
             Text(
-                text = "添加歌曲到「$playlistName」",
+                text = stringResource(R.string.playlist_picker_title, playlistName),
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary,
@@ -920,12 +923,12 @@ fun AddTracksPickerSheet(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("搜索歌名、艺人、专辑…", fontSize = 13.sp) },
+                placeholder = { Text(stringResource(R.string.playlist_picker_search), fontSize = 13.sp) },
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = colors.textSecondary) },
                 trailingIcon = if (query.isNotEmpty()) {
                     {
                         IconButton(onClick = { query = "" }) {
-                            Icon(Icons.Rounded.Close, contentDescription = "清空", tint = colors.textSecondary)
+                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_clear), tint = colors.textSecondary)
                         }
                     }
                 } else null,
@@ -948,7 +951,7 @@ fun AddTracksPickerSheet(
                         .height(180.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("没有找到可添加的歌曲", fontSize = 13.sp, color = colors.textSecondary)
+                    Text(stringResource(R.string.playlist_picker_empty), fontSize = 13.sp, color = colors.textSecondary)
                 }
             } else {
                 LazyColumn(
@@ -999,7 +1002,8 @@ fun AddTracksPickerSheet(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
-                                    text = if (alreadyIn) "已在歌单中 · ${track.artist}" else "${track.artist} · ${track.album}",
+                                    text = if (alreadyIn) stringResource(R.string.playlist_picker_already_in, track.artist)
+                                    else "${track.artist} · ${track.album}",
                                     fontSize = 11.sp,
                                     color = colors.textSecondary,
                                     maxLines = 1,
@@ -1027,7 +1031,8 @@ fun AddTracksPickerSheet(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = if (selectedPaths.isEmpty()) "请勾选要添加的歌曲" else "确认添加（${selectedPaths.size} 首）",
+                    text = if (selectedPaths.isEmpty()) stringResource(R.string.playlist_picker_prompt)
+                    else stringResource(R.string.playlist_picker_confirm, selectedPaths.size),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (selectedPaths.isNotEmpty()) colors.onAccent else colors.textMuted,
@@ -1085,20 +1090,20 @@ fun DownloadQueueSheet(
                 Icon(Icons.Rounded.Download, contentDescription = null, tint = colors.exclusiveGreen)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("离线下载管理", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                    Text(stringResource(R.string.playlist_dl_title), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
                     Text(
-                        text = "已离线 ${downloadedList.size} 首 · 占用 $sizeLabel",
+                        text = stringResource(R.string.playlist_dl_summary, downloadedList.size, sizeLabel),
                         fontSize = 12.sp,
                         color = colors.textSecondary,
                     )
                 }
                 if (queueState.activeCount > 0) {
                     TextButton(onClick = onCancelAll) {
-                        Text("全部取消", color = colors.danger, fontSize = 12.sp)
+                        Text(stringResource(R.string.playlist_dl_cancel_all), color = colors.danger, fontSize = 12.sp)
                     }
                 } else if (queueState.tasks.isNotEmpty()) {
                     TextButton(onClick = onClearFinished) {
-                        Text("清理记录", color = colors.textSecondary, fontSize = 12.sp)
+                        Text(stringResource(R.string.playlist_dl_clear_done), color = colors.textSecondary, fontSize = 12.sp)
                     }
                 }
             }
@@ -1113,7 +1118,7 @@ fun DownloadQueueSheet(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "当前没有进行中的下载任务",
+                        text = stringResource(R.string.playlist_dl_no_active),
                         fontSize = 13.sp,
                         color = colors.textSecondary,
                     )
@@ -1144,13 +1149,14 @@ fun DownloadQueueSheet(
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     val statusText = when (item.status) {
-                                        DownloadTaskStatus.QUEUED -> "排队等待中…"
+                                        DownloadTaskStatus.QUEUED -> stringResource(R.string.playlist_dl_queued)
                                         DownloadTaskStatus.DOWNLOADING -> {
                                             val pct = (item.progress * 100f).toInt()
-                                            if (item.totalBytes > 0) "下载中 $pct%" else "下载中…"
+                                            if (item.totalBytes > 0) stringResource(R.string.playlist_dl_progress, pct)
+                                            else stringResource(R.string.playlist_dl_downloading)
                                         }
-                                        DownloadTaskStatus.COMPLETED -> "已完成 · 已支持离线无损播放"
-                                        DownloadTaskStatus.FAILED -> item.error ?: "下载失败"
+                                        DownloadTaskStatus.COMPLETED -> stringResource(R.string.playlist_dl_done)
+                                        DownloadTaskStatus.FAILED -> item.error ?: stringResource(R.string.playlist_dl_failed)
                                     }
                                     Text(
                                         text = statusText,
@@ -1167,12 +1173,12 @@ fun DownloadQueueSheet(
                                 when (item.status) {
                                     DownloadTaskStatus.FAILED -> {
                                         IconButton(onClick = { onRetry(item.track.path) }, modifier = Modifier.size(32.dp)) {
-                                            Icon(Icons.Rounded.Refresh, contentDescription = "重试", tint = colors.accent, modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.common_retry), tint = colors.accent, modifier = Modifier.size(18.dp))
                                         }
                                     }
                                     DownloadTaskStatus.QUEUED, DownloadTaskStatus.DOWNLOADING -> {
                                         IconButton(onClick = { onCancelTask(item.track.path) }, modifier = Modifier.size(32.dp)) {
-                                            Icon(Icons.Rounded.Close, contentDescription = "取消", tint = colors.textSecondary, modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_cancel), tint = colors.textSecondary, modifier = Modifier.size(18.dp))
                                         }
                                     }
                                     DownloadTaskStatus.COMPLETED -> {
@@ -1209,7 +1215,7 @@ fun DownloadQueueSheet(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "清空全部离线文件（释放 $sizeLabel）",
+                        text = stringResource(R.string.playlist_dl_clear_all_btn, sizeLabel),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = colors.danger,
@@ -1223,10 +1229,10 @@ fun DownloadQueueSheet(
         AlertDialog(
             onDismissRequest = { confirmClearAll = false },
             containerColor = colors.surface1,
-            title = { Text("清空全部离线下载", color = colors.textPrimary) },
+            title = { Text(stringResource(R.string.playlist_dl_clear_dialog_title), color = colors.textPrimary) },
             text = {
                 Text(
-                    "确定删除全部 ${downloadedList.size} 首已下载离线文件吗？这会释放 $sizeLabel 本地空间，不影响 Subsonic 服务器上的原文件。",
+                    stringResource(R.string.playlist_dl_clear_dialog_msg, downloadedList.size, sizeLabel),
                     color = colors.textSecondary,
                     fontSize = 13.sp,
                 )
@@ -1236,12 +1242,12 @@ fun DownloadQueueSheet(
                     confirmClearAll = false
                     onDeleteAllDownloads()
                 }) {
-                    Text("确认清空", color = colors.danger, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.playlist_dl_clear_confirm), color = colors.danger, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmClearAll = false }) {
-                    Text("取消", color = colors.textSecondary)
+                    Text(stringResource(R.string.common_cancel), color = colors.textSecondary)
                 }
             },
         )

@@ -44,12 +44,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.audio.ActiveOutputRoute
 import com.sonify.player.data.AppSettings
 import com.sonify.player.ui.theme.LocalHiFiColors
@@ -75,6 +78,7 @@ fun UsbDeviceScreen(
     bottomPadding: Dp,
 ) {
     val colors = LocalHiFiColors.current
+    val ctx = LocalContext.current
     var showEngineering by remember { mutableStateOf(false) }
     var tonePlaying by remember { mutableStateOf(false) }
     var toneRate by remember(usbState.supportedRates) {
@@ -106,14 +110,14 @@ fun UsbDeviceScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "USB 设备",
+                text = stringResource(R.string.usb_title),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary,
                 modifier = Modifier.weight(1f),
             )
             IconButton(onClick = onRefreshDevices) {
-                Icon(Icons.Rounded.Refresh, contentDescription = "扫描 USB", tint = colors.textPrimary)
+                Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.usb_scan), tint = colors.textPrimary)
             }
         }
 
@@ -160,11 +164,13 @@ fun UsbDeviceScreen(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = when {
-                                isExclusiveLocked -> "USB 独占输出运行中"
-                                usbState.isConnected -> "USB DAC 已连接就绪"
-                                else -> "未连接 USB DAC"
-                            },
+                            text = stringResource(
+                                when {
+                                    isExclusiveLocked -> R.string.usb_status_streaming
+                                    usbState.isConnected -> R.string.usb_status_ready
+                                    else -> R.string.usb_status_disconnected
+                                }
+                            ),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = if (usbState.isConnected) colors.exclusiveGreen else colors.textSecondary,
@@ -182,7 +188,7 @@ fun UsbDeviceScreen(
                 }
                 if (usbState.isConnected) {
                     Text(
-                        text = "断开",
+                        text = stringResource(R.string.usb_disconnect),
                         fontSize = 12.sp,
                         color = colors.danger,
                         modifier = Modifier
@@ -204,13 +210,13 @@ fun UsbDeviceScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     MetricTile(
-                        label = "协商采样率",
-                        value = if (stats.rate > 0) "${stats.rate} Hz" else "待机",
+                        label = stringResource(R.string.usb_metric_rate),
+                        value = if (stats.rate > 0) "${stats.rate} Hz" else stringResource(R.string.usb_metric_standby),
                         highlight = stats.running,
                         modifier = Modifier.weight(1f),
                     )
                     MetricTile(
-                        label = "位深 / 容器",
+                        label = stringResource(R.string.usb_metric_bits),
                         value = if (stats.bits > 0) "${stats.bits}b / ${stats.subslot}B" else "—",
                         highlight = false,
                         modifier = Modifier.weight(1f),
@@ -222,13 +228,13 @@ fun UsbDeviceScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     MetricTile(
-                        label = "Feedback 实测",
+                        label = stringResource(R.string.usb_metric_feedback),
                         value = if (stats.fbRate > 0) "%.1f Hz".format(stats.fbRate) else "—",
                         highlight = false,
                         modifier = Modifier.weight(1f),
                     )
                     MetricTile(
-                        label = "缓冲 / 欠载",
+                        label = stringResource(R.string.usb_metric_buffer),
                         value = "%.0fms · %d/%d".format(stats.bufferFillMs, stats.underruns, stats.ringUnderruns),
                         highlight = false,
                         modifier = Modifier.weight(1f),
@@ -237,7 +243,7 @@ fun UsbDeviceScreen(
             } else {
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    text = "通过 OTG 接入 USB DAC 后，点击下方设备授权即可启用 Bit-Perfect 独占驱动。未连接时将自动回退至本机音频输出。",
+                    text = stringResource(R.string.usb_empty_hint),
                     fontSize = 12.sp,
                     color = colors.textSecondary,
                 )
@@ -257,13 +263,13 @@ fun UsbDeviceScreen(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = "USB 独占输出（Bit-Perfect）",
+                    text = stringResource(R.string.usb_exclusive_title),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
                     color = colors.textPrimary,
                 )
                 Text(
-                    text = "绕过 Android AudioFlinger 重采样，直接发 iso URB",
+                    text = stringResource(R.string.usb_exclusive_desc),
                     fontSize = 12.sp,
                     color = colors.textSecondary,
                 )
@@ -280,7 +286,7 @@ fun UsbDeviceScreen(
 
         Spacer(Modifier.height(18.dp))
         Text(
-            text = "已检测到的 USB 音频设备（${usbState.devices.size}）",
+            text = stringResource(R.string.usb_detected_header, usbState.devices.size),
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             color = colors.textSecondary,
@@ -296,7 +302,7 @@ fun UsbDeviceScreen(
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "未检测到 USB Audio Class 设备。请确认 DAC 已插紧且手机已开启 OTG。",
+                    text = stringResource(R.string.usb_none_detected),
                     fontSize = 12.sp,
                     color = colors.textMuted,
                 )
@@ -336,7 +342,7 @@ fun UsbDeviceScreen(
                         )
                     }
                     Text(
-                        text = if (isConn) "已连接" else "连接",
+                        text = stringResource(if (isConn) R.string.usb_connected else R.string.usb_connect),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (isConn) colors.exclusiveGreen else colors.accent,
@@ -359,13 +365,13 @@ fun UsbDeviceScreen(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = "工程诊断与测试音工具",
+                    text = stringResource(R.string.usb_diag_title),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = colors.textPrimary,
                 )
                 Text(
-                    text = "UAC 描述符 / Alt Setting / 440Hz & 1kHz 纯音测试 / 日志",
+                    text = stringResource(R.string.usb_diag_sub),
                     fontSize = 11.sp,
                     color = colors.textSecondary,
                 )
@@ -388,8 +394,8 @@ fun UsbDeviceScreen(
             ) {
                 usbState.uacInfo?.let { info ->
                     Text(
-                        text = "UAC${info.uacVersion} · AC 接口 ${info.acInterface} · " +
-                            if (info.hasClockSource) "Clock ID ${info.clockSourceId}" else "无独立 Clock",
+                        text = stringResource(R.string.usb_diag_uac_info, info.uacVersion, info.acInterface) +
+                            if (info.hasClockSource) "Clock ID ${info.clockSourceId}" else stringResource(R.string.usb_diag_no_clock),
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
                         color = colors.accent,
@@ -407,7 +413,7 @@ fun UsbDeviceScreen(
                     }
 
                     Spacer(Modifier.height(12.dp))
-                    Text("测试音采样率", fontSize = 12.sp, color = colors.textSecondary)
+                    Text(stringResource(R.string.usb_tone_rate), fontSize = 12.sp, color = colors.textSecondary)
                     Spacer(Modifier.height(6.dp))
                     val rates = usbState.supportedRates.ifEmpty { listOf(44100, 48000, 96000) }
                     rates.chunked(4).forEach { row ->
@@ -450,7 +456,7 @@ fun UsbDeviceScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("测试音幅度", fontSize = 12.sp, color = colors.textSecondary)
+                        Text(stringResource(R.string.usb_tone_amp), fontSize = 12.sp, color = colors.textSecondary)
                         Text(
                             "%.0f dB".format(20 * log10(toneAmp.toDouble().coerceAtLeast(1e-6))),
                             fontSize = 12.sp,
@@ -479,11 +485,14 @@ fun UsbDeviceScreen(
                                     if (tonePlaying) {
                                         UsbAudioNative.nativeStop()
                                         tonePlaying = false
-                                        onAppendLog("测试音已停止")
+                                        onAppendLog(ctx.getString(R.string.usb_tone_stopped))
                                     } else {
                                         val ok = UsbAudioNative.nativePlayTone(440.0, 0, toneRate, toneAmp.toDouble())
                                         tonePlaying = ok
-                                        onAppendLog(if (ok) "播放 440Hz @ $toneRate Hz" else "测试音启动失败")
+                                        onAppendLog(
+                                            if (ok) ctx.getString(R.string.usb_tone_playing_440, toneRate)
+                                            else ctx.getString(R.string.usb_tone_failed)
+                                        )
                                     }
                                     onRefreshStats()
                                 }
@@ -491,7 +500,7 @@ fun UsbDeviceScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                text = if (tonePlaying) "停止测试音" else "播放 440Hz",
+                                text = stringResource(if (tonePlaying) R.string.usb_tone_stop_btn else R.string.usb_tone_play_440),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (tonePlaying) Color.White else colors.onAccent,
@@ -505,19 +514,22 @@ fun UsbDeviceScreen(
                                 .clickable {
                                     val ok = UsbAudioNative.nativePlayTone(1000.0, 0, toneRate, toneAmp.toDouble())
                                     tonePlaying = ok
-                                    onAppendLog(if (ok) "播放 1kHz @ $toneRate Hz" else "测试音启动失败")
+                                    onAppendLog(
+                                        if (ok) ctx.getString(R.string.usb_tone_playing_1k, toneRate)
+                                        else ctx.getString(R.string.usb_tone_failed)
+                                    )
                                     onRefreshStats()
                                 }
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("播放 1kHz", fontSize = 13.sp, color = colors.textPrimary)
+                            Text(stringResource(R.string.usb_tone_play_1k), fontSize = 13.sp, color = colors.textPrimary)
                         }
                     }
 
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        text = stats.rawJson.ifBlank { "无实时统计" },
+                        text = stats.rawJson.ifBlank { stringResource(R.string.usb_no_live_stats) },
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
                         color = colors.textMuted,
@@ -525,7 +537,7 @@ fun UsbDeviceScreen(
                 }
 
                 Spacer(Modifier.height(10.dp))
-                Text("最近日志", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.textSecondary)
+                Text(stringResource(R.string.usb_recent_logs), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.textSecondary)
                 Spacer(Modifier.height(4.dp))
                 usbState.logs.takeLast(12).reversed().forEach { line ->
                     Text(

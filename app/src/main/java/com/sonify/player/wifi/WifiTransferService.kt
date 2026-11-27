@@ -10,17 +10,28 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.sonify.player.HiFiApp
 import com.sonify.player.MainActivity
 import com.sonify.player.R
+import com.sonify.player.i18n.SonifyLocaleManager
 
 /**
  * WiFi 局域网传歌前台保活服务（foregroundServiceType="dataSync"）：
  * 防止传输大体积 24-bit/192kHz 无损专辑时息屏或切后台中断，并提供通知栏一键停止。
  */
 class WifiTransferService : Service() {
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(SonifyLocaleManager.wrapContext(base))
+    }
+
+    private fun s(@StringRes id: Int, vararg args: Any): String {
+        val ctx = (applicationContext as? HiFiApp)?.localizedContext() ?: this
+        return if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -47,7 +58,7 @@ class WifiTransferService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
             val ch = NotificationChannel(
                 CHANNEL_ID,
-                "WiFi 局域网传歌",
+                s(R.string.wifi_title),
                 NotificationManager.IMPORTANCE_LOW,
             ).apply {
                 setShowBadge(false)
@@ -75,12 +86,15 @@ class WifiTransferService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_sonify_notification)
-            .setContentTitle("Sonify WiFi 传歌运行中")
-            .setContentText(if (url.isNotBlank()) "浏览器访问 $url" else "等待局域网设备上传无损音乐")
+            .setContentTitle(s(R.string.notif_wifi_running))
+            .setContentText(
+                if (url.isNotBlank()) s(R.string.notif_wifi_visit, url)
+                else s(R.string.notif_wifi_waiting)
+            )
             .setOngoing(true)
             .setSilent(true)
             .setContentIntent(openPi)
-            .addAction(0, "停止服务", stopPi)
+            .addAction(0, s(R.string.notif_wifi_stop), stopPi)
             .build()
     }
 

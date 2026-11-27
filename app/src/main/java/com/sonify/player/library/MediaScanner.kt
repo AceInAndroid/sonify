@@ -5,6 +5,9 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.OpenableColumns
 import android.util.Log
+import androidx.annotation.StringRes
+import com.sonify.player.HiFiApp
+import com.sonify.player.R
 import com.sonify.player.data.LibraryDatabase
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.data.UserPreferences
@@ -38,6 +41,11 @@ class MediaScanner(
     private val _state = MutableStateFlow(ScanState())
     val state: StateFlow<ScanState> = _state.asStateFlow()
 
+    private fun s(@StringRes id: Int, vararg args: Any): String {
+        val ctx = (context.applicationContext as? HiFiApp)?.localizedContext() ?: context
+        return if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    }
+
     @Volatile
     private var scanJob: Job? = null
 
@@ -51,7 +59,7 @@ class MediaScanner(
         val settings = prefs.current
         val minDurationMs = settings.minDurationFilter.minMs
 
-        _state.value = ScanState(isScanning = true, currentFile = "正在遍历目录...")
+        _state.value = ScanState(isScanning = true, currentFile = s(R.string.lib_scanning_traversing))
 
         try {
             coroutineScope {
@@ -141,7 +149,7 @@ class MediaScanner(
                 }
 
                 val finalCount = db.trackDao().count()
-                val summary = "扫描完成：共 $finalCount 首（新增/更新 $updated 首）"
+                val summary = s(R.string.lib_scan_done, finalCount, updated)
                 Log.i(TAG, summary)
                 _state.value = ScanState(
                     isScanning = false,
@@ -152,12 +160,12 @@ class MediaScanner(
                 )
             }
         } catch (_: CancellationException) {
-            _state.value = _state.value.copy(isScanning = false, lastSummary = "已取消扫描")
+            _state.value = _state.value.copy(isScanning = false, lastSummary = s(R.string.lib_scan_cancelled))
         } catch (t: Throwable) {
             Log.e(TAG, "扫描失败", t)
             _state.value = _state.value.copy(
                 isScanning = false,
-                lastSummary = "扫描失败：${t.message ?: "请检查存储权限"}",
+                lastSummary = s(R.string.lib_scan_failed, t.message ?: ""),
             )
         } finally {
             scanJob = null
@@ -195,7 +203,7 @@ class MediaScanner(
             }
         }
         if (imported > 0) {
-            _state.value = _state.value.copy(lastSummary = "已导入 $imported 首歌曲")
+            _state.value = _state.value.copy(lastSummary = s(R.string.lib_imported_count, imported))
         }
         imported
     }

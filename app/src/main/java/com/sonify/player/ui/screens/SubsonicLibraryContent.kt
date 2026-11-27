@@ -62,12 +62,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.sonify.player.R
 import com.sonify.player.data.DownloadedTrackEntity
 import com.sonify.player.data.SubsonicServerEntity
 import com.sonify.player.data.TrackEntity
@@ -127,7 +129,10 @@ fun SubsonicLibraryContent(
                 subtitle = listOfNotNull(
                     drill.album.artist.takeIf { it.isNotBlank() },
                     drill.album.year.takeIf { it > 0 }?.toString(),
-                    "${drill.tracks.size.takeIf { it > 0 } ?: drill.album.songCount} 首",
+                    stringResource(
+                        R.string.common_tracks_short,
+                        drill.tracks.size.takeIf { it > 0 } ?: drill.album.songCount,
+                    ),
                 ).joinToString(" · "),
                 coverPath = drill.album.coverUri(server.id),
                 tracks = drill.tracks,
@@ -161,7 +166,9 @@ fun SubsonicLibraryContent(
             PlaylistDetailScreen(
                 title = drill.playlist.name,
                 description = drill.playlist.comment.ifBlank {
-                    drill.playlist.owner.takeIf { it.isNotBlank() }?.let { "创建者：$it · ${server.name}" } ?: server.name
+                    drill.playlist.owner.takeIf { it.isNotBlank() }?.let {
+                        stringResource(R.string.subsonic_creator_meta, it, server.name)
+                    } ?: server.name
                 },
                 isRemotePlaylist = true,
                 customCoverPath = null,
@@ -219,6 +226,7 @@ fun SubsonicLibraryContent(
 
     // ==================== 搜索模式 ====================
     if (state.searchActive) {
+        val searchResultsLabel = stringResource(R.string.subsonic_search_results_title, server.name)
         SubsonicSearchContent(
             server = server,
             state = state,
@@ -228,7 +236,7 @@ fun SubsonicLibraryContent(
             onCloseSearch = onCloseSearch,
             onOpenAlbum = onOpenAlbum,
             onOpenArtist = onOpenArtist,
-            onPlayTracks = { list, idx -> onPlayTracks(list, idx, "${server.name} · 搜索结果") },
+            onPlayTracks = { list, idx -> onPlayTracks(list, idx, searchResultsLabel) },
             onTrackMenu = onTrackMenu,
             bottomPadding = bottomPadding,
         )
@@ -238,6 +246,8 @@ fun SubsonicLibraryContent(
     // ==================== 常规栏目浏览 ====================
     var multiSelect by remember(state.selectedTab) { mutableStateOf(false) }
     val selectedPaths = remember(state.selectedTab) { mutableStateListOf<String>() }
+    val starredQueueLabel = stringResource(R.string.subsonic_starred_queue_label, server.name)
+    val randomQueueLabel = stringResource(R.string.subsonic_random_queue_label, server.name)
 
     BackHandler(enabled = multiSelect) {
         multiSelect = false
@@ -262,7 +272,7 @@ fun SubsonicLibraryContent(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = tab.label,
+                            text = stringResource(tab.labelRes),
                             fontSize = 13.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                             color = if (selected) colors.onAccent else colors.textPrimary,
@@ -279,7 +289,7 @@ fun SubsonicLibraryContent(
                 ) {
                     item(key = "folder_all") {
                         FolderPill(
-                            label = "全部目录",
+                            label = stringResource(R.string.subsonic_all_folders),
                             selected = state.selectedFolderId == null,
                             onClick = { onSelectFolder(null) },
                         )
@@ -311,7 +321,11 @@ fun SubsonicLibraryContent(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = colors.accent, strokeWidth = 2.5.dp)
                         Spacer(Modifier.height(12.dp))
-                        Text("正在从 ${server.name} 拉取曲库…", fontSize = 12.sp, color = colors.textSecondary)
+                        Text(
+                            stringResource(R.string.subsonic_loading_from, server.name),
+                            fontSize = 12.sp,
+                            color = colors.textSecondary,
+                        )
                     }
                 }
                 return@Column
@@ -332,7 +346,7 @@ fun SubsonicLibraryContent(
 
                 SubsonicTab.ARTISTS -> {
                     if (state.artists.isEmpty()) {
-                        EmptyRemoteHint("服务器中暂无艺术家")
+                        EmptyRemoteHint(stringResource(R.string.subsonic_empty_artists))
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
@@ -381,7 +395,7 @@ fun SubsonicLibraryContent(
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                         Text(
-                                            text = "${artist.albumCount} 张专辑",
+                                            text = stringResource(R.string.common_albums_count, artist.albumCount),
                                             fontSize = 12.sp,
                                             color = colors.textSecondary,
                                         )
@@ -406,7 +420,7 @@ fun SubsonicLibraryContent(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
                                 Text(
-                                    text = "服务器歌单（${state.playlists.size}）",
+                                    text = stringResource(R.string.subsonic_playlists_header, state.playlists.size),
                                     fontSize = 12.sp,
                                     color = colors.textSecondary,
                                 )
@@ -420,7 +434,12 @@ fun SubsonicLibraryContent(
                                 ) {
                                     Icon(Icons.Rounded.Add, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(15.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("新建服务器歌单", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                                    Text(
+                                        stringResource(R.string.subsonic_new_playlist),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = colors.onAccent,
+                                    )
                                 }
                             }
                         }
@@ -433,7 +452,11 @@ fun SubsonicLibraryContent(
                                         .padding(vertical = 48.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Text("服务器中暂无歌单，点击右上角即可新建", fontSize = 13.sp, color = colors.textSecondary)
+                                    Text(
+                                        stringResource(R.string.subsonic_empty_playlists),
+                                        fontSize = 13.sp,
+                                        color = colors.textSecondary,
+                                    )
                                 }
                             }
                         } else {
@@ -479,7 +502,7 @@ fun SubsonicLibraryContent(
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                         val sub = listOfNotNull(
-                                            "${pl.songCount} 首",
+                                            stringResource(R.string.common_tracks_short, pl.songCount),
                                             pl.owner.takeIf { it.isNotBlank() },
                                         ).joinToString(" · ")
                                         Text(
@@ -498,7 +521,7 @@ fun SubsonicLibraryContent(
 
                 SubsonicTab.STARRED -> {
                     if (state.starredTracks.isEmpty() && state.starredAlbums.isEmpty()) {
-                        EmptyRemoteHint("还没有在服务器收藏歌曲或专辑")
+                        EmptyRemoteHint(stringResource(R.string.subsonic_empty_starred))
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
@@ -507,7 +530,7 @@ fun SubsonicLibraryContent(
                             if (state.starredAlbums.isNotEmpty()) {
                                 item(key = "starred_albums_title") {
                                     Text(
-                                        text = "收藏专辑（${state.starredAlbums.size}）",
+                                        text = stringResource(R.string.subsonic_starred_albums, state.starredAlbums.size),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = colors.textSecondary,
@@ -561,7 +584,7 @@ fun SubsonicLibraryContent(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                     ) {
                                         Text(
-                                            text = "收藏歌曲（${state.starredTracks.size}）",
+                                            text = stringResource(R.string.subsonic_starred_tracks, state.starredTracks.size),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = colors.textSecondary,
@@ -580,21 +603,21 @@ fun SubsonicLibraryContent(
                                             ) {
                                                 Icon(Icons.Rounded.Checklist, contentDescription = null, tint = if (multiSelect) colors.accent else colors.textSecondary, modifier = Modifier.size(15.dp))
                                                 Spacer(Modifier.width(4.dp))
-                                                Text("多选", fontSize = 12.sp, color = colors.textPrimary)
+                                                Text(stringResource(R.string.common_multi_select), fontSize = 12.sp, color = colors.textPrimary)
                                             }
                                             Row(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(999.dp))
                                                     .background(colors.surface2)
                                                     .clickable {
-                                                        onPlayTracks(state.starredTracks, 0, "${server.name} · 已收藏")
+                                                        onPlayTracks(state.starredTracks, 0, starredQueueLabel)
                                                     }
                                                     .padding(horizontal = 12.dp, vertical = 5.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
                                                 Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = colors.accent, modifier = Modifier.size(16.dp))
                                                 Spacer(Modifier.width(4.dp))
-                                                Text("播放", fontSize = 12.sp, color = colors.textPrimary)
+                                                Text(stringResource(R.string.common_play), fontSize = 12.sp, color = colors.textPrimary)
                                             }
                                         }
                                     }
@@ -611,7 +634,7 @@ fun SubsonicLibraryContent(
                                             if (multiSelect) {
                                                 if (isSel) selectedPaths.remove(track.path) else selectedPaths.add(track.path)
                                             } else {
-                                                onPlayTracks(state.starredTracks, idx, "${server.name} · 已收藏")
+                                                onPlayTracks(state.starredTracks, idx, starredQueueLabel)
                                             }
                                         },
                                         onLongClick = {
@@ -631,7 +654,7 @@ fun SubsonicLibraryContent(
 
                 SubsonicTab.RANDOM -> {
                     if (state.randomTracks.isEmpty()) {
-                        EmptyRemoteHint("未能从服务器获取随机曲目")
+                        EmptyRemoteHint(stringResource(R.string.subsonic_empty_random))
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
@@ -646,7 +669,7 @@ fun SubsonicLibraryContent(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Text(
-                                        text = "随机挑选 ${state.randomTracks.size} 首",
+                                        text = stringResource(R.string.subsonic_random_header, state.randomTracks.size),
                                         fontSize = 12.sp,
                                         color = colors.textSecondary,
                                     )
@@ -664,7 +687,7 @@ fun SubsonicLibraryContent(
                                         ) {
                                             Icon(Icons.Rounded.Checklist, contentDescription = null, tint = if (multiSelect) colors.accent else colors.textSecondary, modifier = Modifier.size(14.dp))
                                             Spacer(Modifier.width(3.dp))
-                                            Text("多选", fontSize = 12.sp, color = colors.textPrimary)
+                                            Text(stringResource(R.string.common_multi_select), fontSize = 12.sp, color = colors.textPrimary)
                                         }
                                         Row(
                                             modifier = Modifier
@@ -676,19 +699,19 @@ fun SubsonicLibraryContent(
                                         ) {
                                             Icon(Icons.Rounded.Refresh, contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(14.dp))
                                             Spacer(Modifier.width(3.dp))
-                                            Text("换一批", fontSize = 12.sp, color = colors.textPrimary)
+                                            Text(stringResource(R.string.subsonic_shuffle_refresh), fontSize = 12.sp, color = colors.textPrimary)
                                         }
                                         Row(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(999.dp))
                                                 .background(colors.accent)
-                                                .clickable { onPlayTracks(state.randomTracks, 0, "${server.name} · 随机发现") }
+                                                .clickable { onPlayTracks(state.randomTracks, 0, randomQueueLabel) }
                                                 .padding(horizontal = 11.dp, vertical = 6.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Icon(Icons.Rounded.Shuffle, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(14.dp))
                                             Spacer(Modifier.width(3.dp))
-                                            Text("播放", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                                            Text(stringResource(R.string.common_play), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
                                         }
                                     }
                                 }
@@ -705,7 +728,7 @@ fun SubsonicLibraryContent(
                                         if (multiSelect) {
                                             if (isSel) selectedPaths.remove(track.path) else selectedPaths.add(track.path)
                                         } else {
-                                            onPlayTracks(state.randomTracks, idx, "${server.name} · 随机发现")
+                                            onPlayTracks(state.randomTracks, idx, randomQueueLabel)
                                         }
                                     },
                                     onLongClick = {
@@ -813,7 +836,7 @@ private fun SubsonicAlbumGrid(
 ) {
     val colors = LocalHiFiColors.current
     if (albums.isEmpty()) {
-        EmptyRemoteHint("服务器中暂无专辑")
+        EmptyRemoteHint(stringResource(R.string.subsonic_empty_albums))
         return
     }
     val gridState = rememberLazyGridState()
@@ -864,7 +887,7 @@ private fun SubsonicAlbumGrid(
                 )
                 val sub = listOfNotNull(
                     album.artist.takeIf { it.isNotBlank() },
-                    album.songCount.takeIf { it > 0 }?.let { "${it} 首" },
+                    album.songCount.takeIf { it > 0 }?.let { stringResource(R.string.common_tracks_short, it) },
                 ).joinToString(" · ")
                 Text(
                     text = sub,
@@ -919,7 +942,7 @@ private fun SubsonicSearchContent(
             OutlinedTextField(
                 value = state.searchQuery,
                 onValueChange = onQueryChange,
-                placeholder = { Text("在 ${server.name} 中搜索歌曲、专辑、艺术家…", fontSize = 13.sp) },
+                placeholder = { Text(stringResource(R.string.subsonic_search_hint, server.name), fontSize = 13.sp) },
                 leadingIcon = {
                     Icon(Icons.Rounded.Search, contentDescription = null, tint = colors.textSecondary)
                 },
@@ -927,7 +950,11 @@ private fun SubsonicSearchContent(
                     IconButton(onClick = {
                         if (state.searchQuery.isNotEmpty()) onQueryChange("") else onCloseSearch()
                     }) {
-                        Icon(Icons.Rounded.Close, contentDescription = "关闭搜索", tint = colors.textSecondary)
+                        Icon(
+                            Icons.Rounded.Close,
+                            contentDescription = stringResource(R.string.subsonic_close_search),
+                            tint = colors.textSecondary,
+                        )
                     }
                 },
                 singleLine = true,
@@ -956,13 +983,13 @@ private fun SubsonicSearchContent(
         }
 
         if (state.searchQuery.isBlank()) {
-            EmptyRemoteHint("输入关键词实时检索服务器曲库")
+            EmptyRemoteHint(stringResource(R.string.subsonic_search_prompt))
             return
         }
 
         val res = state.searchResult
         if (state.searchTracks.isEmpty() && res.albums.isEmpty() && res.artists.isEmpty()) {
-            EmptyRemoteHint("未找到与「${state.searchQuery}」匹配的结果")
+            EmptyRemoteHint(stringResource(R.string.subsonic_search_empty, state.searchQuery))
             return
         }
 
@@ -973,7 +1000,7 @@ private fun SubsonicSearchContent(
             if (res.artists.isNotEmpty()) {
                 item(key = "s_artists_h") {
                     Text(
-                        text = "艺术家（${res.artists.size}）",
+                        text = stringResource(R.string.subsonic_search_artists, res.artists.size),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.textSecondary,
@@ -1006,7 +1033,7 @@ private fun SubsonicSearchContent(
             if (res.albums.isNotEmpty()) {
                 item(key = "s_albums_h") {
                     Text(
-                        text = "专辑（${res.albums.size}）",
+                        text = stringResource(R.string.subsonic_search_albums, res.albums.size),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.textSecondary,
@@ -1054,7 +1081,7 @@ private fun SubsonicSearchContent(
             if (state.searchTracks.isNotEmpty()) {
                 item(key = "s_songs_h") {
                     Text(
-                        text = "歌曲（${state.searchTracks.size}）",
+                        text = stringResource(R.string.subsonic_search_songs, state.searchTracks.size),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.textSecondary,
@@ -1126,7 +1153,11 @@ private fun SubsonicAlbumDetailScreen(
                         selectedPaths.clear()
                     } else onBack()
                 }) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = colors.textPrimary)
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = stringResource(R.string.common_back),
+                        tint = colors.textPrimary,
+                    )
                 }
                 Text(
                     text = title,
@@ -1144,7 +1175,7 @@ private fun SubsonicAlbumDetailScreen(
                     }) {
                         Icon(
                             imageVector = Icons.Rounded.Checklist,
-                            contentDescription = "批量选择",
+                            contentDescription = stringResource(R.string.subsonic_batch_select),
                             tint = if (multiSelect) colors.accent else colors.textPrimary,
                         )
                     }
@@ -1204,7 +1235,7 @@ private fun SubsonicAlbumDetailScreen(
                                     ) {
                                         Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(3.dp))
-                                        Text("播放", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                                        Text(stringResource(R.string.common_play), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
                                     }
                                     Row(
                                         modifier = Modifier
@@ -1216,7 +1247,7 @@ private fun SubsonicAlbumDetailScreen(
                                     ) {
                                         Icon(Icons.Rounded.Shuffle, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(15.dp))
                                         Spacer(Modifier.width(3.dp))
-                                        Text("随机", fontSize = 12.sp, color = colors.textPrimary)
+                                        Text(stringResource(R.string.common_shuffle), fontSize = 12.sp, color = colors.textPrimary)
                                     }
                                     Row(
                                         modifier = Modifier
@@ -1231,13 +1262,13 @@ private fun SubsonicAlbumDetailScreen(
                                     ) {
                                         Icon(
                                             imageVector = if (allDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
-                                            contentDescription = "下载专辑",
+                                            contentDescription = stringResource(R.string.subsonic_download_album),
                                             tint = if (allDownloaded) colors.exclusiveGreen else colors.textPrimary,
                                             modifier = Modifier.size(15.dp),
                                         )
                                         Spacer(Modifier.width(3.dp))
                                         Text(
-                                            text = if (allDownloaded) "已离线" else "下载",
+                                            text = stringResource(if (allDownloaded) R.string.common_downloaded else R.string.common_download),
                                             fontSize = 12.sp,
                                             color = if (allDownloaded) colors.exclusiveGreen else colors.textPrimary,
                                         )
@@ -1337,7 +1368,11 @@ private fun SubsonicArtistDetail(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = colors.textPrimary)
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = stringResource(R.string.common_back),
+                    tint = colors.textPrimary,
+                )
             }
             Column(Modifier.weight(1f)) {
                 Text(
@@ -1349,7 +1384,10 @@ private fun SubsonicArtistDetail(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "${albums.size.takeIf { it > 0 } ?: artist.albumCount} 张专辑",
+                    text = stringResource(
+                        R.string.common_albums_count,
+                        albums.size.takeIf { it > 0 } ?: artist.albumCount,
+                    ),
                     fontSize = 11.sp,
                     color = colors.textSecondary,
                 )
@@ -1400,7 +1438,12 @@ private fun SubsonicErrorState(
             modifier = Modifier.size(48.dp),
         )
         Spacer(Modifier.height(12.dp))
-        Text("无法连接媒体服务器", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
+        Text(
+            stringResource(R.string.subsonic_connect_failed_title),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = colors.textPrimary,
+        )
         Spacer(Modifier.height(6.dp))
         Text(text = message, fontSize = 12.sp, color = colors.textSecondary)
         Spacer(Modifier.height(18.dp))
@@ -1412,7 +1455,12 @@ private fun SubsonicErrorState(
                     .clickable { onRetry() }
                     .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
-                Text("重试连接", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                Text(
+                    stringResource(R.string.subsonic_retry_connect),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.onAccent,
+                )
             }
             if (onManageAccount != null) {
                 Box(
@@ -1422,7 +1470,11 @@ private fun SubsonicErrorState(
                         .clickable { onManageAccount() }
                         .padding(horizontal = 18.dp, vertical = 10.dp)
                 ) {
-                    Text("检查账号", fontSize = 13.sp, color = colors.textPrimary)
+                    Text(
+                        stringResource(R.string.subsonic_check_account),
+                        fontSize = 13.sp,
+                        color = colors.textPrimary,
+                    )
                 }
             }
         }

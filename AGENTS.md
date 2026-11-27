@@ -42,3 +42,4 @@ Required pre-push sequence (see `docs/testing/RELEASE_GATE.md` for full checklis
   - Test Cases: `docs/testing/TEST_CASES.md`
   - Release Gate SOP: `docs/testing/RELEASE_GATE.md`
   - QA Reports: `docs/testing/reports/`
+  - Multi-Language Standard & Key Catalog: `docs/i18n/I18N_STANDARD.md`, `docs/i18n/STRING_KEY_CATALOG.md` (run `python3 scripts/check_i18n.py --strict --sync-doc` whenever strings change)

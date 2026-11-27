@@ -43,11 +43,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.crash.CrashReport
 import com.sonify.player.crash.CrashReporter
 import com.sonify.player.ui.theme.LocalHiFiColors
@@ -96,16 +98,16 @@ fun CrashLogsSheet(
                 Icon(Icons.Rounded.BugReport, contentDescription = null, tint = colors.accent, modifier = Modifier.size(21.dp))
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("本地崩溃诊断记录（${reports.size}）", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
-                    Text("已自动脱敏路径与凭据，可复制或上报分析", fontSize = 11.sp, color = colors.textSecondary)
+                    Text(stringResource(R.string.crash_logs_title, reports.size), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                    Text(stringResource(R.string.crash_logs_sub), fontSize = 11.sp, color = colors.textSecondary)
                 }
                 if (reports.isNotEmpty()) {
                     TextButton(onClick = {
                         CrashReporter.clearAllReports(context)
                         reports = emptyList()
-                        onShowToast("已清空本地崩溃记录")
+                        onShowToast(context.getString(R.string.toast_crash_cleared))
                     }) {
-                        Text("清空", color = colors.danger, fontSize = 12.sp)
+                        Text(stringResource(R.string.common_clear), color = colors.danger, fontSize = 12.sp)
                     }
                 }
             }
@@ -114,7 +116,7 @@ fun CrashLogsSheet(
 
             if (reports.isEmpty()) {
                 Text(
-                    text = "暂无崩溃记录，当前运行非常稳定。",
+                    text = stringResource(R.string.crash_logs_empty),
                     fontSize = 13.sp,
                     color = colors.textSecondary,
                     modifier = Modifier.padding(vertical = 28.dp),
@@ -137,7 +139,7 @@ fun CrashLogsSheet(
                             onCopy = {
                                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                                 cm?.setPrimaryClip(ClipData.newPlainText("Sonify Crash", report.toShareableSummary()))
-                                onShowToast("已复制脱敏崩溃堆栈")
+                                onShowToast(context.getString(R.string.toast_crash_copied))
                             },
                             onUpload = {
                                 scope.launch {
@@ -196,7 +198,7 @@ private fun CrashLogItemCard(
                 )
             }
             if (report.uploaded) {
-                Icon(Icons.Rounded.CloudDone, contentDescription = "已上报", tint = colors.exclusiveGreen, modifier = Modifier.size(16.dp))
+                Icon(Icons.Rounded.CloudDone, contentDescription = stringResource(R.string.crash_badge_uploaded), tint = colors.exclusiveGreen, modifier = Modifier.size(16.dp))
             }
         }
 
@@ -223,9 +225,13 @@ private fun CrashLogItemCard(
                 )
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SmallActionChip(Icons.Rounded.ContentCopy, "复制", onCopy)
-                    SmallActionChip(Icons.Rounded.CloudUpload, if (report.uploaded) "重报" else "上报", onUpload)
-                    SmallActionChip(Icons.Rounded.Delete, "删除", onDelete)
+                    SmallActionChip(Icons.Rounded.ContentCopy, stringResource(R.string.common_copy), onCopy)
+                    SmallActionChip(
+                        Icons.Rounded.CloudUpload,
+                        stringResource(if (report.uploaded) R.string.crash_btn_reupload else R.string.crash_btn_upload_short),
+                        onUpload,
+                    )
+                    SmallActionChip(Icons.Rounded.Delete, stringResource(R.string.common_delete), onDelete)
                 }
             }
         }

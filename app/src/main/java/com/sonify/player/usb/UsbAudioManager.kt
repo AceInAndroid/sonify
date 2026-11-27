@@ -11,7 +11,10 @@ import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
+import com.sonify.player.HiFiApp
+import com.sonify.player.R
 import com.sonify.player.ui.UacInfo
 import com.sonify.player.ui.parseInfo
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -40,7 +43,7 @@ data class UsbConnectionState(
         get() = uacInfo?.product?.takeIf { it.isNotBlank() }
             ?: connectedDevice?.productName?.takeIf { it.isNotBlank() }
             ?: connectedDevice?.deviceName
-            ?: "未连接 USB DAC"
+            ?: if (java.util.Locale.getDefault().language.equals("zh", ignoreCase = true)) "未连接 USB DAC" else "No USB DAC Connected"
 }
 
 /**
@@ -54,6 +57,11 @@ class UsbAudioManager(
 
     private val usbManager = appContext.getSystemService(Context.USB_SERVICE) as UsbManager
     private val permissionAction = "${appContext.packageName}.USB_PERMISSION"
+
+    private fun s(@StringRes id: Int, vararg args: Any): String {
+        val ctx = (appContext.applicationContext as? HiFiApp)?.localizedContext() ?: appContext
+        return if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    }
 
     @Volatile
     private var connection: UsbDeviceConnection? = null
@@ -83,11 +91,11 @@ class UsbAudioManager(
             _state.update { it.copy(devices = list) }
             when (intent?.action) {
                 UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
-                    appendLog("检测到 USB 音频设备接入（共 ${list.size} 台）")
+                    appendLog(s(R.string.usb_log_attached, list.size))
                 }
 
                 UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-                    appendLog("USB 设备已拔出")
+                    appendLog(s(R.string.usb_log_detached))
                     val current = openedDevice
                     if (current != null && list.none { it.deviceName == current.deviceName }) {
                         close()
@@ -107,7 +115,7 @@ class UsbAudioManager(
 
         val list = listAudioDevices()
         _state.update { it.copy(devices = list, nativeLoaded = loaded) }
-        appendLog(if (loaded) "native 音频库已加载" else "native 库加载失败，请检查 ABI (arm64-v8a)")
+        appendLog(s(if (loaded) R.string.usb_log_native_ok else R.string.usb_log_native_fail))
 
         val filter = IntentFilter().apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
@@ -188,11 +196,11 @@ class UsbAudioManager(
 
     /** 一键授权并打开 USB DAC */
     suspend fun connectDevice(device: UsbDevice): Result<UacInfo> {
-        appendLog("请求权限: ${device.productName ?: device.deviceName}")
+        appendLog(s(R.string.usb_log_req_perm, device.productName ?: device.deviceName))
         val granted = requestPermission(device)
         if (!granted) {
-            appendLog("用户拒绝了 USB 权限")
-            return Result.failure(IOException("USB 权限被拒绝"))
+            appendLog(s(R.string.usb_log_perm_denied))
+            return Result.failure(IOException(s(R.string.usb_log_perm_denied)))
         }
         return open(device)
     }
@@ -209,7 +217,7 @@ class UsbAudioManager(
         close()
 
         val conn = usbManager.openDevice(device)
-            ?: return Result.failure(IOException("openDevice 返回 null（权限不足或被其他进程占用）"))
+            ?: return Result.failure(IOException(s(R.string.usb_log_open_null)))
 
         val claimed = mutableListOf<UsbInterface>()
         for (i in 0 until device.interfaceCount) {
@@ -221,21 +229,21 @@ class UsbAudioManager(
             } else {
                 claimed.forEach { runCatching { conn.releaseInterface(it) } }
                 conn.close()
-                val msg = "claimInterface(if=${itf.id}, force=true) 失败，内核驱动可能占着"
+                val msg = s(R.string.usb_log_claim_fail, itf.id)
                 appendLog(msg)
                 return Result.failure(IOException(msg))
             }
         }
         if (claimed.isEmpty()) {
             conn.close()
-            return Result.failure(IOException("设备没有音频类接口，无法以 UAC 模式使用"))
+            return Result.failure(IOException(s(R.string.usb_log_no_audio_if)))
         }
 
         val fd = conn.fileDescriptor
         if (fd < 0) {
             claimed.forEach { runCatching { conn.releaseInterface(it) } }
             conn.close()
-            return Result.failure(IOException("getFileDescriptor 返回 $fd"))
+            return Result.failure(IOException("getFileDescriptor -> $fd"))
         }
 
         val json = UsbAudioNative.nativeOpen(fd)
@@ -243,7 +251,7 @@ class UsbAudioManager(
             claimed.forEach { runCatching { conn.releaseInterface(it) } }
             conn.close()
             val err = json.removePrefix("ERROR:").trim()
-            appendLog("打开失败: $err")
+            appendLog(s(R.string.usb_log_open_fail, err))
             return Result.failure(IOException(err))
         }
 
@@ -252,7 +260,7 @@ class UsbAudioManager(
             UsbAudioNative.nativeClose()
             claimed.forEach { runCatching { conn.releaseInterface(it) } }
             conn.close()
-            return Result.failure(IOException("描述符 JSON 解析失败"))
+            return Result.failure(IOException(s(R.string.usb_log_desc_parse_fail)))
         }
 
         val rates = UsbAudioNative.nativeSupportedRates()
@@ -292,8 +300,11 @@ class UsbAudioManager(
             )
         }
         appendLog(
-            "已连接 $devLabel (UAC${info.uacVersion}, ${rates.size} 档采样率, " +
-                if (hasHwVol) "支持硬件音量 %.1f..%.1fdB)".format(hwRange[0], hwRange[1]) else "软件对数音量)"
+            if (hasHwVol) {
+                s(R.string.usb_log_connected_hw, devLabel, info.uacVersion, rates.size, hwRange[0], hwRange[1])
+            } else {
+                s(R.string.usb_log_connected_sw, devLabel, info.uacVersion, rates.size)
+            }
         )
         _connectedEvents.tryEmit(Unit)
         return Result.success(info)

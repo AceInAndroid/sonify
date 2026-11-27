@@ -3,6 +3,7 @@ package com.sonify.player.update
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import java.util.Locale
 
 /**
  * Sonify 官方仓库与版本日志链接常量。
@@ -27,7 +28,7 @@ object ProjectLinks {
 }
 
 /**
- * 内置版本更新日志条目，保证离线或已是最新版时也可在应用内查看完整变更历史。
+ * 内置版本更新日志条目，保证离线或已是最新版时也可在应用内查看中英双语变更历史。
  */
 data class ChangelogEntry(
     val versionName: String,
@@ -38,18 +39,18 @@ data class ChangelogEntry(
 )
 
 object ReleaseNotesCatalog {
-    val entries: List<ChangelogEntry> = listOf(
+    val entriesZh: List<ChangelogEntry> = listOf(
         ChangelogEntry(
             versionName = "0.2.0",
             versionCode = 2,
             releaseDate = "2026-11-27",
-            summary = "全局跨源搜索、独立进程崩溃恢复、强制更新与日活面板",
+            summary = "全局跨源搜索、独立进程崩溃恢复、强制更新、日活面板与双语支持",
             highlights = listOf(
                 "全屏跨源全局搜索：覆盖本地歌曲/专辑/艺人/歌单、Subsonic 远程曲库与 .lrc 歌词搜歌，支持简繁互通归一化与音质规格检索",
                 "独立 :crash 进程崩溃拦截与 3 秒自动重启，自动安全释放 USB DAC 流并脱敏路径与账号信息",
                 "应用内安全更新与全生命周期强制更新保护：支持更新内容/历史日志、GitHub 发布页跳转与安装前强制 SHA-256 校验",
                 "隐私优先匿名日活统计（仅随机 UUID，设置页可一键关闭）与云端 /admin 运营数据面板",
-                "完善开源许可协议：明确个人非商用开源、禁止未经授权的商业用途",
+                "新增应用内中英双语即时无缝切换，并完善非商用开源许可协议（禁止商用）",
             ),
         ),
         ChangelogEntry(
@@ -66,10 +67,52 @@ object ReleaseNotesCatalog {
         ),
     )
 
-    fun formatCurrentNotes(serverRelease: ReleaseInfo?, currentVersionName: String): String {
+    val entriesEn: List<ChangelogEntry> = listOf(
+        ChangelogEntry(
+            versionName = "0.2.0",
+            versionCode = 2,
+            releaseDate = "2026-11-27",
+            summary = "Global Search, Isolated Crash Recovery, Force Update, Analytics & Bilingual UI",
+            highlights = listOf(
+                "Full-screen cross-source global search across local library, playlists, Subsonic remote servers, and cached .lrc lyrics with spec filtering",
+                "Isolated :crash recovery process with safe USB DAC teardown, 3-second auto-restart, loop breaker, and sanitized crash reporting",
+                "In-app updates with mandatory SHA-256 verification, full-lifecycle Force Update lock, in-app changelog, and GitHub links",
+                "Privacy-first anonymous DAU telemetry (random UUID only, opt-out toggle in Settings) and authenticated /admin ops dashboard",
+                "Added instant zero-interruption English / Simplified Chinese switching and Sonify Non-Commercial License v1.0",
+            ),
+        ),
+        ChangelogEntry(
+            versionName = "0.1.0",
+            versionCode = 1,
+            releaseDate = "2026-11-26",
+            summary = "Initial Public Release · Bit-Perfect USB Exclusive & Vinyl Immersion",
+            highlights = listOf(
+                "Custom C++17 + libusb 1.0.27 userspace UAC1/UAC2 driver with async feedback pacing and 24-bit/32-bit lossless pipeline",
+                "DAC hardware volume control, full physical volume key hijacking, and 4-layer ear protection ceilings",
+                "Spotify-dark spinning vinyl Now Playing, Zen Vinyl mode, immersive system bars, 5-button notification, and Vinyl Lockscreen",
+                "Subsonic/OpenSubsonic lossless streaming & offline downloads, local/remote playlists, dual-mode WiFi transfer, and synced aurora lyrics",
+            ),
+        ),
+    )
+
+    /** 默认列表（保留兼容旧调用与单测） */
+    val entries: List<ChangelogEntry> get() = entriesZh
+
+    fun entriesFor(locale: Locale = Locale.getDefault()): List<ChangelogEntry> =
+        if (locale.language.equals("zh", ignoreCase = true)) entriesZh else entriesEn
+
+    fun formatCurrentNotes(
+        serverRelease: ReleaseInfo?,
+        currentVersionName: String,
+        locale: Locale = Locale.getDefault(),
+    ): String {
+        val isZh = locale.language.equals("zh", ignoreCase = true)
         val remote = serverRelease?.releaseNotes?.trim().orEmpty()
-        if (remote.isNotEmpty()) return remote
-        val matched = entries.firstOrNull { it.versionName == currentVersionName } ?: entries.first()
+        // If UI is English and remote notes contain Chinese, prefer built-in English notes for current version
+        val useRemote = remote.isNotEmpty() && (isZh || remote.none { it in '\u4e00'..'\u9fff' })
+        if (useRemote) return remote
+        val list = entriesFor(locale)
+        val matched = list.firstOrNull { it.versionName == currentVersionName } ?: list.first()
         return matched.highlights.joinToString("\n") { "- $it" }
     }
 

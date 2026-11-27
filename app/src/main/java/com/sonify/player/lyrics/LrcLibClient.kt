@@ -34,11 +34,11 @@ class LrcLibClient(
 
         val urlBuilder = "$BASE_URL/api/get".toHttpUrl().newBuilder()
             .addQueryParameter("track_name", cleanTitle)
-        if (cleanArtist.isNotEmpty() && cleanArtist != "未知艺术家") {
+        if (cleanArtist.isNotEmpty() && cleanArtist != "未知艺术家" && cleanArtist != "Unknown Artist") {
             urlBuilder.addQueryParameter("artist_name", cleanArtist)
         }
         val cleanAlbum = albumName.trim()
-        if (cleanAlbum.isNotEmpty() && cleanAlbum != "未知专辑") {
+        if (cleanAlbum.isNotEmpty() && cleanAlbum != "未知专辑" && cleanAlbum != "Unknown Album") {
             urlBuilder.addQueryParameter("album_name", cleanAlbum)
         }
         if (durationSec > 0) {
@@ -77,7 +77,11 @@ class LrcLibClient(
 
         http.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
-                throw IllegalStateException("在线搜词服务响应异常（HTTP ${resp.code}）")
+                val isZh = java.util.Locale.getDefault().language.equals("zh", ignoreCase = true)
+                throw IllegalStateException(
+                    if (isZh) "在线搜词服务响应异常（HTTP ${resp.code}）"
+                    else "Lyrics service returned HTTP ${resp.code}"
+                )
             }
             val body = resp.body?.string().orEmpty()
             parseSearchCandidates(body)

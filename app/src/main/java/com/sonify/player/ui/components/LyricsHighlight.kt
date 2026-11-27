@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -50,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.LyricsAlignment
 import com.sonify.player.data.LyricsFontFamily
@@ -381,7 +383,7 @@ fun LyricsSettingsPreviewCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = "实时预览 · ${settings.lyricsFontSizeSp}sp",
+                    text = stringResource(R.string.lyrics_preview_badge, settings.lyricsFontSizeSp),
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     color = Color.White.copy(alpha = 0.72f),
@@ -400,12 +402,12 @@ fun LyricsSettingsPreviewCard(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Refresh,
-                        contentDescription = "恢复默认",
+                        contentDescription = stringResource(R.string.common_reset_default),
                         tint = colors.accent,
                         modifier = Modifier.size(13.dp),
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text("恢复默认", fontSize = 11.sp, color = colors.accent, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.common_reset_default), fontSize = 11.sp, color = colors.accent, fontWeight = FontWeight.Medium)
                 }
             }
 
@@ -415,7 +417,7 @@ fun LyricsSettingsPreviewCard(
                 verticalArrangement = Arrangement.spacedBy((settings.lyricsLineSpacing.itemGapDp * 0.45f).dp),
             ) {
                 Text(
-                    text = "针尖轻落入黑胶微光",
+                    text = stringResource(R.string.lyrics_preview_line1),
                     style = TextStyle(
                         fontSize = inactiveSp.sp,
                         fontFamily = composeFont,
@@ -428,7 +430,7 @@ fun LyricsSettingsPreviewCard(
                 )
                 Column(horizontalAlignment = hAlign, modifier = Modifier.fillMaxWidth()) {
                     ActiveLyricText(
-                        text = "旋律与光影在夜色里缓缓相融",
+                        text = stringResource(R.string.lyrics_preview_line2),
                         highlightStyle = settings.lyricsHighlightStyle,
                         sweepProgress = sweep,
                         fontSizeSp = activeSp,
@@ -455,7 +457,7 @@ fun LyricsSettingsPreviewCard(
                     }
                 }
                 Text(
-                    text = "每一帧采样都还原现场呼吸",
+                    text = stringResource(R.string.lyrics_preview_line3),
                     style = TextStyle(
                         fontSize = inactiveSp.sp,
                         fontFamily = composeFont,

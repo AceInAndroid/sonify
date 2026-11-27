@@ -3,6 +3,7 @@ package com.sonify.player.wifi
 import java.io.File
 import java.io.RandomAccessFile
 import java.security.MessageDigest
+import java.util.Locale
 
 /**
  * 与浏览器端纯 JS 实现逐字节一致的快速内容指纹算法（用于 WiFi 传歌三层防重）：
@@ -143,9 +144,14 @@ object WifiPathSanitizer {
     }
 
     /** 解析 HTTP User-Agent，在上传历史中清晰标明来源端（如 "PC · Chrome" / "手机 · Safari"） */
-    fun parseClientInfo(userAgent: String?): String {
+    fun parseClientInfo(
+        userAgent: String?,
+        lanClientLabel: String = if (Locale.getDefault().language.equals("zh", ignoreCase = true)) "局域网客户端" else "LAN Client",
+        androidPhoneLabel: String = if (Locale.getDefault().language.equals("zh", ignoreCase = true)) "Android 手机" else "Android Phone",
+        phoneLabel: String = if (Locale.getDefault().language.equals("zh", ignoreCase = true)) "手机" else "Phone",
+    ): String {
         val ua = userAgent.orEmpty()
-        if (ua.isBlank()) return "局域网客户端"
+        if (ua.isBlank()) return lanClientLabel
 
         val isMobile = ua.contains("Mobile", ignoreCase = true) ||
             ua.contains("Android", ignoreCase = true) ||
@@ -155,8 +161,8 @@ object WifiPathSanitizer {
         val device = when {
             ua.contains("iPhone", ignoreCase = true) -> "iPhone"
             ua.contains("iPad", ignoreCase = true) -> "iPad"
-            ua.contains("Android", ignoreCase = true) -> "Android 手机"
-            isMobile -> "手机"
+            ua.contains("Android", ignoreCase = true) -> androidPhoneLabel
+            isMobile -> phoneLabel
             ua.contains("Macintosh", ignoreCase = true) || ua.contains("Mac OS", ignoreCase = true) -> "Mac"
             ua.contains("Windows", ignoreCase = true) -> "Windows PC"
             ua.contains("Linux", ignoreCase = true) -> "Linux PC"

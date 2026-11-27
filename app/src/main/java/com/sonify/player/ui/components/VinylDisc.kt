@@ -27,9 +27,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.sonify.player.R
 import com.sonify.player.ui.theme.CoverArtSupport
 import com.sonify.player.ui.theme.LocalHiFiColors
 
@@ -142,7 +144,7 @@ fun VinylDisc(
                 if (coverModel != null) {
                     AsyncImage(
                         model = coverModel,
-                        contentDescription = "专辑封面",
+                        contentDescription = stringResource(R.string.common_album_cover),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )

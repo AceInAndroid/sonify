@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.Memory
@@ -77,6 +78,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,6 +86,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sonify.player.BuildConfig
+import com.sonify.player.R
 import com.sonify.player.data.AccentStyle
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.AudioFocusPolicy
@@ -105,6 +108,8 @@ import com.sonify.player.data.StreamQuality
 import com.sonify.player.data.SubsonicServerEntity
 import com.sonify.player.data.UserPreferences
 import com.sonify.player.data.VolumeMode
+import com.sonify.player.i18n.AppLanguage
+import com.sonify.player.i18n.SonifyLocaleManager
 import com.sonify.player.ui.components.ChangelogDialog
 import com.sonify.player.ui.components.LyricsSettingsPreviewCard
 import com.sonify.player.ui.components.SheetOption
@@ -131,6 +136,7 @@ private enum class ActiveSheet {
     AUDIO_FOCUS_POLICY,
     IMPORT_MODE,
     MIN_DURATION,
+    APP_LANGUAGE,
     COVER_STYLE,
     DARK_CANVAS,
     ACCENT_STYLE,
@@ -210,7 +216,7 @@ fun SettingsScreen(
             .padding(top = 14.dp, bottom = bottomPadding + 28.dp)
     ) {
         Text(
-            text = "设置",
+            text = stringResource(R.string.settings_title),
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = colors.textPrimary,
@@ -218,12 +224,12 @@ fun SettingsScreen(
         )
 
         // ==================== 分组 1：音频输出与 USB ====================
-        SettingsGroupHeader("音频输出与 USB 独占")
+        SettingsGroupHeader(stringResource(R.string.settings_group_audio))
 
         SettingsSwitchItem(
             icon = Icons.Rounded.Usb,
-            title = "USB 独占输出（Bit-Perfect）",
-            subtitle = "绕过系统重采样，经 libusb 直送 USB DAC",
+            title = stringResource(R.string.settings_usb_exclusive_title),
+            subtitle = stringResource(R.string.settings_usb_exclusive_sub),
             checked = settings.usbExclusiveEnabled,
             accentChecked = colors.exclusiveGreen,
             onCheckedChange = {
@@ -235,36 +241,36 @@ fun SettingsScreen(
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Speed,
-            title = "采样率策略",
-            subtitle = settings.sampleRatePolicy.label,
+            title = stringResource(R.string.settings_sample_rate),
+            subtitle = stringResource(settings.sampleRatePolicy.labelRes),
             onClick = { activeSheet = ActiveSheet.SAMPLE_RATE },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Memory,
-            title = "输出位深",
-            subtitle = settings.bitDepthPref.label,
+            title = stringResource(R.string.settings_bit_depth),
+            subtitle = stringResource(settings.bitDepthPref.labelRes),
             onClick = { activeSheet = ActiveSheet.BIT_DEPTH },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Tune,
-            title = "环形缓冲大小",
-            subtitle = settings.bufferSizePref.label,
+            title = stringResource(R.string.settings_buffer_size),
+            subtitle = stringResource(settings.bufferSizePref.labelRes),
             onClick = { activeSheet = ActiveSheet.BUFFER_SIZE },
         )
         SettingsSelectItem(
             icon = Icons.AutoMirrored.Rounded.VolumeUp,
-            title = "USB 音量控制模式",
-            subtitle = settings.volumeMode.label,
+            title = stringResource(R.string.settings_volume_mode),
+            subtitle = stringResource(settings.volumeMode.labelRes),
             onClick = { activeSheet = ActiveSheet.VOLUME_MODE },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Shield,
-            title = "耳朵音量保护",
+            title = stringResource(R.string.settings_ear_guard_title),
             subtitle = if (settings.hearingProtectionEnabled) {
                 val limitDb = "%.0f".format(VolumeMath.percentToDb(settings.maxVolumeLimitPercent))
-                "已锁定最大上限 ${settings.maxVolumeLimitPercent}% ($limitDb dB)，防止误触炸耳"
+                stringResource(R.string.settings_ear_guard_on_sub, settings.maxVolumeLimitPercent, limitDb)
             } else {
-                "已关闭（可调节至 100% / 0 dBFS，请注意保护听力）"
+                stringResource(R.string.settings_ear_guard_off_sub)
             },
             checked = settings.hearingProtectionEnabled,
             accentChecked = colors.exclusiveGreen,
@@ -283,35 +289,35 @@ fun SettingsScreen(
             val limitDb = "%.0f".format(VolumeMath.percentToDb(settings.maxVolumeLimitPercent))
             SettingsSelectItem(
                 icon = Icons.Rounded.Shield,
-                title = "最大音量保护上限",
-                subtitle = "${settings.maxVolumeLimitPercent}% (约 $limitDb dB)",
+                title = stringResource(R.string.settings_max_vol_title),
+                subtitle = stringResource(R.string.common_pct_with_db, settings.maxVolumeLimitPercent, limitDb),
                 onClick = { activeSheet = ActiveSheet.MAX_VOLUME_LIMIT },
             )
         }
         SettingsSwitchItem(
             icon = Icons.Rounded.Shield,
-            title = "重新接入 DAC 回落至安全音量",
-            subtitle = "重插 DAC 时若上次高于 35%，自动回落至 ${settings.safeStartupPercent}% 起步",
+            title = stringResource(R.string.settings_safe_replug_title),
+            subtitle = stringResource(R.string.settings_safe_replug_sub, settings.safeStartupPercent),
             checked = settings.safeResetOnPlugEnabled,
             onCheckedChange = { scope.launch { prefs.setSafeResetOnPlug(it) } },
         )
         val startupDb = "%.0f".format(VolumeMath.percentToDb(settings.safeStartupPercent))
         SettingsSelectItem(
             icon = Icons.Rounded.Tune,
-            title = "安全起步音量",
-            subtitle = "${settings.safeStartupPercent}% (约 $startupDb dB)",
+            title = stringResource(R.string.settings_safe_startup_title),
+            subtitle = stringResource(R.string.common_pct_with_db, settings.safeStartupPercent, startupDb),
             onClick = { activeSheet = ActiveSheet.SAFE_STARTUP_VOLUME },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Tune,
-            title = "物理音量键步进",
-            subtitle = "每按一次增减 ${settings.volumeStepPercent}%（USB 独占模式接管物理键）",
+            title = stringResource(R.string.settings_vol_step_title),
+            subtitle = stringResource(R.string.settings_vol_step_sub, settings.volumeStepPercent),
             onClick = { activeSheet = ActiveSheet.VOLUME_STEP },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.GraphicEq,
-            title = "Feedback 异步时钟闭环微调",
-            subtitle = "跟随 DAC 反馈端点自动对齐晶振速率，防止长播漂移",
+            title = stringResource(R.string.settings_feedback_title),
+            subtitle = stringResource(R.string.settings_feedback_sub),
             checked = settings.feedbackControlEnabled,
             onCheckedChange = {
                 scope.launch {
@@ -322,32 +328,32 @@ fun SettingsScreen(
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Tune,
-            title = "切采样率前复位 Alt Setting",
-            subtitle = "兼容部分 XMOS 方案 DAC（切率时先切 alt=0）",
+            title = stringResource(R.string.settings_reset_alt_title),
+            subtitle = stringResource(R.string.settings_reset_alt_sub),
             checked = settings.resetAltOnRateChange,
             onCheckedChange = { scope.launch { prefs.setResetAlt(it) } },
         )
 
         // ==================== 分组 2：播放控制 ====================
-        SettingsGroupHeader("播放控制")
+        SettingsGroupHeader(stringResource(R.string.settings_group_playback))
 
         SettingsSelectItem(
             icon = Icons.Rounded.GraphicEq,
-            title = "系统音频焦点策略",
-            subtitle = settings.audioFocusPolicy.label,
+            title = stringResource(R.string.settings_audio_focus),
+            subtitle = stringResource(settings.audioFocusPolicy.labelRes),
             onClick = { activeSheet = ActiveSheet.AUDIO_FOCUS_POLICY },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Album,
-            title = "无缝播放（Gapless）",
-            subtitle = "同采样率连续曲目保持 USB 流不断开直接续流",
+            title = stringResource(R.string.settings_gapless_title),
+            subtitle = stringResource(R.string.settings_gapless_sub),
             checked = settings.gaplessEnabled,
             onCheckedChange = { scope.launch { prefs.setGapless(it) } },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.GraphicEq,
-            title = "防爆音淡入淡出",
-            subtitle = "暂停、Seek、切率时施加 5ms 平滑淡变",
+            title = stringResource(R.string.settings_fade_title),
+            subtitle = stringResource(R.string.settings_fade_sub),
             checked = settings.fadeEnabled,
             onCheckedChange = {
                 scope.launch {
@@ -358,120 +364,120 @@ fun SettingsScreen(
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Headphones,
-            title = "耳机与 USB 拔出自动暂停",
-            subtitle = "检测到输出设备断开时立即暂停播放",
+            title = stringResource(R.string.settings_unplug_pause_title),
+            subtitle = stringResource(R.string.settings_unplug_pause_sub),
             checked = settings.pauseOnUnplug,
             onCheckedChange = { scope.launch { prefs.setPauseOnUnplug(it) } },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.History,
-            title = "记住播放断点",
-            subtitle = "重启后在首页显示「继续上次播放」卡片，不自动出声",
+            title = stringResource(R.string.settings_remember_pos_title),
+            subtitle = stringResource(R.string.settings_remember_pos_sub),
             checked = settings.rememberPosition,
             onCheckedChange = { scope.launch { prefs.setRememberPosition(it) } },
         )
 
         // ==================== 分组 3：资料库与导入 ====================
-        SettingsGroupHeader("资料库与导入")
+        SettingsGroupHeader(stringResource(R.string.settings_group_library))
 
         SettingsSelectItem(
             icon = Icons.Rounded.Wifi,
-            title = "WiFi 局域网传歌",
+            title = stringResource(R.string.settings_wifi_title),
             subtitle = if (wifiTransferState.isRunning) {
-                "运行中 · ${wifiTransferState.primaryUrl}（手机/PC 浏览器均可访问）"
+                stringResource(R.string.settings_wifi_running_sub, wifiTransferState.primaryUrl)
             } else {
-                "手机或电脑浏览器扫码/局域网传无损，支持防重与上传历史"
+                stringResource(R.string.settings_wifi_idle_sub)
             },
             onClick = onOpenWifiTransfer,
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Folder,
-            title = "扫描目录管理",
+            title = stringResource(R.string.settings_scan_dirs),
             subtitle = settings.scanDirs.joinToString(" · "),
             onClick = { showDirsDialog = true },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Folder,
-            title = "歌曲导入方式",
-            subtitle = settings.importMode.label,
+            title = stringResource(R.string.settings_import_mode),
+            subtitle = stringResource(settings.importMode.labelRes),
             onClick = { activeSheet = ActiveSheet.IMPORT_MODE },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Timer,
-            title = "过滤短音频",
-            subtitle = settings.minDurationFilter.label,
+            title = stringResource(R.string.settings_min_duration),
+            subtitle = stringResource(settings.minDurationFilter.labelRes),
             onClick = { activeSheet = ActiveSheet.MIN_DURATION },
         )
 
         // ==================== 分组 3.5：媒体服务器（Subsonic / OpenSubsonic） ====================
-        SettingsGroupHeader("媒体服务器（Subsonic）")
+        SettingsGroupHeader(stringResource(R.string.settings_group_subsonic))
 
         SettingsSelectItem(
             icon = Icons.Rounded.Cloud,
-            title = "服务器与账号管理",
+            title = stringResource(R.string.settings_subsonic_accounts),
             subtitle = if (subsonicServers.isEmpty()) {
-                "尚未登录 · 支持 Navidrome / Subsonic / Airsonic / Gonic 等"
+                stringResource(R.string.settings_subsonic_not_signed_in)
             } else {
                 val cur = activeSubsonicServer ?: subsonicServers.first()
-                "已保存 ${subsonicServers.size} 个账号 · 当前：${cur.name}（${cur.username}）"
+                stringResource(R.string.settings_subsonic_signed_in, subsonicServers.size, cur.name, cur.username)
             },
             onClick = onOpenSubsonicAccounts,
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Wifi,
-            title = "Wi-Fi 流媒体音质",
-            subtitle = settings.subsonicWifiQuality.label,
+            title = stringResource(R.string.settings_subsonic_wifi_q),
+            subtitle = stringResource(settings.subsonicWifiQuality.labelRes),
             onClick = { activeSheet = ActiveSheet.SUBSONIC_WIFI_QUALITY },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.SignalCellularAlt,
-            title = "移动网络流媒体音质",
-            subtitle = settings.subsonicCellularQuality.label,
+            title = stringResource(R.string.settings_subsonic_cell_q),
+            subtitle = stringResource(settings.subsonicCellularQuality.labelRes),
             onClick = { activeSheet = ActiveSheet.SUBSONIC_CELLULAR_QUALITY },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.History,
-            title = "同步播放记录（Scrobble）",
-            subtitle = "向 Subsonic 服务器上报正在播放与听完计数",
+            title = stringResource(R.string.settings_subsonic_scrobble_title),
+            subtitle = stringResource(R.string.settings_subsonic_scrobble_sub),
             checked = settings.subsonicScrobbleEnabled,
             onCheckedChange = { scope.launch { prefs.setSubsonicScrobble(it) } },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Folder,
-            title = "歌曲/歌单下载存储位置",
-            subtitle = settings.downloadStorageMode.label,
+            title = stringResource(R.string.settings_dl_storage),
+            subtitle = stringResource(settings.downloadStorageMode.labelRes),
             onClick = { activeSheet = ActiveSheet.DOWNLOAD_STORAGE_MODE },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Download,
-            title = "离线下载音质",
-            subtitle = settings.downloadQuality.label,
+            title = stringResource(R.string.settings_dl_quality),
+            subtitle = stringResource(settings.downloadQuality.labelRes),
             onClick = { activeSheet = ActiveSheet.DOWNLOAD_QUALITY },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Wifi,
-            title = "仅 Wi-Fi 下载歌曲与歌单",
-            subtitle = "移动网络点击下载时先弹窗确认，防止意外消耗流量",
+            title = stringResource(R.string.settings_dl_wifi_only_title),
+            subtitle = stringResource(R.string.settings_dl_wifi_only_sub),
             checked = settings.downloadWifiOnly,
             onCheckedChange = { scope.launch { prefs.setDownloadWifiOnly(it) } },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Download,
-            title = "离线下载文件管理",
-            subtitle = if (downloadedCount <= 0) "尚未下载任何远程歌曲" else {
+            title = stringResource(R.string.settings_dl_manager_title),
+            subtitle = if (downloadedCount <= 0) stringResource(R.string.settings_dl_manager_empty) else {
                 val mb = downloadedTotalBytes / (1024.0 * 1024.0)
                 val sizeStr = if (mb >= 1.0) "${"%.1f".format(mb)} MB" else "${(downloadedTotalBytes / 1024L).coerceAtLeast(1L)} KB"
-                "已离线 $downloadedCount 首（共 $sizeStr）· 查看队列与清理"
+                stringResource(R.string.settings_dl_manager_summary, downloadedCount, sizeStr)
             },
             onClick = onOpenDownloadManager,
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Delete,
-            title = "清除远程封面缓存",
-            subtitle = if (coverCacheBytes <= 0L) "当前无缓存" else {
+            title = stringResource(R.string.settings_cover_cache_title),
+            subtitle = if (coverCacheBytes <= 0L) stringResource(R.string.settings_cache_empty) else {
                 val mb = coverCacheBytes / (1024.0 * 1024.0)
-                if (mb >= 1.0) "已占用 ${"%.1f".format(mb)} MB · 点击清理"
-                else "已占用 ${(coverCacheBytes / 1024L).coerceAtLeast(1L)} KB · 点击清理"
+                if (mb >= 1.0) stringResource(R.string.settings_cover_cache_mb, mb)
+                else stringResource(R.string.settings_cover_cache_kb, (coverCacheBytes / 1024L).coerceAtLeast(1L))
             },
             onClick = {
                 CoverArtSupport.clearAllCoverCache(context)
@@ -479,38 +485,52 @@ fun SettingsScreen(
             },
         )
 
-        // ==================== 分组 4：外观风格 ====================
-        SettingsGroupHeader("外观与黑胶风格")
+        // ==================== 分组 4：外观、语言与黑胶风格 ====================
+        SettingsGroupHeader(stringResource(R.string.settings_group_appearance))
 
+        val resolvedSysLangLabel = if (SonifyLocaleManager.isChinese(AppLanguage.SYSTEM)) {
+            AppLanguage.ZH_CN.nativeName
+        } else {
+            AppLanguage.EN.nativeName
+        }
+        SettingsSelectItem(
+            icon = Icons.Rounded.Language,
+            title = stringResource(R.string.settings_language_title),
+            subtitle = when (settings.appLanguage) {
+                AppLanguage.SYSTEM -> "${stringResource(R.string.settings_language_follow_system)} ($resolvedSysLangLabel)"
+                else -> settings.appLanguage.nativeName
+            },
+            onClick = { activeSheet = ActiveSheet.APP_LANGUAGE },
+        )
         SettingsSelectItem(
             icon = Icons.Rounded.Album,
-            title = "播放页视觉样式",
-            subtitle = settings.coverStyle.label,
+            title = stringResource(R.string.settings_cover_style),
+            subtitle = stringResource(settings.coverStyle.labelRes),
             onClick = { activeSheet = ActiveSheet.COVER_STYLE },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Palette,
-            title = "深色背景底色",
-            subtitle = settings.darkCanvasStyle.label,
+            title = stringResource(R.string.settings_dark_canvas),
+            subtitle = stringResource(settings.darkCanvasStyle.labelRes),
             onClick = { activeSheet = ActiveSheet.DARK_CANVAS },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.ColorLens,
-            title = "主题强调色",
-            subtitle = settings.accentStyle.label,
+            title = stringResource(R.string.settings_accent_style),
+            subtitle = stringResource(settings.accentStyle.labelRes),
             onClick = { activeSheet = ActiveSheet.ACCENT_STYLE },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Palette,
-            title = "封面动态氛围背景",
-            subtitle = "提取专辑主色渲染播放页与 MiniPlayer 暗调渐变",
+            title = stringResource(R.string.settings_ambient_bg_title),
+            subtitle = stringResource(R.string.settings_ambient_bg_sub),
             checked = settings.ambientBackground,
             onCheckedChange = { scope.launch { prefs.setAmbientBackground(it) } },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Fullscreen,
-            title = "沉浸音乐模式",
-            subtitle = "隐藏状态栏与导航栏，边到边无干扰黑胶听音（边缘内滑呼出系统栏）",
+            title = stringResource(R.string.settings_immersive_title),
+            subtitle = stringResource(R.string.settings_immersive_sub),
             checked = settings.immersiveMusicMode,
             accentChecked = colors.accent,
             onCheckedChange = { scope.launch { prefs.setImmersiveMusicMode(it) } },
@@ -518,34 +538,34 @@ fun SettingsScreen(
         if (settings.immersiveMusicMode) {
             SettingsSelectItem(
                 icon = Icons.Rounded.Fullscreen,
-                title = "沉浸生效范围",
-                subtitle = settings.immersiveScope.label,
+                title = stringResource(R.string.settings_immersive_scope),
+                subtitle = stringResource(settings.immersiveScope.labelRes),
                 onClick = { activeSheet = ActiveSheet.IMMERSIVE_SCOPE },
             )
             SettingsSwitchItem(
                 icon = Icons.Rounded.Fullscreen,
-                title = "隐藏顶部状态栏",
-                subtitle = "隐藏时间、电量与顶部通知图标",
+                title = stringResource(R.string.settings_hide_status_title),
+                subtitle = stringResource(R.string.settings_hide_status_sub),
                 checked = settings.immersiveHideStatusBar,
                 onCheckedChange = { scope.launch { prefs.setImmersiveHideStatusBar(it) } },
             )
             SettingsSwitchItem(
                 icon = Icons.Rounded.Fullscreen,
-                title = "隐藏底部导航栏",
-                subtitle = "隐藏返回/主页/多任务三键或手势条",
+                title = stringResource(R.string.settings_hide_nav_title),
+                subtitle = stringResource(R.string.settings_hide_nav_sub),
                 checked = settings.immersiveHideNavBar,
                 onCheckedChange = { scope.launch { prefs.setImmersiveHideNavBar(it) } },
             )
             SettingsSwitchItem(
                 icon = Icons.Rounded.Album,
-                title = "沉浸时保持屏幕常亮",
-                subtitle = "仅播放页播放中生效，适合接 USB DAC 作桌面黑胶摆台",
+                title = stringResource(R.string.settings_keep_screen_on_title),
+                subtitle = stringResource(R.string.settings_keep_screen_on_sub),
                 checked = settings.immersiveKeepScreenOn,
                 onCheckedChange = { scope.launch { prefs.setImmersiveKeepScreenOn(it) } },
             )
         }
         // ==================== 分组 4.5：歌词与沉浸样式 ====================
-        SettingsGroupHeader("歌词与沉浸样式")
+        SettingsGroupHeader(stringResource(R.string.settings_group_lyrics))
 
         LyricsSettingsPreviewCard(
             settings = settings,
@@ -554,23 +574,23 @@ fun SettingsScreen(
 
         SettingsSelectItem(
             icon = Icons.Rounded.Palette,
-            title = "沉浸背景风格",
-            subtitle = settings.lyricsBackdropStyle.label,
+            title = stringResource(R.string.settings_lyrics_backdrop),
+            subtitle = stringResource(settings.lyricsBackdropStyle.labelRes),
             onClick = { activeSheet = ActiveSheet.LYRICS_BACKDROP_STYLE },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.AutoAwesome,
-            title = "当前句高亮动效",
-            subtitle = settings.lyricsHighlightStyle.label,
+            title = stringResource(R.string.settings_lyrics_highlight),
+            subtitle = stringResource(settings.lyricsHighlightStyle.labelRes),
             onClick = { activeSheet = ActiveSheet.LYRICS_HIGHLIGHT_STYLE },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.FormatSize,
-            title = "歌词字体风格",
-            subtitle = "${settings.lyricsFontFamily.label} · ${settings.lyricsFontFamily.sample}",
+            title = stringResource(R.string.settings_lyrics_font),
+            subtitle = "${stringResource(settings.lyricsFontFamily.labelRes)} · ${stringResource(settings.lyricsFontFamily.sampleRes)}",
             onClick = { activeSheet = ActiveSheet.LYRICS_FONT_FAMILY },
         )
-        // 内联连续字号微调滑块（拖动时上方预览卡片即时放大/缩小）
+        // 内联连续字号微调滑块
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -588,7 +608,7 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.width(16.dp))
                 Text(
-                    text = "歌词字号",
+                    text = stringResource(R.string.settings_lyrics_size),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
                     color = colors.textPrimary,
@@ -608,7 +628,7 @@ fun SettingsScreen(
                     .padding(start = 38.dp, top = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("小", fontSize = 11.sp, color = colors.textMuted)
+                Text(stringResource(R.string.settings_lyrics_size_small), fontSize = 11.sp, color = colors.textMuted)
                 Slider(
                     value = settings.lyricsFontSizeSp.toFloat(),
                     onValueChange = { v -> scope.launch { prefs.setLyricsFontSizeSp(v.roundToInt()) } },
@@ -623,63 +643,63 @@ fun SettingsScreen(
                         .weight(1f)
                         .padding(horizontal = 8.dp),
                 )
-                Text("大", fontSize = 13.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.settings_lyrics_size_large), fontSize = 13.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
             }
         }
         SettingsSelectItem(
             icon = Icons.Rounded.Tune,
-            title = "行距与留白",
-            subtitle = settings.lyricsLineSpacing.label,
+            title = stringResource(R.string.settings_lyrics_spacing),
+            subtitle = stringResource(settings.lyricsLineSpacing.labelRes),
             onClick = { activeSheet = ActiveSheet.LYRICS_LINE_SPACING },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Lyrics,
-            title = "歌词排版对齐",
-            subtitle = settings.lyricsAlignment.label,
+            title = stringResource(R.string.settings_lyrics_align),
+            subtitle = stringResource(settings.lyricsAlignment.labelRes),
             onClick = { activeSheet = ActiveSheet.LYRICS_ALIGNMENT },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.FormatSize,
-            title = "当前演唱句加粗强调",
-            subtitle = "开启时高亮句使用粗体聚焦；关闭时采用柔和字重更显诗意",
+            title = stringResource(R.string.settings_lyrics_bold_title),
+            subtitle = stringResource(R.string.settings_lyrics_bold_sub),
             checked = settings.lyricsBoldActive,
             onCheckedChange = { scope.launch { prefs.setLyricsBoldActive(it) } },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Subtitles,
-            title = "显示双语歌词译文",
-            subtitle = "检测到同时间戳双语 LRC 时在原文下方呈现译文",
+            title = stringResource(R.string.settings_lyrics_trans_title),
+            subtitle = stringResource(R.string.settings_lyrics_trans_sub),
             checked = settings.lyricsShowTranslation,
             onCheckedChange = { scope.launch { prefs.setLyricsShowTranslation(it) } },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.VisibilityOff,
-            title = "沉浸纯享态（自动隐藏控件）",
-            subtitle = "全屏歌词播放 5 秒无操作自动淡出顶/底栏，仅留流光与歌词，轻点即唤醒",
+            title = stringResource(R.string.settings_lyrics_autohide_title),
+            subtitle = stringResource(R.string.settings_lyrics_autohide_sub),
             checked = settings.lyricsAutoHideControls,
             accentChecked = colors.accent,
             onCheckedChange = { scope.launch { prefs.setLyricsAutoHideControls(it) } },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Lyrics,
-            title = "播放页单行歌词预览",
-            subtitle = "在黑胶唱片下方轻盈显示当前演唱句，点击可展开全屏沉浸歌词",
+            title = stringResource(R.string.settings_lyrics_mini_title),
+            subtitle = stringResource(R.string.settings_lyrics_mini_sub),
             checked = settings.lyricsShowMiniPreview,
             onCheckedChange = { scope.launch { prefs.setLyricsShowMiniPreview(it) } },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Lyrics,
-            title = "自动在线匹配歌词（LRCLIB）",
-            subtitle = "本地与 Subsonic 无歌词时自动向开源免费库匹配并缓存离线",
+            title = stringResource(R.string.settings_lyrics_auto_online_title),
+            subtitle = stringResource(R.string.settings_lyrics_auto_online_sub),
             checked = settings.lyricsAutoOnlineSearch,
             onCheckedChange = { scope.launch { prefs.setLyricsAutoOnlineSearch(it) } },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Delete,
-            title = "清除歌词缓存",
-            subtitle = if (lyricsCacheBytes <= 0L) "当前无缓存" else {
+            title = stringResource(R.string.settings_lyrics_cache_title),
+            subtitle = if (lyricsCacheBytes <= 0L) stringResource(R.string.settings_cache_empty) else {
                 val kb = (lyricsCacheBytes / 1024L).coerceAtLeast(1L)
-                "已占用 $kb KB · 点击清空已下载与缓存的歌词"
+                stringResource(R.string.settings_lyrics_cache_kb, kb)
             },
             onClick = {
                 appRef.lyricsRepo.clearAllCache()
@@ -688,26 +708,26 @@ fun SettingsScreen(
         )
 
         // ==================== 分组 5：通知、锁屏与后台保活 ====================
-        SettingsGroupHeader("通知、锁屏与后台保活")
+        SettingsGroupHeader(stringResource(R.string.settings_group_background))
 
         SettingsSwitchItem(
             icon = Icons.Rounded.Lock,
-            title = "启用黑胶锁屏界面",
-            subtitle = "播放时熄屏再亮屏呈现 Sonify 黑胶锁屏页，上滑即可退出",
+            title = stringResource(R.string.settings_lockscreen_title),
+            subtitle = stringResource(R.string.settings_lockscreen_sub),
             checked = settings.lockScreenVinylEnabled,
             onCheckedChange = { scope.launch { prefs.setLockScreenVinyl(it) } },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Notifications,
-            title = "通知栏显示 HiFi 音频规格",
-            subtitle = "在通知栏与原生锁屏实时显示 USB 独占采样率/位深",
+            title = stringResource(R.string.settings_notif_spec_title),
+            subtitle = stringResource(R.string.settings_notif_spec_sub),
             checked = settings.notifShowAudioSpec,
             onCheckedChange = { scope.launch { prefs.setNotifShowAudioSpec(it) } },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Notifications,
-            title = "系统通知栏权限设置",
-            subtitle = "确保锁屏与通知栏媒体控制常驻不被系统隐藏",
+            title = stringResource(R.string.settings_notif_perm_title),
+            subtitle = stringResource(R.string.settings_notif_perm_sub),
             onClick = {
                 val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
                     putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
@@ -717,8 +737,8 @@ fun SettingsScreen(
         )
         SettingsSelectItem(
             icon = Icons.Rounded.BatteryChargingFull,
-            title = "后台电池优化白名单",
-            subtitle = if (ignoringBattery) "已加入白名单（息屏播放更稳定）" else "未加入，点击前往系统设置授权",
+            title = stringResource(R.string.settings_battery_title),
+            subtitle = stringResource(if (ignoringBattery) R.string.settings_battery_on else R.string.settings_battery_off),
             onClick = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     val intent = Intent(
@@ -736,86 +756,86 @@ fun SettingsScreen(
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Info,
-            title = "息屏防杀后台保活指引",
-            subtitle = "查看各品牌手机后台不中断设置建议",
+            title = stringResource(R.string.settings_keepalive_title),
+            subtitle = stringResource(R.string.settings_keepalive_sub),
             onClick = { showKeepAliveDialog = true },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.BatteryChargingFull,
-            title = "播放时保持 CPU 唤醒（WakeLock）",
-            subtitle = "配合音频高优先级调度，息屏持续发包零欠载，暂停自动释放",
+            title = stringResource(R.string.settings_wakelock_title),
+            subtitle = stringResource(R.string.settings_wakelock_sub),
             checked = settings.wakeLockEnabled,
             onCheckedChange = { scope.launch { prefs.setWakeLock(it) } },
         )
 
         // ==================== 分组 6：应用更新与崩溃诊断 ====================
-        SettingsGroupHeader("应用更新与崩溃诊断")
+        SettingsGroupHeader(stringResource(R.string.settings_group_update))
 
         SettingsSelectItem(
             icon = Icons.Rounded.NewReleases,
-            title = "检查应用更新",
+            title = stringResource(R.string.settings_check_update_title),
             subtitle = if (updateAvailableBadge != null) {
-                "发现新版本 v${updateAvailableBadge.versionName} · 点击查看日志并安全升级"
+                stringResource(R.string.settings_check_update_new, updateAvailableBadge.versionName)
             } else {
-                "当前版本 v${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE}) · SHA-256 校验"
+                stringResource(R.string.settings_check_update_cur, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
             },
             badgeText = updateAvailableBadge?.let { "v${it.versionName}" },
             onClick = onCheckUpdate,
         )
         SettingsSelectItem(
             icon = Icons.Rounded.History,
-            title = "版本更新日志",
-            subtitle = "查看 v${BuildConfig.VERSION_NAME} 及历史版本更新内容与特性说明",
+            title = stringResource(R.string.settings_changelog_title),
+            subtitle = stringResource(R.string.settings_changelog_sub, BuildConfig.VERSION_NAME),
             onClick = { showChangelogDialog = true },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.Code,
-            title = "GitHub 开源主页",
-            subtitle = "github.com/AceInAndroid/sonify · 仅限个人非商用（禁止商用）",
+            title = stringResource(R.string.settings_github_title),
+            subtitle = stringResource(R.string.settings_github_sub),
             onClick = { ProjectLinks.openExternalUrl(context, ProjectLinks.GITHUB_REPO_URL) },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Download,
-            title = "自动检查更新",
-            subtitle = "启动时按 12 小时节流静默检查，不打扰听音",
+            title = stringResource(R.string.settings_auto_update_title),
+            subtitle = stringResource(R.string.settings_auto_update_sub),
             checked = settings.autoCheckUpdate,
             onCheckedChange = { scope.launch { prefs.setAutoCheckUpdate(it) } },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.CloudUpload,
-            title = "自动上报脱敏崩溃日志",
-            subtitle = "发生闪退后仅上报异常堆栈与设备型号，自动剥离路径与账号信息",
+            title = stringResource(R.string.settings_auto_crash_title),
+            subtitle = stringResource(R.string.settings_auto_crash_sub),
             checked = settings.autoUploadCrashLogs,
             onCheckedChange = { scope.launch { prefs.setAutoUploadCrashLogs(it) } },
         )
         SettingsSwitchItem(
             icon = Icons.Rounded.Info,
-            title = "匿名日活与功能统计",
-            subtitle = "仅统计匿名装机日活、版本与 USB DAC 型号，不含歌名、路径或个人隐私",
+            title = stringResource(R.string.settings_analytics_title),
+            subtitle = stringResource(R.string.settings_analytics_sub),
             checked = settings.analyticsEnabled,
             onCheckedChange = { scope.launch { prefs.setAnalyticsEnabled(it) } },
         )
         SettingsSelectItem(
             icon = Icons.Rounded.BugReport,
-            title = "查看本地崩溃记录",
+            title = stringResource(R.string.settings_crash_logs_title),
             subtitle = if (crashReportCount > 0) {
-                "已保存 $crashReportCount 条脱敏诊断记录 · 支持复制或手动补报"
+                stringResource(R.string.settings_crash_logs_count, crashReportCount)
             } else {
-                "当前无本地崩溃记录 · 独立进程恢复守护运行中"
+                stringResource(R.string.settings_crash_logs_empty)
             },
             onClick = onOpenCrashLogs,
         )
         if (BuildConfig.DEBUG) {
             SettingsSelectItem(
                 icon = Icons.Rounded.Cloud,
-                title = "更新与诊断服务地址（Debug）",
+                title = stringResource(R.string.settings_debug_server_title),
                 subtitle = activeUpdateBaseUrl,
                 onClick = { showUpdateServerDialog = true },
             )
             SettingsSelectItem(
                 icon = Icons.Rounded.Warning,
-                title = "模拟一次测试崩溃（Debug）",
-                subtitle = "用于真机验证独立 :crash 进程恢复页、3 秒自动重启与日志上报",
+                title = stringResource(R.string.settings_debug_crash_title),
+                subtitle = stringResource(R.string.settings_debug_crash_sub),
                 onClick = { showSimulateCrashConfirm = true },
             )
         }
@@ -847,7 +867,7 @@ fun SettingsScreen(
                     color = colors.textMuted,
                 )
                 Text(
-                    text = "开源协议：Sonify Non-Commercial v1.0（禁止商用） · 点击查看",
+                    text = stringResource(R.string.settings_license_footer),
                     fontSize = 11.sp,
                     color = colors.textMuted,
                 )
@@ -862,8 +882,8 @@ fun SettingsScreen(
     // ---- 单选 BottomSheet ----
     when (activeSheet) {
         ActiveSheet.SAMPLE_RATE -> SpotifyOptionSheet(
-            title = "采样率策略",
-            options = SampleRatePolicy.entries.map { SheetOption(it, it.label) },
+            title = stringResource(R.string.settings_sample_rate),
+            options = SampleRatePolicy.entries.map { SheetOption(it, stringResource(it.labelRes)) },
             selected = settings.sampleRatePolicy,
             onSelect = {
                 scope.launch {
@@ -875,8 +895,8 @@ fun SettingsScreen(
         )
 
         ActiveSheet.BIT_DEPTH -> SpotifyOptionSheet(
-            title = "输出位深偏好",
-            options = BitDepthPref.entries.map { SheetOption(it, it.label) },
+            title = stringResource(R.string.settings_bit_depth_sheet),
+            options = BitDepthPref.entries.map { SheetOption(it, stringResource(it.labelRes)) },
             selected = settings.bitDepthPref,
             onSelect = {
                 scope.launch {
@@ -888,8 +908,8 @@ fun SettingsScreen(
         )
 
         ActiveSheet.BUFFER_SIZE -> SpotifyOptionSheet(
-            title = "环形缓冲大小",
-            options = BufferSizePref.entries.map { SheetOption(it, it.label) },
+            title = stringResource(R.string.settings_buffer_size),
+            options = BufferSizePref.entries.map { SheetOption(it, stringResource(it.labelRes)) },
             selected = settings.bufferSizePref,
             onSelect = {
                 scope.launch {
@@ -901,8 +921,8 @@ fun SettingsScreen(
         )
 
         ActiveSheet.VOLUME_MODE -> SpotifyOptionSheet(
-            title = "USB 音量控制模式",
-            options = VolumeMode.entries.map { SheetOption(it, it.label, it.subtitle) },
+            title = stringResource(R.string.settings_volume_mode),
+            options = VolumeMode.entries.map { SheetOption(it, stringResource(it.labelRes), stringResource(it.subtitleRes)) },
             selected = settings.volumeMode,
             onSelect = { mode ->
                 if (mode == VolumeMode.FIXED_DIRECT) {
@@ -918,13 +938,13 @@ fun SettingsScreen(
         )
 
         ActiveSheet.MAX_VOLUME_LIMIT -> SpotifyOptionSheet(
-            title = "设置耳朵音量保护上限",
+            title = stringResource(R.string.settings_max_vol_sheet),
             options = listOf(20, 30, 40, 50, 60, 70, 80, 90, 100).map { pct ->
                 val db = VolumeMath.percentToDb(pct)
                 val note = when (pct) {
-                    60 -> "推荐默认（约 %.0f dB，耳塞舒适上限）".format(db)
-                    in 90..100 -> "极高电平（约 %.0f dB，仅建议高阻大耳）".format(db)
-                    else -> "约 %.0f dB".format(db)
+                    60 -> stringResource(R.string.settings_max_vol_opt_default, db)
+                    in 90..100 -> stringResource(R.string.settings_max_vol_opt_high, db)
+                    else -> stringResource(R.string.common_approx_db, db)
                 }
                 SheetOption(pct, "$pct%", note)
             },
@@ -943,13 +963,13 @@ fun SettingsScreen(
         )
 
         ActiveSheet.SAFE_STARTUP_VOLUME -> SpotifyOptionSheet(
-            title = "接入 DAC 安全起步音量",
+            title = stringResource(R.string.settings_safe_startup_sheet),
             options = listOf(15, 20, 25, 30, 35).map { pct ->
                 val db = VolumeMath.percentToDb(pct)
                 SheetOption(
                     pct,
-                    if (pct == 25) "$pct%（推荐）" else "$pct%",
-                    "约 %.0f dB".format(db),
+                    if (pct == 25) stringResource(R.string.common_pct_recommended, pct) else "$pct%",
+                    stringResource(R.string.common_approx_db, db),
                 )
             },
             selected = settings.safeStartupPercent,
@@ -958,11 +978,11 @@ fun SettingsScreen(
         )
 
         ActiveSheet.VOLUME_STEP -> SpotifyOptionSheet(
-            title = "物理音量键单步增量",
+            title = stringResource(R.string.settings_vol_step_sheet),
             options = listOf(
-                SheetOption(1, "1%（极精细 · 100 级）", "每格约 0.6 dB"),
-                SheetOption(2, "2%（推荐 · 50 级）", "每格约 1.2 dB，细腻且顺手"),
-                SheetOption(5, "5%（快速 · 20 级）", "每格约 3.0 dB"),
+                SheetOption(1, stringResource(R.string.settings_vol_step_1_label), stringResource(R.string.settings_vol_step_1_sub)),
+                SheetOption(2, stringResource(R.string.settings_vol_step_2_label), stringResource(R.string.settings_vol_step_2_sub)),
+                SheetOption(5, stringResource(R.string.settings_vol_step_5_label), stringResource(R.string.settings_vol_step_5_sub)),
             ),
             selected = settings.volumeStepPercent,
             onSelect = { step -> scope.launch { prefs.setVolumeStepPercent(step) } },
@@ -970,128 +990,167 @@ fun SettingsScreen(
         )
 
         ActiveSheet.AUDIO_FOCUS_POLICY -> SpotifyOptionSheet(
-            title = "系统音频焦点交互策略",
-            options = AudioFocusPolicy.entries.map { SheetOption(it, it.label, it.subtitle) },
+            title = stringResource(R.string.settings_audio_focus_sheet),
+            options = AudioFocusPolicy.entries.map { SheetOption(it, stringResource(it.labelRes), stringResource(it.subtitleRes)) },
             selected = settings.audioFocusPolicy,
             onSelect = { policy -> scope.launch { prefs.setAudioFocusPolicy(policy) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.IMPORT_MODE -> SpotifyOptionSheet(
-            title = "歌曲导入方式",
-            options = ImportMode.entries.map { SheetOption(it, it.label) },
+            title = stringResource(R.string.settings_import_mode),
+            options = ImportMode.entries.map { SheetOption(it, stringResource(it.labelRes)) },
             selected = settings.importMode,
             onSelect = { scope.launch { prefs.setImportMode(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.MIN_DURATION -> SpotifyOptionSheet(
-            title = "过滤短音频",
-            options = MinDurationFilter.entries.map { SheetOption(it, it.label) },
+            title = stringResource(R.string.settings_min_duration),
+            options = MinDurationFilter.entries.map { SheetOption(it, stringResource(it.labelRes)) },
             selected = settings.minDurationFilter,
             onSelect = { scope.launch { prefs.setMinDurationFilter(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
+        ActiveSheet.APP_LANGUAGE -> {
+            val sysResolved = if (SonifyLocaleManager.isChinese(AppLanguage.SYSTEM)) {
+                AppLanguage.ZH_CN.nativeName
+            } else {
+                AppLanguage.EN.nativeName
+            }
+            SpotifyOptionSheet(
+                title = stringResource(R.string.settings_language_sheet_title),
+                options = listOf(
+                    SheetOption(
+                        AppLanguage.SYSTEM,
+                        stringResource(R.string.settings_language_follow_system),
+                        stringResource(R.string.settings_language_follow_system_sub, sysResolved),
+                    ),
+                    SheetOption(
+                        AppLanguage.ZH_CN,
+                        AppLanguage.ZH_CN.nativeName,
+                        stringResource(R.string.settings_language_zh_sub),
+                    ),
+                    SheetOption(
+                        AppLanguage.EN,
+                        AppLanguage.EN.nativeName,
+                        stringResource(R.string.settings_language_en_sub),
+                    ),
+                ),
+                selected = settings.appLanguage,
+                onSelect = { lang -> scope.launch { prefs.setAppLanguage(lang) } },
+                onDismiss = { activeSheet = ActiveSheet.NONE },
+            )
+        }
+
         ActiveSheet.COVER_STYLE -> SpotifyOptionSheet(
-            title = "播放页视觉样式",
-            options = CoverStyle.entries.map { SheetOption(it, it.label) },
+            title = stringResource(R.string.settings_cover_style),
+            options = CoverStyle.entries.map { SheetOption(it, stringResource(it.labelRes)) },
             selected = settings.coverStyle,
             onSelect = { scope.launch { prefs.setCoverStyle(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.DARK_CANVAS -> SpotifyOptionSheet(
-            title = "深色背景底色",
-            options = DarkCanvasStyle.entries.map { SheetOption(it, it.label) },
+            title = stringResource(R.string.settings_dark_canvas),
+            options = DarkCanvasStyle.entries.map { SheetOption(it, stringResource(it.labelRes)) },
             selected = settings.darkCanvasStyle,
             onSelect = { scope.launch { prefs.setDarkCanvasStyle(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.ACCENT_STYLE -> SpotifyOptionSheet(
-            title = "主题强调色",
-            options = AccentStyle.entries.map { SheetOption(it, it.label) },
+            title = stringResource(R.string.settings_accent_style),
+            options = AccentStyle.entries.map { SheetOption(it, stringResource(it.labelRes)) },
             selected = settings.accentStyle,
             onSelect = { scope.launch { prefs.setAccentStyle(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.IMMERSIVE_SCOPE -> SpotifyOptionSheet(
-            title = "沉浸音乐模式生效范围",
-            options = ImmersiveScope.entries.map { SheetOption(it, it.label, it.subtitle) },
+            title = stringResource(R.string.settings_immersive_scope_sheet),
+            options = ImmersiveScope.entries.map { SheetOption(it, stringResource(it.labelRes), stringResource(it.subtitleRes)) },
             selected = settings.immersiveScope,
             onSelect = { scope.launch { prefs.setImmersiveScope(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.SUBSONIC_WIFI_QUALITY -> SpotifyOptionSheet(
-            title = "Wi-Fi 流媒体音质",
-            options = StreamQuality.entries.map { SheetOption(it, it.label, it.subtitle) },
+            title = stringResource(R.string.settings_subsonic_wifi_q),
+            options = StreamQuality.entries.map { SheetOption(it, stringResource(it.labelRes), stringResource(it.subtitleRes)) },
             selected = settings.subsonicWifiQuality,
             onSelect = { scope.launch { prefs.setSubsonicWifiQuality(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.SUBSONIC_CELLULAR_QUALITY -> SpotifyOptionSheet(
-            title = "移动网络流媒体音质",
-            options = StreamQuality.entries.map { SheetOption(it, it.label, it.subtitle) },
+            title = stringResource(R.string.settings_subsonic_cell_q),
+            options = StreamQuality.entries.map { SheetOption(it, stringResource(it.labelRes), stringResource(it.subtitleRes)) },
             selected = settings.subsonicCellularQuality,
             onSelect = { scope.launch { prefs.setSubsonicCellularQuality(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.DOWNLOAD_STORAGE_MODE -> SpotifyOptionSheet(
-            title = "离线下载存储位置",
-            options = DownloadStorageMode.entries.map { SheetOption(it, it.label, it.subtitle) },
+            title = stringResource(R.string.settings_dl_storage_sheet),
+            options = DownloadStorageMode.entries.map { SheetOption(it, stringResource(it.labelRes), stringResource(it.subtitleRes)) },
             selected = settings.downloadStorageMode,
             onSelect = { scope.launch { prefs.setDownloadStorageMode(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.DOWNLOAD_QUALITY -> SpotifyOptionSheet(
-            title = "离线下载音质",
-            options = StreamQuality.entries.map { SheetOption(it, it.label, it.subtitle) },
+            title = stringResource(R.string.settings_dl_quality),
+            options = StreamQuality.entries.map { SheetOption(it, stringResource(it.labelRes), stringResource(it.subtitleRes)) },
             selected = settings.downloadQuality,
             onSelect = { scope.launch { prefs.setDownloadQuality(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.LYRICS_BACKDROP_STYLE -> SpotifyOptionSheet(
-            title = "歌词沉浸背景风格",
-            options = LyricsBackdropStyle.entries.map { SheetOption(it, it.label, it.subtitle) },
+            title = stringResource(R.string.settings_lyrics_backdrop_sheet),
+            options = LyricsBackdropStyle.entries.map { SheetOption(it, stringResource(it.labelRes), stringResource(it.subtitleRes)) },
             selected = settings.lyricsBackdropStyle,
             onSelect = { scope.launch { prefs.setLyricsBackdropStyle(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.LYRICS_HIGHLIGHT_STYLE -> SpotifyOptionSheet(
-            title = "歌词当前句高亮动效",
-            options = LyricsHighlightStyle.entries.map { SheetOption(it, it.label, it.subtitle) },
+            title = stringResource(R.string.settings_lyrics_highlight_sheet),
+            options = LyricsHighlightStyle.entries.map { SheetOption(it, stringResource(it.labelRes), stringResource(it.subtitleRes)) },
             selected = settings.lyricsHighlightStyle,
             onSelect = { scope.launch { prefs.setLyricsHighlightStyle(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.LYRICS_FONT_FAMILY -> SpotifyOptionSheet(
-            title = "歌词字体风格",
-            options = LyricsFontFamily.entries.map { SheetOption(it, it.label, "${it.subtitle} · ${it.sample}") },
+            title = stringResource(R.string.settings_lyrics_font),
+            options = LyricsFontFamily.entries.map {
+                SheetOption(it, stringResource(it.labelRes), "${stringResource(it.subtitleRes)} · ${stringResource(it.sampleRes)}")
+            },
             selected = settings.lyricsFontFamily,
             onSelect = { scope.launch { prefs.setLyricsFontFamily(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.LYRICS_LINE_SPACING -> SpotifyOptionSheet(
-            title = "歌词行距与留白",
-            options = LyricsLineSpacing.entries.map { SheetOption(it, it.label, "句间距 ${it.itemGapDp}dp · ${"%.2f".format(it.lineHeightMultiplier)}x 行高") },
+            title = stringResource(R.string.settings_lyrics_spacing_sheet),
+            options = LyricsLineSpacing.entries.map {
+                SheetOption(
+                    it,
+                    stringResource(it.labelRes),
+                    stringResource(R.string.settings_lyrics_spacing_detail, it.itemGapDp, it.lineHeightMultiplier),
+                )
+            },
             selected = settings.lyricsLineSpacing,
             onSelect = { scope.launch { prefs.setLyricsLineSpacing(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
         )
 
         ActiveSheet.LYRICS_ALIGNMENT -> SpotifyOptionSheet(
-            title = "歌词排版对齐",
-            options = LyricsAlignment.entries.map { SheetOption(it, it.label) },
+            title = stringResource(R.string.settings_lyrics_align),
+            options = LyricsAlignment.entries.map { SheetOption(it, stringResource(it.labelRes)) },
             selected = settings.lyricsAlignment,
             onSelect = { scope.launch { prefs.setLyricsAlignment(it) } },
             onDismiss = { activeSheet = ActiveSheet.NONE },
@@ -1103,17 +1162,17 @@ fun SettingsScreen(
     // 高音量 / 关闭护耳二次警示确认弹窗
     highVolConfirm?.let { pending ->
         val (title, message) = when (pending) {
-            HighVolumeConfirm.DirectPassThrough -> "高音量炸耳警告" to
-                "开启「固定直通 100%」将以满幅 0 dBFS 直接驱动 USB DAC，音量保护将被绕过！仅限外接独立耳放/功放时使用，直推耳机/耳塞极可能损伤听力。确认继续吗？"
+            HighVolumeConfirm.DirectPassThrough -> stringResource(R.string.settings_warn_direct_title) to
+                stringResource(R.string.settings_warn_direct_msg)
 
             is HighVolumeConfirm.RaiseLimit -> {
                 val targetDb = "%.0f".format(VolumeMath.percentToDb(pending.targetPercent))
-                "确认提高音量上限至 ${pending.targetPercent}%？" to
-                    "超过 80%（约 $targetDb dB）在高灵敏度耳塞上可能非常响亮，建议先摘下耳机再确认。"
+                stringResource(R.string.settings_warn_raise_title, pending.targetPercent) to
+                    stringResource(R.string.settings_warn_raise_msg, targetDb)
             }
 
-            HighVolumeConfirm.DisableProtection -> "确认关闭耳朵音量保护？" to
-                "关闭后音量可调至 100%（0 dBFS），误触物理按键或拖动滑块可能造成突然大音量。建议保持开启。"
+            HighVolumeConfirm.DisableProtection -> stringResource(R.string.settings_warn_disable_title) to
+                stringResource(R.string.settings_warn_disable_msg)
         }
         AlertDialog(
             onDismissRequest = { highVolConfirm = null },
@@ -1145,12 +1204,12 @@ fun SettingsScreen(
                         }
                     }
                 ) {
-                    Text("我已确认风险", color = colors.danger, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.settings_warn_confirm), color = colors.danger, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { highVolConfirm = null }) {
-                    Text("取消", color = colors.textPrimary)
+                    Text(stringResource(R.string.common_cancel), color = colors.textPrimary)
                 }
             },
         )
@@ -1162,20 +1221,16 @@ fun SettingsScreen(
             containerColor = colors.surface1,
             titleContentColor = colors.textPrimary,
             textContentColor = colors.textSecondary,
-            title = { Text("后台息屏保活建议", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.settings_keepalive_dialog_title), fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    text = "为了保证息屏连续播放 USB 独占无损音频不断流，建议完成以下 3 步：\n\n" +
-                        "1. 开启本页「后台电池优化白名单」（设为无限制）。\n" +
-                        "2. 在系统应用管理中允许 Sonify「后台高耗电 / 自启动」。\n" +
-                        "3. 在最近任务列表中下拉或长按锁定 Sonify 卡片，防止一键清理误杀。\n\n" +
-                        "（注：Sonify 已自动为 USB 音频线程启用高优先级调度与播放期 WakeLock。）",
+                    text = stringResource(R.string.settings_keepalive_dialog_body),
                     fontSize = 13.sp,
                 )
             },
             confirmButton = {
                 TextButton(onClick = { showKeepAliveDialog = false }) {
-                    Text("知道了", color = colors.accent)
+                    Text(stringResource(R.string.common_got_it), color = colors.accent)
                 }
             },
         )
@@ -1189,7 +1244,7 @@ fun SettingsScreen(
             containerColor = colors.surface1,
             titleContentColor = colors.textPrimary,
             textContentColor = colors.textSecondary,
-            title = { Text("扫描目录管理", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.settings_scan_dirs), fontWeight = FontWeight.Bold) },
             text = {
                 Column {
                     settings.scanDirs.forEach { dir ->
@@ -1215,7 +1270,7 @@ fun SettingsScreen(
                                 ) {
                                     Icon(
                                         Icons.Rounded.Delete,
-                                        contentDescription = "删除目录",
+                                        contentDescription = stringResource(R.string.settings_scan_dirs_remove),
                                         tint = colors.danger,
                                         modifier = Modifier.size(18.dp),
                                     )
@@ -1244,12 +1299,15 @@ fun SettingsScreen(
                         }
                     }
                 ) {
-                    Text(if (newPath.isBlank()) "立即扫描" else "添加并扫描", color = colors.accent)
+                    Text(
+                        stringResource(if (newPath.isBlank()) R.string.settings_scan_now else R.string.settings_add_and_scan),
+                        color = colors.accent,
+                    )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDirsDialog = false }) {
-                    Text("关闭", color = colors.textSecondary)
+                    Text(stringResource(R.string.common_close), color = colors.textSecondary)
                 }
             },
         )
@@ -1260,11 +1318,11 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showUpdateServerDialog = false },
             containerColor = colors.surface1,
-            title = { Text("更新与诊断服务地址", color = colors.textPrimary) },
+            title = { Text(stringResource(R.string.settings_debug_server_dialog_title), color = colors.textPrimary) },
             text = {
                 Column {
                     Text(
-                        text = "默认对接官方自建服务 ${BuildConfig.UPDATE_BASE_URL}；如需切换局域网测试或私有镜像，可在此填写以 http:// 或 https:// 开头的根地址。",
+                        text = stringResource(R.string.settings_debug_server_dialog_desc, BuildConfig.UPDATE_BASE_URL),
                         fontSize = 12.sp,
                         color = colors.textSecondary,
                         lineHeight = 17.sp,
@@ -1293,7 +1351,7 @@ fun SettingsScreen(
                         showUpdateServerDialog = false
                     }
                 ) {
-                    Text("保存", color = colors.accent, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.common_save), color = colors.accent, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -1305,11 +1363,11 @@ fun SettingsScreen(
                                 showUpdateServerDialog = false
                             }
                         ) {
-                            Text("恢复默认", color = colors.textSecondary)
+                            Text(stringResource(R.string.common_reset_default), color = colors.textSecondary)
                         }
                     }
                     TextButton(onClick = { showUpdateServerDialog = false }) {
-                        Text("取消", color = colors.textSecondary)
+                        Text(stringResource(R.string.common_cancel), color = colors.textSecondary)
                     }
                 }
             },
@@ -1320,10 +1378,10 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showSimulateCrashConfirm = false },
             containerColor = colors.surface1,
-            title = { Text("模拟一次测试崩溃？", color = colors.textPrimary) },
+            title = { Text(stringResource(R.string.settings_debug_crash_dialog_title), color = colors.textPrimary) },
             text = {
                 Text(
-                    "将在主线程抛出测试异常以验证 SonifyCrashHandler 拦截、独立 :crash 进程恢复页、3 秒自动重启及脱敏日志保存/上报流程。",
+                    stringResource(R.string.settings_debug_crash_dialog_msg),
                     fontSize = 13.sp,
                     color = colors.textSecondary,
                 )
@@ -1335,12 +1393,12 @@ fun SettingsScreen(
                         onSimulateCrash()
                     }
                 ) {
-                    Text("立即模拟", color = colors.danger, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.settings_debug_crash_confirm), color = colors.danger, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSimulateCrashConfirm = false }) {
-                    Text("取消", color = colors.textSecondary)
+                    Text(stringResource(R.string.common_cancel), color = colors.textSecondary)
                 }
             },
         )

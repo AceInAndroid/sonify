@@ -2,6 +2,7 @@ package com.sonify.player.data
 
 import android.content.Context
 import android.os.Environment
+import androidx.annotation.StringRes
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -9,6 +10,10 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.sonify.player.HiFiApp
+import com.sonify.player.R
+import com.sonify.player.i18n.AppLanguage
+import com.sonify.player.i18n.SonifyLocaleManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,196 +26,129 @@ import org.json.JSONArray
 
 private val Context.dataStore by preferencesDataStore(name = "sonify_settings")
 
-enum class SampleRatePolicy(val label: String, val fixedHz: Int) {
-    FOLLOW_SOURCE("跟随源文件（推荐）", 0),
-    FIXED_44100("固定 44.1 kHz", 44100),
-    FIXED_48000("固定 48 kHz", 48000),
-    FIXED_96000("固定 96 kHz", 96000),
-    FIXED_192000("固定 192 kHz", 192000),
+enum class SampleRatePolicy(@StringRes val labelRes: Int, val fixedHz: Int) {
+    FOLLOW_SOURCE(R.string.pref_sr_follow, 0),
+    FIXED_44100(R.string.pref_sr_44100, 44100),
+    FIXED_48000(R.string.pref_sr_48000, 48000),
+    FIXED_96000(R.string.pref_sr_96000, 96000),
+    FIXED_192000(R.string.pref_sr_192000, 192000),
 }
 
-enum class BitDepthPref(val label: String, val subslotBytes: Int) {
-    AUTO("自动匹配（推荐）", 0),
-    BIT_24("24-bit（兼容便携 DAC）", 3),
-    BIT_32("32-bit 容器", 4),
+enum class BitDepthPref(@StringRes val labelRes: Int, val subslotBytes: Int) {
+    AUTO(R.string.pref_bits_auto, 0),
+    BIT_24(R.string.pref_bits_24, 3),
+    BIT_32(R.string.pref_bits_32, 4),
 }
 
-enum class BufferSizePref(val label: String, val ms: Int) {
-    LOW("低延迟（100 ms）", 100),
-    BALANCED("均衡（180 ms · 推荐）", 180),
-    SAFE("抗抖动（300 ms）", 300),
+enum class BufferSizePref(@StringRes val labelRes: Int, val ms: Int) {
+    LOW(R.string.pref_buf_low, 100),
+    BALANCED(R.string.pref_buf_balanced, 180),
+    SAFE(R.string.pref_buf_safe, 300),
 }
 
-enum class VolumeMode(val label: String, val subtitle: String) {
-    AUTO_HARDWARE(
-        "智能硬件优先（推荐）",
-        "优先调 DAC 硬件音量保持 Bit-Perfect，无硬件音量时自动切对数软件音量"
-    ),
-    SOFTWARE_ONLY(
-        "强制对数软件音量",
-        "始终在 C++ 端用对数 dB 曲线做 32-bit 高精度衰减"
-    ),
-    FIXED_DIRECT(
-        "固定直通 100%（仅外接耳放）",
-        "0 dBFS 满幅输出，直推耳塞有炸耳风险，仅限外接独立耳放/前级"
-    ),
+enum class VolumeMode(@StringRes val labelRes: Int, @StringRes val subtitleRes: Int) {
+    AUTO_HARDWARE(R.string.pref_vol_auto_label, R.string.pref_vol_auto_sub),
+    SOFTWARE_ONLY(R.string.pref_vol_sw_label, R.string.pref_vol_sw_sub),
+    FIXED_DIRECT(R.string.pref_vol_direct_label, R.string.pref_vol_direct_sub),
 }
 
-enum class ImportMode(val label: String) {
-    REFERENCE("仅引用原路径"),
-    COPY_TO_LIBRARY("拷贝到 HiFiMusic 资料库"),
+enum class ImportMode(@StringRes val labelRes: Int) {
+    REFERENCE(R.string.pref_import_ref),
+    COPY_TO_LIBRARY(R.string.pref_import_copy),
 }
 
-enum class MinDurationFilter(val label: String, val minMs: Long) {
-    NONE("不过滤", 0L),
-    SEC_15("忽略短于 15 秒", 15_000L),
-    SEC_30("忽略短于 30 秒", 30_000L),
+enum class MinDurationFilter(@StringRes val labelRes: Int, val minMs: Long) {
+    NONE(R.string.pref_dur_none, 0L),
+    SEC_15(R.string.pref_dur_15, 15_000L),
+    SEC_30(R.string.pref_dur_30, 30_000L),
 }
 
-enum class CoverStyle(val label: String) {
-    VINYL("黑胶唱片（旋转）"),
-    SQUARE("极简方形封面"),
+enum class CoverStyle(@StringRes val labelRes: Int) {
+    VINYL(R.string.pref_cover_vinyl),
+    SQUARE(R.string.pref_cover_square),
 }
 
-enum class DarkCanvasStyle(val label: String) {
-    SPOTIFY_CHARCOAL("Spotify 炭黑 (#121212)"),
-    OLED_BLACK("OLED 纯黑 (#000000)"),
+enum class DarkCanvasStyle(@StringRes val labelRes: Int) {
+    SPOTIFY_CHARCOAL(R.string.pref_canvas_charcoal),
+    OLED_BLACK(R.string.pref_canvas_oled),
 }
 
-enum class AccentStyle(val label: String) {
-    VINYL_GOLD("黑胶暖金 (#E5A93C)"),
-    SPOTIFY_GREEN("Spotify 翠绿 (#1DB954)"),
+enum class AccentStyle(@StringRes val labelRes: Int) {
+    VINYL_GOLD(R.string.pref_accent_gold),
+    SPOTIFY_GREEN(R.string.pref_accent_green),
 }
 
-enum class ImmersiveScope(val label: String, val subtitle: String) {
-    PLAYER_AND_LOCKSCREEN(
-        "仅播放页与锁屏（推荐）",
-        "进入黑胶播放页与锁屏时自动隐藏系统栏，回到音乐库与设置自动恢复"
-    ),
-    GLOBAL(
-        "全局应用",
-        "在 Sonify 所有页面均隐藏所选系统栏，边缘滑动可临时呼出"
-    ),
+enum class ImmersiveScope(@StringRes val labelRes: Int, @StringRes val subtitleRes: Int) {
+    PLAYER_AND_LOCKSCREEN(R.string.pref_imm_player_label, R.string.pref_imm_player_sub),
+    GLOBAL(R.string.pref_imm_global_label, R.string.pref_imm_global_sub),
 }
 
-enum class LyricsFontSize(val label: String, val activeSp: Float, val inactiveSp: Float) {
-    SMALL("紧凑", 19f, 16f),
-    MEDIUM("标准（推荐）", 23f, 18f),
-    LARGE("大字号", 27f, 21f),
+enum class LyricsFontSize(@StringRes val labelRes: Int, val activeSp: Float, val inactiveSp: Float) {
+    SMALL(R.string.pref_lrc_size_small, 19f, 16f),
+    MEDIUM(R.string.pref_lrc_size_medium, 23f, 18f),
+    LARGE(R.string.pref_lrc_size_large, 27f, 21f),
 }
 
-enum class LyricsAlignment(val label: String) {
-    LEFT("Spotify 左对齐"),
-    CENTER("经典居中"),
+enum class LyricsAlignment(@StringRes val labelRes: Int) {
+    LEFT(R.string.pref_lrc_align_left),
+    CENTER(R.string.pref_lrc_align_center),
 }
 
-enum class LyricsBackdropStyle(val label: String, val subtitle: String) {
-    FLUID_AURORA(
-        "流体多色氛围光晕（推荐）",
-        "提取封面三色动态漂移光斑，随播放呼吸律动，全机型 60fps 丝滑渲染"
-    ),
-    COVER_BLUR(
-        "封面暗调虚化底图",
-        "柔化专辑封面与暗角渐晕融合，呈现黑胶唱片内页质感"
-    ),
-    MINIMAL_DARK(
-        "极简深黑",
-        "纯净暗调基底叠加微弱主色晕染，夜间零干扰阅读"
-    ),
+enum class LyricsBackdropStyle(@StringRes val labelRes: Int, @StringRes val subtitleRes: Int) {
+    FLUID_AURORA(R.string.pref_lrc_bg_aurora_label, R.string.pref_lrc_bg_aurora_sub),
+    COVER_BLUR(R.string.pref_lrc_bg_blur_label, R.string.pref_lrc_bg_blur_sub),
+    MINIMAL_DARK(R.string.pref_lrc_bg_dark_label, R.string.pref_lrc_bg_dark_sub),
 }
 
-enum class LyricsHighlightStyle(val label: String, val subtitle: String) {
-    PROGRESSIVE_SWEEP(
-        "逐句流光扫色（推荐）",
-        "高光随演唱节奏从左向右丝滑扫过，支持增强型 LRC 逐字时间戳"
-    ),
-    GLOW_PURE(
-        "柔光纯白",
-        "纯净高亮白字叠加专辑主色柔和外发光"
-    ),
-    ACCENT_TINT(
-        "主题强调色",
-        "使用当前黑胶暖金或 Spotify 翠绿点亮演唱句"
-    ),
-    CAPSULE_FOCUS(
-        "暗调玻璃聚焦条",
-        "为当前演唱句叠加半透明磨砂聚焦胶囊，焦点醒目"
-    ),
+enum class LyricsHighlightStyle(@StringRes val labelRes: Int, @StringRes val subtitleRes: Int) {
+    PROGRESSIVE_SWEEP(R.string.pref_lrc_hl_sweep_label, R.string.pref_lrc_hl_sweep_sub),
+    GLOW_PURE(R.string.pref_lrc_hl_pure_label, R.string.pref_lrc_hl_pure_sub),
+    ACCENT_TINT(R.string.pref_lrc_hl_accent_label, R.string.pref_lrc_hl_accent_sub),
+    CAPSULE_FOCUS(R.string.pref_lrc_hl_capsule_label, R.string.pref_lrc_hl_capsule_sub),
 }
 
-enum class LyricsFontFamily(val label: String, val subtitle: String, val sample: String) {
-    SANS_MODERN("现代无衬线（推荐）", "Spotify 编辑风清晰利落", "流光岁月 · Modern Sans"),
-    SERIF_EDITORIAL("文艺黑胶衬线", "黑胶内页与古典杂志叙事质感", "流光岁月 · Editorial Serif"),
-    ROUNDED_SOFT("温润舒展体", "舒展字距与柔和呼吸感", "流光岁月 · Soft Wide"),
-    MONO_STUDIO("母带录音室等宽", "专业录音室提词与时间码美学", "流光岁月 · Studio Mono"),
+enum class LyricsFontFamily(
+    @StringRes val labelRes: Int,
+    @StringRes val subtitleRes: Int,
+    @StringRes val sampleRes: Int,
+) {
+    SANS_MODERN(R.string.pref_lrc_font_sans_label, R.string.pref_lrc_font_sans_sub, R.string.pref_lrc_font_sans_sample),
+    SERIF_EDITORIAL(R.string.pref_lrc_font_serif_label, R.string.pref_lrc_font_serif_sub, R.string.pref_lrc_font_serif_sample),
+    ROUNDED_SOFT(R.string.pref_lrc_font_rounded_label, R.string.pref_lrc_font_rounded_sub, R.string.pref_lrc_font_rounded_sample),
+    MONO_STUDIO(R.string.pref_lrc_font_mono_label, R.string.pref_lrc_font_mono_sub, R.string.pref_lrc_font_mono_sample),
 }
 
 enum class LyricsLineSpacing(
-    val label: String,
+    @StringRes val labelRes: Int,
     val itemGapDp: Int,
     val lineHeightMultiplier: Float,
 ) {
-    COMPACT("紧凑", 14, 1.30f),
-    COMFORTABLE("舒展（推荐）", 22, 1.42f),
-    RELAXED("宽松", 30, 1.56f),
+    COMPACT(R.string.pref_lrc_space_compact, 14, 1.30f),
+    COMFORTABLE(R.string.pref_lrc_space_comfort, 22, 1.42f),
+    RELAXED(R.string.pref_lrc_space_relaxed, 30, 1.56f),
 }
 
 enum class StreamQuality(
-    val label: String,
-    val subtitle: String,
+    @StringRes val labelRes: Int,
+    @StringRes val subtitleRes: Int,
     val format: String,
     val maxBitRate: Int,
 ) {
-    RAW(
-        "原盘无损直通（推荐）",
-        "不经服务端转码（format=raw），完美匹配 USB DAC Bit-Perfect 独占",
-        "raw",
-        0,
-    ),
-    MP3_320(
-        "高音质 MP3 320 kbps",
-        "兼顾音质与带宽，适合移动网络聆听",
-        "mp3",
-        320,
-    ),
-    OPUS_192(
-        "流畅 Opus 192 kbps",
-        "高压缩效率，适合弱网或省流量场景",
-        "opus",
-        192,
-    ),
-    MP3_192(
-        "省流量 MP3 192 kbps",
-        "通用兼容转码档位，显著减少蜂窝流量消耗",
-        "mp3",
-        192,
-    ),
+    RAW(R.string.pref_stream_raw_label, R.string.pref_stream_raw_sub, "raw", 0),
+    MP3_320(R.string.pref_stream_mp3_320_label, R.string.pref_stream_mp3_320_sub, "mp3", 320),
+    OPUS_192(R.string.pref_stream_opus_192_label, R.string.pref_stream_opus_192_sub, "opus", 192),
+    MP3_192(R.string.pref_stream_mp3_192_label, R.string.pref_stream_mp3_192_sub, "mp3", 192),
 }
 
-enum class DownloadStorageMode(val label: String, val subtitle: String) {
-    PUBLIC_MUSIC(
-        "公开目录（/sdcard/Music/SonifyDownloads）",
-        "文件按艺人/专辑归档，文件管理器可见并自动纳入本地库（无写权限时自动回落私有目录）"
-    ),
-    APP_PRIVATE(
-        "App 私有离线目录",
-        "仅限 Sonify 内部离线播放与管理，不写入手机公共 Music 目录"
-    ),
+enum class DownloadStorageMode(@StringRes val labelRes: Int, @StringRes val subtitleRes: Int) {
+    PUBLIC_MUSIC(R.string.pref_dl_public_label, R.string.pref_dl_public_sub),
+    APP_PRIVATE(R.string.pref_dl_private_label, R.string.pref_dl_private_sub),
 }
 
-enum class AudioFocusPolicy(val label: String, val subtitle: String) {
-    STANDARD_DUCK(
-        "标准模式 · 压低避让（推荐）",
-        "播歌抢占其他应用；来电/语音暂停并自动恢复；导航/提示音临时压低 -12 dB"
-    ),
-    PAUSE_ON_DUCK(
-        "纯净模式 · 暂停避让",
-        "遇到提示音或导航播报时暂停播放而非降音量，结束后自动续播"
-    ),
-    IGNORE_DUCK(
-        "沉浸模式 · 忽略短提示音",
-        "忽略消息提示音不断流不降音量，仅来电或视频等强打断时礼让暂停"
-    ),
+enum class AudioFocusPolicy(@StringRes val labelRes: Int, @StringRes val subtitleRes: Int) {
+    STANDARD_DUCK(R.string.pref_focus_duck_label, R.string.pref_focus_duck_sub),
+    PAUSE_ON_DUCK(R.string.pref_focus_pause_label, R.string.pref_focus_pause_sub),
+    IGNORE_DUCK(R.string.pref_focus_ignore_label, R.string.pref_focus_ignore_sub),
 }
 
 data class AppSettings(
@@ -239,7 +177,8 @@ data class AppSettings(
     val scanDirs: List<String> = defaultScanDirs(),
     val importMode: ImportMode = ImportMode.REFERENCE,
     val minDurationFilter: MinDurationFilter = MinDurationFilter.SEC_15,
-    // 外观与沉浸音乐模式
+    // 外观、语言与沉浸音乐模式
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val coverStyle: CoverStyle = CoverStyle.VINYL,
     val darkCanvasStyle: DarkCanvasStyle = DarkCanvasStyle.SPOTIFY_CHARCOAL,
     val accentStyle: AccentStyle = AccentStyle.VINYL_GOLD,
@@ -330,6 +269,7 @@ class UserPreferences(private val context: Context) {
         val SCAN_DIRS = stringSetPreferencesKey("scan_dirs")
         val IMPORT_MODE = stringPreferencesKey("import_mode")
         val MIN_DURATION = stringPreferencesKey("min_duration")
+        val APP_LANGUAGE = stringPreferencesKey("app_language")
         val COVER_STYLE = stringPreferencesKey("cover_style")
         val DARK_CANVAS = stringPreferencesKey("dark_canvas")
         val ACCENT_STYLE = stringPreferencesKey("accent_style")
@@ -421,6 +361,7 @@ class UserPreferences(private val context: Context) {
                 minDurationFilter = p[Keys.MIN_DURATION]?.let {
                     runCatching { MinDurationFilter.valueOf(it) }.getOrNull()
                 } ?: MinDurationFilter.SEC_15,
+                appLanguage = AppLanguage.fromStorageKey(p[Keys.APP_LANGUAGE]),
                 coverStyle = p[Keys.COVER_STYLE]?.let {
                     runCatching { CoverStyle.valueOf(it) }.getOrNull()
                 } ?: CoverStyle.VINYL,
@@ -611,6 +552,12 @@ class UserPreferences(private val context: Context) {
 
     suspend fun setMinDurationFilter(filter: MinDurationFilter) {
         context.dataStore.edit { it[Keys.MIN_DURATION] = filter.name }
+    }
+
+    suspend fun setAppLanguage(language: AppLanguage) {
+        SonifyLocaleManager.writePersistedSync(context, language)
+        (context.applicationContext as? HiFiApp)?.onLanguageChanged(language)
+        context.dataStore.edit { it[Keys.APP_LANGUAGE] = language.storageKey }
     }
 
     suspend fun setCoverStyle(style: CoverStyle) {

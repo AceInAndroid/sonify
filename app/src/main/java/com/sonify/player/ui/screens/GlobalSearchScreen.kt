@@ -1,6 +1,7 @@
 package com.sonify.player.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -58,6 +59,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -68,6 +70,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.data.SubsonicServerEntity
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.library.PlaylistSummary
@@ -86,14 +89,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private enum class SearchCategory(val label: String) {
-    ALL("全部"),
-    SONGS("歌曲"),
-    ALBUMS("专辑"),
-    ARTISTS("艺人"),
-    PLAYLISTS("歌单"),
-    REMOTE("远程"),
-    LYRICS("歌词"),
+private enum class SearchCategory(@StringRes val labelRes: Int) {
+    ALL(R.string.search_tab_all),
+    SONGS(R.string.search_tab_songs),
+    ALBUMS(R.string.search_tab_albums),
+    ARTISTS(R.string.search_tab_artists),
+    PLAYLISTS(R.string.search_tab_playlists),
+    REMOTE(R.string.search_tab_remote),
+    LYRICS(R.string.search_tab_lyrics),
 }
 
 /**
@@ -191,7 +194,7 @@ fun GlobalSearchScreen(
     val drillArtist = openLocalArtist
     if (drillAlbum != null || drillArtist != null) {
         val headerTitle = drillAlbum?.title ?: drillArtist!!.name
-        val headerSub = drillAlbum?.artist ?: "${drillArtist!!.tracks.size} 首本地曲目"
+        val headerSub = drillAlbum?.artist ?: stringResource(R.string.common_local_tracks_count, drillArtist!!.tracks.size)
         val drillTracks = drillAlbum?.tracks ?: drillArtist!!.tracks
         Column(
             modifier = Modifier
@@ -208,7 +211,7 @@ fun GlobalSearchScreen(
                     openLocalAlbum = null
                     openLocalArtist = null
                 }) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回搜索", tint = colors.textPrimary)
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.search_back_to_search), tint = colors.textPrimary)
                 }
                 Column(Modifier.weight(1f)) {
                     Text(headerTitle, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -227,7 +230,7 @@ fun GlobalSearchScreen(
                 ) {
                     Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(3.dp))
-                    Text("播放", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.onAccent)
+                    Text(stringResource(R.string.common_play), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.onAccent)
                 }
             }
             LazyColumn(
@@ -262,15 +265,17 @@ fun GlobalSearchScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = colors.textPrimary)
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = colors.textPrimary)
             }
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
                 placeholder = {
                     Text(
-                        text = if (activeSubsonicServer != null) "搜本地/远程歌曲、专辑、歌单、歌词（简繁互通）"
-                        else "搜歌曲、艺人、专辑、歌单、歌词（简繁互通）",
+                        text = stringResource(
+                            if (activeSubsonicServer != null) R.string.search_hint_with_remote
+                            else R.string.search_hint_local
+                        ),
                         fontSize = 13.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -282,7 +287,7 @@ fun GlobalSearchScreen(
                 trailingIcon = {
                     if (query.isNotEmpty()) {
                         IconButton(onClick = { query = "" }) {
-                            Icon(Icons.Rounded.Close, contentDescription = "清空", tint = colors.textSecondary, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_clear), tint = colors.textSecondary, modifier = Modifier.size(18.dp))
                         }
                     }
                 },
@@ -320,7 +325,7 @@ fun GlobalSearchScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text("最近搜索", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.textSecondary)
+                                Text(stringResource(R.string.search_recent_title), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.textSecondary)
                                 Row(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
@@ -330,7 +335,7 @@ fun GlobalSearchScreen(
                                 ) {
                                     Icon(Icons.Rounded.DeleteSweep, contentDescription = null, tint = colors.textMuted, modifier = Modifier.size(15.dp))
                                     Spacer(Modifier.width(3.dp))
-                                    Text("清空", fontSize = 11.sp, color = colors.textMuted)
+                                    Text(stringResource(R.string.common_clear), fontSize = 11.sp, color = colors.textMuted)
                                 }
                             }
                             Spacer(Modifier.height(10.dp))
@@ -359,7 +364,7 @@ fun GlobalSearchScreen(
                                         Spacer(Modifier.width(4.dp))
                                         Icon(
                                             imageVector = Icons.Rounded.Close,
-                                            contentDescription = "删除历史",
+                                            contentDescription = stringResource(R.string.search_delete_history),
                                             tint = colors.textMuted,
                                             modifier = Modifier
                                                 .size(15.dp)
@@ -375,7 +380,7 @@ fun GlobalSearchScreen(
                 // 快捷探索卡片
                 item(key = "quick_explore") {
                     Column(Modifier.fillMaxWidth()) {
-                        Text("快捷发现", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.textSecondary)
+                        Text(stringResource(R.string.search_quick_discover), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.textSecondary)
                         Spacer(Modifier.height(10.dp))
                         val hiResTracks = remember(tracks) { tracks.filter { it.isHiRes } }
                         val favTracks = remember(tracks) { tracks.filter { it.isFavorite } }
@@ -385,19 +390,21 @@ fun GlobalSearchScreen(
                         ) {
                             QuickExploreCard(
                                 icon = Icons.Rounded.GraphicEq,
-                                title = "FLAC 无损",
-                                subtitle = "快速检索无损曲目",
+                                title = stringResource(R.string.search_quick_flac_title),
+                                subtitle = stringResource(R.string.search_quick_flac_sub),
                                 tint = colors.accent,
                                 onClick = { query = "FLAC"; commitQuery("FLAC") },
                                 modifier = Modifier.weight(1f),
                             )
                             QuickExploreCard(
                                 icon = Icons.Rounded.Favorite,
-                                title = "已收藏",
-                                subtitle = "${favTracks.size} 首喜爱",
+                                title = stringResource(R.string.search_quick_fav_title),
+                                subtitle = stringResource(R.string.search_quick_fav_sub, favTracks.size),
                                 tint = colors.exclusiveGreen,
                                 onClick = {
-                                    if (favTracks.isNotEmpty()) onPlayTracks(favTracks, 0, "已收藏")
+                                    if (favTracks.isNotEmpty()) {
+                                        onPlayTracks(favTracks, 0, context.getString(R.string.search_quick_fav_title))
+                                    }
                                 },
                                 modifier = Modifier.weight(1f),
                             )
@@ -406,10 +413,10 @@ fun GlobalSearchScreen(
                             Spacer(Modifier.height(10.dp))
                             QuickExploreCard(
                                 icon = Icons.Rounded.Album,
-                                title = "Hi-Res 高解析母带",
-                                subtitle = "${hiResTracks.size} 首 (>48kHz / 24-bit)",
+                                title = stringResource(R.string.search_quick_hires_title),
+                                subtitle = stringResource(R.string.search_quick_hires_sub, hiResTracks.size),
                                 tint = colors.accent,
-                                onClick = { onPlayTracks(hiResTracks, 0, "Hi-Res 母带") },
+                                onClick = { onPlayTracks(hiResTracks, 0, context.getString(R.string.search_quick_hires_queue)) },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
@@ -451,6 +458,7 @@ fun GlobalSearchScreen(
                         SearchCategory.LYRICS -> lyricHits.size
                     }
                     val sel = category == cat
+                    val catLabel = stringResource(cat.labelRes)
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(999.dp))
@@ -460,7 +468,7 @@ fun GlobalSearchScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = if (count > 0 && cat != SearchCategory.ALL) "${cat.label} $count" else cat.label,
+                            text = if (count > 0 && cat != SearchCategory.ALL) "$catLabel $count" else catLabel,
                             fontSize = 12.sp,
                             fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
                             color = if (sel) colors.onAccent else colors.textPrimary,
@@ -480,9 +488,9 @@ fun GlobalSearchScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Rounded.Search, contentDescription = null, tint = colors.textMuted, modifier = Modifier.size(44.dp))
                         Spacer(Modifier.height(10.dp))
-                        Text("未找到与「${query.trim()}」相关的音乐", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
+                        Text(stringResource(R.string.search_empty_title, query.trim()), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
                         Spacer(Modifier.height(4.dp))
-                        Text("支持简繁体互通搜索歌名、艺人、专辑、歌单与本地歌词", fontSize = 12.sp, color = colors.textSecondary)
+                        Text(stringResource(R.string.search_empty_sub), fontSize = 12.sp, color = colors.textSecondary)
                     }
                 }
             } else {
@@ -497,7 +505,7 @@ fun GlobalSearchScreen(
                         val slice = if (category == SearchCategory.ALL) localResult.songs.take(5) else localResult.songs
                         item(key = "sec_songs") {
                             SearchSectionHeader(
-                                title = "本地歌曲（${localResult.songs.size}）",
+                                title = stringResource(R.string.search_sec_local_songs, localResult.songs.size),
                                 showMore = category == SearchCategory.ALL && localResult.songs.size > 5,
                                 onShowMore = { category = SearchCategory.SONGS },
                             )
@@ -510,7 +518,7 @@ fun GlobalSearchScreen(
                                 isRemote = false,
                                 onClick = {
                                     commitQuery(query)
-                                    onPlayTracks(localResult.songs, idx, "搜索：${query.trim()}")
+                                    onPlayTracks(localResult.songs, idx, context.getString(R.string.search_queue_label, query.trim()))
                                 },
                                 onMore = { onTrackMenu(track) },
                             )
@@ -522,7 +530,7 @@ fun GlobalSearchScreen(
                         val slice = if (category == SearchCategory.ALL) localResult.albums.take(4) else localResult.albums
                         item(key = "sec_albums") {
                             SearchSectionHeader(
-                                title = "专辑（${localResult.albums.size}）",
+                                title = stringResource(R.string.search_sec_albums, localResult.albums.size),
                                 showMore = category == SearchCategory.ALL && localResult.albums.size > 4,
                                 onShowMore = { category = SearchCategory.ALBUMS },
                             )
@@ -542,7 +550,7 @@ fun GlobalSearchScreen(
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
                                     HighlightedText(alb.title, tokens, 14.sp, FontWeight.SemiBold, colors.textPrimary, colors.accent)
-                                    HighlightedText("${alb.artist} · ${alb.tracks.size} 首", tokens, 12.sp, FontWeight.Normal, colors.textSecondary, colors.accent)
+                                    HighlightedText(stringResource(R.string.lib_album_meta, alb.artist, alb.tracks.size), tokens, 12.sp, FontWeight.Normal, colors.textSecondary, colors.accent)
                                 }
                             }
                         }
@@ -553,7 +561,7 @@ fun GlobalSearchScreen(
                         val slice = if (category == SearchCategory.ALL) localResult.artists.take(4) else localResult.artists
                         item(key = "sec_artists") {
                             SearchSectionHeader(
-                                title = "艺术家（${localResult.artists.size}）",
+                                title = stringResource(R.string.search_sec_artists, localResult.artists.size),
                                 showMore = category == SearchCategory.ALL && localResult.artists.size > 4,
                                 onShowMore = { category = SearchCategory.ARTISTS },
                             )
@@ -581,7 +589,7 @@ fun GlobalSearchScreen(
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
                                     HighlightedText(art.name, tokens, 14.sp, FontWeight.SemiBold, colors.textPrimary, colors.accent)
-                                    Text("${art.tracks.size} 首本地曲目", fontSize = 12.sp, color = colors.textSecondary)
+                                    Text(stringResource(R.string.common_local_tracks_count, art.tracks.size), fontSize = 12.sp, color = colors.textSecondary)
                                 }
                             }
                         }
@@ -592,7 +600,7 @@ fun GlobalSearchScreen(
                         val slice = if (category == SearchCategory.ALL) localResult.playlists.take(4) else localResult.playlists
                         item(key = "sec_playlists") {
                             SearchSectionHeader(
-                                title = "自建歌单（${localResult.playlists.size}）",
+                                title = stringResource(R.string.search_sec_playlists, localResult.playlists.size),
                                 showMore = category == SearchCategory.ALL && localResult.playlists.size > 4,
                                 onShowMore = { category = SearchCategory.PLAYLISTS },
                             )
@@ -617,7 +625,7 @@ fun GlobalSearchScreen(
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
                                     HighlightedText(pl.playlist.name, tokens, 14.sp, FontWeight.SemiBold, colors.textPrimary, colors.accent)
-                                    Text("${pl.trackCount} 首歌曲", fontSize = 12.sp, color = colors.textSecondary)
+                                    Text(stringResource(R.string.common_tracks_count, pl.trackCount), fontSize = 12.sp, color = colors.textSecondary)
                                 }
                             }
                         }
@@ -635,13 +643,13 @@ fun GlobalSearchScreen(
                                 ) {
                                     CircularProgressIndicator(color = colors.exclusiveGreen, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(8.dp))
-                                    Text("正在检索远程服务器「${activeSubsonicServer.name}」…", fontSize = 12.sp, color = colors.textSecondary)
+                                    Text(stringResource(R.string.search_remote_loading, activeSubsonicServer.name), fontSize = 12.sp, color = colors.textSecondary)
                                 }
                             }
                         } else if (remoteSongs.isNotEmpty() || remoteAlbums.isNotEmpty()) {
                             item(key = "sec_remote") {
                                 SearchSectionHeader(
-                                    title = "Subsonic 远程 · ${activeSubsonicServer.name}（${remoteSongs.size + remoteAlbums.size}）",
+                                    title = stringResource(R.string.search_sec_remote, activeSubsonicServer.name, remoteSongs.size + remoteAlbums.size),
                                     showMore = category == SearchCategory.ALL && (remoteSongs.size + remoteAlbums.size) > 4,
                                     onShowMore = { category = SearchCategory.REMOTE },
                                 )
@@ -655,7 +663,7 @@ fun GlobalSearchScreen(
                                     isRemote = true,
                                     onClick = {
                                         commitQuery(query)
-                                        onPlayTracks(remoteSongs, idx, "远程搜索：${query.trim()}")
+                                        onPlayTracks(remoteSongs, idx, context.getString(R.string.search_remote_queue_label, query.trim()))
                                     },
                                     onMore = { onTrackMenu(track) },
                                 )
@@ -676,7 +684,7 @@ fun GlobalSearchScreen(
                                     Spacer(Modifier.width(12.dp))
                                     Column(Modifier.weight(1f)) {
                                         HighlightedText(alb.name, tokens, 14.sp, FontWeight.SemiBold, colors.textPrimary, colors.exclusiveGreen)
-                                        Text("远程专辑 · ${alb.artist}", fontSize = 12.sp, color = colors.exclusiveGreen)
+                                        Text(stringResource(R.string.search_remote_album_sub, alb.artist), fontSize = 12.sp, color = colors.exclusiveGreen)
                                     }
                                 }
                             }
@@ -688,7 +696,7 @@ fun GlobalSearchScreen(
                         val slice = if (category == SearchCategory.ALL) lyricHits.take(4) else lyricHits
                         item(key = "sec_lyrics") {
                             SearchSectionHeader(
-                                title = "歌词命中（${lyricHits.size}）",
+                                title = stringResource(R.string.search_sec_lyrics, lyricHits.size),
                                 showMore = category == SearchCategory.ALL && lyricHits.size > 4,
                                 onShowMore = { category = SearchCategory.LYRICS },
                             )
@@ -715,7 +723,7 @@ fun GlobalSearchScreen(
                                 }
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    HighlightedText("「${hit.matchedLine}」", tokens, 14.sp, FontWeight.SemiBold, colors.textPrimary, colors.accent)
+                                    HighlightedText("\"${hit.matchedLine}\"", tokens, 14.sp, FontWeight.SemiBold, colors.textPrimary, colors.accent)
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         text = "${hit.track.title} · ${hit.track.artist} · ${formatDuration(hit.timeMs)}",
@@ -751,7 +759,7 @@ private fun SearchSectionHeader(
         Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.textSecondary)
         if (showMore) {
             Text(
-                text = "查看全部",
+                text = stringResource(R.string.common_view_all),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.accent,
@@ -820,7 +828,7 @@ private fun SearchSongRow(
             Text(formatDuration(track.durationMs), fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = colors.textMuted)
         }
         IconButton(onClick = onMore, modifier = Modifier.size(34.dp)) {
-            Icon(Icons.Rounded.MoreVert, contentDescription = "更多操作", tint = colors.textMuted, modifier = Modifier.size(18.dp))
+            Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.common_more_actions), tint = colors.textMuted, modifier = Modifier.size(18.dp))
         }
     }
 }

@@ -10,6 +10,8 @@ import com.sonify.player.crash.SonifyCrashHandler
 import com.sonify.player.data.LibraryDatabase
 import com.sonify.player.data.UserPreferences
 import com.sonify.player.download.SonifyDownloadManager
+import com.sonify.player.i18n.AppLanguage
+import com.sonify.player.i18n.SonifyLocaleManager
 import com.sonify.player.library.MediaScanner
 import com.sonify.player.library.PlaylistRepository
 import com.sonify.player.lyrics.LyricsRepository
@@ -57,6 +59,33 @@ class HiFiApp : Application(), ImageLoaderFactory {
         private set
     lateinit var analytics: SonifyAnalytics
         private set
+
+    @Volatile
+    private var cachedLocalizedContext: Context? = null
+
+    @Volatile
+    private var cachedLanguage: AppLanguage? = null
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(SonifyLocaleManager.wrapContext(base))
+    }
+
+    /** 供 Service / ViewModel / Repository 读取最新语言资源的 Context */
+    fun localizedContext(): Context {
+        val lang = SonifyLocaleManager.readPersistedSync(this)
+        val cached = cachedLocalizedContext
+        if (cached != null && cachedLanguage == lang) return cached
+        return SonifyLocaleManager.wrapContext(this, lang).also {
+            cachedLanguage = lang
+            cachedLocalizedContext = it
+        }
+    }
+
+    fun onLanguageChanged(language: AppLanguage) {
+        SonifyLocaleManager.writePersistedSync(this, language)
+        cachedLanguage = language
+        cachedLocalizedContext = SonifyLocaleManager.wrapContext(this, language)
+    }
 
     override fun onCreate() {
         super.onCreate()

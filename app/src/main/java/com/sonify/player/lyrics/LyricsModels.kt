@@ -1,14 +1,16 @@
 package com.sonify.player.lyrics
 
+import androidx.annotation.StringRes
+import com.sonify.player.R
 import com.sonify.player.data.TrackEntity
 
-enum class LyricsSource(val label: String) {
-    USER_CUSTOM("自定义 LRC"),
-    LOCAL_LRC("本地 LRC"),
-    EMBEDDED_TAG("音频内嵌"),
-    SUBSONIC("Subsonic"),
-    LRCLIB("LRCLIB 在线"),
-    NONE("无歌词"),
+enum class LyricsSource(@StringRes val labelRes: Int) {
+    USER_CUSTOM(R.string.lyrics_source_custom),
+    LOCAL_LRC(R.string.lyrics_source_sidecar),
+    EMBEDDED_TAG(R.string.lyrics_source_embedded),
+    SUBSONIC(R.string.lyrics_source_subsonic),
+    LRCLIB(R.string.lyrics_source_lrclib),
+    NONE(R.string.lyrics_source_none),
 }
 
 data class LyricWord(

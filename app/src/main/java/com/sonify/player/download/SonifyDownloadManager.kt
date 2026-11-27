@@ -6,6 +6,9 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Environment
 import android.util.Log
+import androidx.annotation.StringRes
+import com.sonify.player.HiFiApp
+import com.sonify.player.R
 import com.sonify.player.data.DownloadStorageMode
 import com.sonify.player.data.DownloadedTrackEntity
 import com.sonify.player.data.LibraryDatabase
@@ -86,6 +89,11 @@ class SonifyDownloadManager(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val semaphore = Semaphore(permits = 2)
+
+    private fun s(@StringRes id: Int, vararg args: Any): String {
+        val ctx = (context.applicationContext as? HiFiApp)?.localizedContext() ?: context
+        return if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    }
     private val downloadedDao = db.downloadedTrackDao()
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val localPathCache = ConcurrentHashMap<String, String>()
@@ -212,9 +220,9 @@ class SonifyDownloadManager(
 
     private suspend fun executeDownload(track: TrackEntity) {
         val ref = SubsonicUri.parseTrackUri(track.path)
-            ?: throw IOException("无效的远程曲目路径")
+            ?: throw IOException(s(R.string.err_dl_invalid_uri))
         val creds = subsonicRepo.getCredentials(ref.serverId)
-            ?: throw IOException("未找到对应服务器账号凭据")
+            ?: throw IOException(s(R.string.err_subsonic_no_creds))
 
         val quality = prefs.current.downloadQuality
         val client = subsonicRepo.client.httpClientFor(creds.allowSelfSignedTls)
@@ -245,13 +253,13 @@ class SonifyDownloadManager(
             response.use { resp ->
                 val ct = resp.header("Content-Type").orEmpty()
                 if (!resp.isSuccessful) {
-                    throw IOException("HTTP ${resp.code}: 下载失败")
+                    throw IOException(s(R.string.err_dl_http, resp.code))
                 }
                 if (ct.contains("json", true) || ct.contains("xml", true)) {
-                    throw IOException("服务器拒绝下载该曲目（可能未授予下载权限）")
+                    throw IOException(s(R.string.err_dl_forbidden))
                 }
 
-                val body = resp.body ?: throw IOException("空响应体")
+                val body = resp.body ?: throw IOException(s(R.string.err_dl_empty_body))
                 val totalBytes = body.contentLength().takeIf { it > 0L } ?: track.fileSize
                 val ext = DownloadPathHelper.resolveExtension(track.format, quality, ct)
                 val relPath = DownloadPathHelper.buildRelativePath(
@@ -291,7 +299,7 @@ class SonifyDownloadManager(
                     }
                 }
 
-                if (copied <= 0L) throw IOException("下载文件为空")
+                if (copied <= 0L) throw IOException(s(R.string.err_dl_empty_file))
                 if (dest.exists()) dest.delete()
                 if (!part.renameTo(dest)) {
                     part.copyTo(dest, overwrite = true)
@@ -364,7 +372,7 @@ class SonifyDownloadManager(
             if (targetFile?.length() == 0L) runCatching { targetFile?.delete() }
             Log.w(TAG, "下载失败 ${track.title}: ${e.message}")
             updateTask(track.path) {
-                it.copy(status = DownloadTaskStatus.FAILED, error = e.message ?: "下载失败")
+                it.copy(status = DownloadTaskStatus.FAILED, error = e.message ?: s(R.string.playlist_dl_failed))
             }
         }
     }

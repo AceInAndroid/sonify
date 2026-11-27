@@ -6,9 +6,13 @@ import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.util.Log
+import androidx.annotation.StringRes
+import com.sonify.player.HiFiApp
+import com.sonify.player.R
 import com.sonify.player.data.LibraryDatabase
 import com.sonify.player.data.UserPreferences
 import com.sonify.player.data.WifiUploadHistoryEntity
+import com.sonify.player.i18n.SonifyLocaleManager
 import com.sonify.player.library.AudioMetadataParser
 import com.sonify.player.ui.theme.hiFiColorsFor
 import com.sonify.player.usb.UsbAudioManager
@@ -86,7 +90,20 @@ class WifiTransferManager(
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     @Volatile
-    private var cachedHtml: ByteArray? = null
+    private var cachedHtmlTemplate: String? = null
+
+    private fun s(@StringRes id: Int, vararg args: Any): String {
+        val ctx = (context.applicationContext as? HiFiApp)?.localizedContext() ?: context
+        return if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    }
+
+    override fun resolveErrorMessage(error: WifiHttpError): String = when (error) {
+        WifiHttpError.BAD_PIN -> s(R.string.err_wifi_bad_pin)
+        WifiHttpError.NEED_PIN -> s(R.string.err_wifi_need_pin)
+        WifiHttpError.BAD_HISTORY_ID -> s(R.string.err_wifi_bad_history_id)
+        WifiHttpError.SERVER_ERROR -> s(R.string.err_wifi_server_err)
+        WifiHttpError.CLIENT_ABORT -> s(R.string.err_wifi_client_abort)
+    }
 
     fun startServer(): Boolean {
         if (server.isRunning) return true
@@ -113,14 +130,14 @@ class WifiTransferManager(
                 sessionSkippedCount = 0,
                 storageDirPath = rootDir.absolutePath,
                 freeSpaceBytes = computeFreeSpaceBytes(rootDir),
-                error = if (ips.isEmpty()) "未检测到局域网 WiFi 地址，请确认手机已连接 WiFi" else null,
+                error = if (ips.isEmpty()) s(R.string.err_wifi_no_lan) else null,
             )
             WifiTransferService.start(context, primary)
             Log.i(TAG, "WiFi 传歌服务已启动: $primary (dir=${rootDir.absolutePath})")
             true
         } catch (t: Throwable) {
             Log.e(TAG, "启动 WiFi 传歌失败: ${t.message}", t)
-            _state.update { it.copy(isRunning = false, error = t.message ?: "启动服务失败") }
+            _state.update { it.copy(isRunning = false, error = t.message ?: s(R.string.err_wifi_start_fail)) }
             false
         }
     }
@@ -170,7 +187,7 @@ class WifiTransferManager(
                 allUrls = urls,
                 storageDirPath = rootDir.absolutePath,
                 freeSpaceBytes = free,
-                error = if (ips.isEmpty()) "未检测到局域网 WiFi 地址，请确认手机已连接 WiFi" else null,
+                error = if (ips.isEmpty()) s(R.string.err_wifi_no_lan) else null,
             )
         }
     }
@@ -178,10 +195,11 @@ class WifiTransferManager(
     // ==================== WifiTransferBackend 实现 ====================
 
     override fun loadWebPageHtml(): ByteArray {
-        cachedHtml?.let { return it }
-        val bytes = context.assets.open("wifi_transfer.html").use { it.readBytes() }
-        cachedHtml = bytes
-        return bytes
+        val template = cachedHtmlTemplate ?: context.assets.open("wifi_transfer.html")
+            .use { it.readBytes().toString(Charsets.UTF_8) }
+            .also { cachedHtmlTemplate = it }
+        val isChinese = SonifyLocaleManager.isChinese(prefs.current.appLanguage)
+        return WifiHttpServer.injectBilingualSupport(template, isChinese)
     }
 
     override fun buildStatusJson(): JSONObject {
@@ -195,6 +213,7 @@ class WifiTransferManager(
 
         return JSONObject()
             .put("appName", "Sonify")
+            .put("lang", if (SonifyLocaleManager.isChinese(settings.appLanguage)) "zh" else "en")
             .put("deviceName", "${Build.MANUFACTURER} ${Build.MODEL}".trim())
             .put("storageDir", rootDir.absolutePath)
             .put("freeSpaceBytes", freeBytes)
@@ -247,7 +266,12 @@ class WifiTransferManager(
             "${File(it.path).name.lowercase()}::${it.fileSize}"
         }
 
-        val clientInfo = WifiPathSanitizer.parseClientInfo(userAgent)
+        val clientInfo = WifiPathSanitizer.parseClientInfo(
+            userAgent = userAgent,
+            lanClientLabel = s(R.string.wifi_client_lan),
+            androidPhoneLabel = s(R.string.wifi_client_android),
+            phoneLabel = s(R.string.wifi_client_phone),
+        )
 
         items.map { item ->
             val (safeRel, safeName) = WifiPathSanitizer.sanitizeRelativePath(item.relativePath, item.name)
@@ -255,7 +279,7 @@ class WifiTransferManager(
                 return@map CheckFileResultItem(
                     relativePath = item.relativePath,
                     status = "UNSUPPORTED",
-                    reason = "不支持的文件格式（仅支持常见无损/音频、.lrc 与封面图片）",
+                    reason = s(R.string.err_wifi_unsupported_type),
                 )
             }
 
@@ -267,7 +291,7 @@ class WifiTransferManager(
                     return@map CheckFileResultItem(
                         relativePath = item.relativePath,
                         status = "DUPLICATE_HASH",
-                        reason = "内容与已上传文件完全一致",
+                        reason = s(R.string.err_wifi_dup_uploaded),
                         existingName = hashHit.fileName,
                     )
                 }
@@ -281,7 +305,7 @@ class WifiTransferManager(
                 return@map CheckFileResultItem(
                     relativePath = item.relativePath,
                     status = "DUPLICATE_LIBRARY",
-                    reason = "本地音乐库已存在相同曲目",
+                    reason = s(R.string.err_wifi_dup_library),
                     existingName = hitName,
                 )
             }
@@ -293,7 +317,7 @@ class WifiTransferManager(
                 return@map CheckFileResultItem(
                     relativePath = item.relativePath,
                     status = "DUPLICATE_DISK",
-                    reason = "目标目录已存在同名同大小文件",
+                    reason = s(R.string.err_wifi_dup_dir),
                     existingName = dest.name,
                 )
             }
@@ -312,13 +336,18 @@ class WifiTransferManager(
         bodyStream: InputStream,
     ): UploadOutcome = withContext(Dispatchers.IO) {
         val (safeRel, safeName) = WifiPathSanitizer.sanitizeRelativePath(relativePath, fileName)
-        val clientInfo = WifiPathSanitizer.parseClientInfo(userAgent)
+        val clientInfo = WifiPathSanitizer.parseClientInfo(
+            userAgent = userAgent,
+            lanClientLabel = s(R.string.wifi_client_lan),
+            androidPhoneLabel = s(R.string.wifi_client_android),
+            phoneLabel = s(R.string.wifi_client_phone),
+        )
 
         if (!WifiPathSanitizer.isAllowedFile(safeName)) {
             return@withContext UploadOutcome(
                 httpStatus = 415,
                 status = "ERROR",
-                message = "不支持的文件类型：$safeName",
+                message = s(R.string.err_wifi_unsupported_name, safeName),
             )
         }
 
@@ -344,7 +373,7 @@ class WifiTransferManager(
 
             if (written <= 0L) {
                 runCatching { partFile.delete() }
-                return@withContext UploadOutcome(400, "ERROR", "收到空文件")
+                return@withContext UploadOutcome(400, "ERROR", s(R.string.err_wifi_empty_file))
             }
 
             // 服务端计算真实内容指纹做最终原子防重
@@ -380,7 +409,7 @@ class WifiTransferManager(
                 return@withContext UploadOutcome(
                     httpStatus = 409,
                     status = "DUPLICATE",
-                    message = "重复文件已自动跳过（与「$duplicateHit」一致）",
+                    message = s(R.string.err_wifi_dup_skipped, duplicateHit),
                     recordJson = historyToJson(rec.copy(id = id)),
                 )
             }
@@ -438,7 +467,7 @@ class WifiTransferManager(
             UploadOutcome(
                 httpStatus = 200,
                 status = "SUCCESS",
-                message = "上传并入库成功",
+                message = s(R.string.err_wifi_upload_ok),
                 recordJson = historyToJson(rec.copy(id = id)),
             )
         } catch (t: Throwable) {
@@ -459,7 +488,7 @@ class WifiTransferManager(
             UploadOutcome(
                 httpStatus = 500,
                 status = "ERROR",
-                message = t.message ?: "写入文件失败",
+                message = t.message ?: s(R.string.err_wifi_write_fail),
                 recordJson = historyToJson(rec.copy(id = id)),
             )
         } finally {

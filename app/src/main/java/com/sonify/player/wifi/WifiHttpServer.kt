@@ -18,6 +18,26 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
+import java.util.Locale
+
+enum class WifiHttpError {
+    BAD_PIN,
+    NEED_PIN,
+    BAD_HISTORY_ID,
+    SERVER_ERROR,
+    CLIENT_ABORT;
+
+    fun defaultMessage(): String {
+        val zh = Locale.getDefault().language.equals("zh", ignoreCase = true)
+        return when (this) {
+            BAD_PIN -> if (zh) "PIN 码错误，请核对手机屏幕上的 4 位访问码" else "Incorrect PIN — check the 4-digit code on your phone"
+            NEED_PIN -> if (zh) "请输入手机端显示的 4 位访问码" else "Enter the 4-digit PIN shown on your phone"
+            BAD_HISTORY_ID -> if (zh) "无效的历史记录 ID" else "Invalid history record ID"
+            SERVER_ERROR -> if (zh) "服务器内部错误" else "Internal server error"
+            CLIENT_ABORT -> if (zh) "客户端连接提前断开" else "Client disconnected before upload completed"
+        }
+    }
+}
 
 data class CheckFileRequestItem(
     val name: String,
@@ -63,6 +83,7 @@ interface WifiTransferBackend {
     suspend fun getHistoryJson(query: String, statusFilter: String): JSONArray
     suspend fun deleteHistoryItem(id: Long, deleteFile: Boolean): Boolean
     suspend fun clearHistory(deleteFiles: Boolean)
+    fun resolveErrorMessage(error: WifiHttpError): String = error.defaultMessage()
 }
 
 /**
@@ -107,7 +128,7 @@ class WifiHttpServer(
             }
         }
 
-        val ss = opened ?: throw IllegalStateException("无法绑定端口 $preferredPort：${lastErr?.message}", lastErr)
+        val ss = opened ?: throw IllegalStateException("Failed to bind port $preferredPort: ${lastErr?.message}", lastErr)
         serverSocket = ss
         boundPort = ss.localPort
 
@@ -209,14 +230,22 @@ class WifiHttpServer(
                     if (issued != null) {
                         writeJson(output, 200, JSONObject().put("ok", true).put("token", issued))
                     } else {
-                        writeJson(output, 401, JSONObject().put("ok", false).put("error", "PIN 码错误，请核对手机屏幕上的 4 位访问码"))
+                        writeJson(
+                            output,
+                            401,
+                            JSONObject().put("ok", false).put("error", backend.resolveErrorMessage(WifiHttpError.BAD_PIN))
+                        )
                     }
                     return
                 }
 
                 // 其余 /api/* 接口若启用 PIN 则必须鉴权
                 if (path.startsWith("/api/") && backend.isPinRequired() && !backend.isTokenValid(token)) {
-                    writeJson(output, 401, JSONObject().put("error", "PIN_REQUIRED").put("message", "请输入手机端显示的 4 位访问码"))
+                    writeJson(
+                        output,
+                        401,
+                        JSONObject().put("error", "PIN_REQUIRED").put("message", backend.resolveErrorMessage(WifiHttpError.NEED_PIN))
+                    )
                     return
                 }
 
@@ -259,7 +288,11 @@ class WifiHttpServer(
                         val overwrite = queryParams["overwrite"].equals("true", ignoreCase = true)
                         // 流式读取超时放宽，保障大体积无损文件上传
                         s.soTimeout = 120_000
-                        val limited = ExactLengthInputStream(input, contentLength)
+                        val limited = ExactLengthInputStream(
+                            upstream = input,
+                            remaining = contentLength,
+                            eofMessage = backend.resolveErrorMessage(WifiHttpError.CLIENT_ABORT),
+                        )
                         val outcome = backend.receiveUpload(
                             fileName = fileName,
                             relativePath = relPath,
@@ -292,7 +325,11 @@ class WifiHttpServer(
                     method == "DELETE" && path.startsWith("/api/history/") -> {
                         val id = path.removePrefix("/api/history/").toLongOrNull()
                         if (id == null) {
-                            writeJson(output, 400, JSONObject().put("error", "无效的历史记录 ID"))
+                            writeJson(
+                                output,
+                                400,
+                                JSONObject().put("error", backend.resolveErrorMessage(WifiHttpError.BAD_HISTORY_ID))
+                            )
                         } else {
                             val deleteFile = queryParams["deleteFile"].equals("true", ignoreCase = true)
                             val ok = backend.deleteHistoryItem(id, deleteFile)
@@ -306,7 +343,11 @@ class WifiHttpServer(
                 }
             } catch (t: Throwable) {
                 runCatching {
-                    writeJson(output, 500, JSONObject().put("error", t.message ?: "服务器内部错误"))
+                    writeJson(
+                        output,
+                        500,
+                        JSONObject().put("error", t.message ?: backend.resolveErrorMessage(WifiHttpError.SERVER_ERROR))
+                    )
                 }
             }
         }
@@ -405,17 +446,190 @@ class WifiHttpServer(
             }
             return String(out.toByteArray(), Charsets.UTF_8)
         }
+        /** 为内嵌 WiFi 传歌 Web 页面注入中/英双语支持与顶部快速切换按钮 */
+        fun injectBilingualSupport(rawHtml: String, defaultChinese: Boolean): ByteArray {
+            val defaultLang = if (defaultChinese) "zh" else "en"
+            val langBtnHtml =
+                """<button id="langToggleBtn" type="button" class="pill" style="cursor:pointer;color:var(--text-primary);font-family:var(--sans);font-weight:600;" onclick="window.__sonifyToggleLang && window.__sonifyToggleLang()">中 / EN</button>"""
+
+            var out = rawHtml
+            val pillsMarker = """<div class="status-pills">"""
+            if (out.contains(pillsMarker) && !out.contains("id=\"langToggleBtn\"")) {
+                out = out.replaceFirst(pillsMarker, "$pillsMarker\n        $langBtnHtml")
+            }
+
+            val i18nScript = """
+  <script>
+    (function() {
+      var DEFAULT_LANG = '$defaultLang';
+      var curLang = localStorage.getItem('sonify_wifi_lang') || DEFAULT_LANG;
+      var EXACT_EN = {
+        'WiFi 传歌': 'WiFi Transfer',
+        '正在连接手机服务…': 'Connecting to phone…',
+        '可用空间 --': 'Free --',
+        '传歌上传': 'Upload',
+        '上传无损音乐': 'Upload Lossless Music',
+        '支持 FLAC / WAV / ALAC / MP3 / M4A / OPUS 及配套 .lrc / 封面图': 'Supports FLAC / WAV / ALAC / MP3 / M4A / OPUS, .lrc lyrics & cover art',
+        '拖拽音频文件或整个专辑文件夹到此处': 'Drag & drop audio files or full album folders here',
+        '上传前自动计算文件指纹防重，已存在曲目零流量跳过；传完自动解析入库': 'Auto SHA-256 dedup before upload; completed files are indexed automatically',
+        '选择音频文件': 'Select Audio Files',
+        '选择专辑文件夹': 'Select Album Folder',
+        '防重：自动跳过重复文件': 'Dedup: auto-skip duplicate files',
+        '等待选择文件': 'Waiting for files',
+        '上传历史': 'Upload History',
+        '与手机端实时同步': 'Live synced with phone',
+        '刷新': 'Refresh',
+        '清空记录': 'Clear',
+        '全部': 'All',
+        '上传成功': 'Success',
+        '重复跳过': 'Skipped',
+        '失败': 'Failed',
+        '暂无上传历史': 'No upload history yet',
+        '暂无匹配的上传记录': 'No matching upload records',
+        '请输入 4 位访问码': 'Enter 4-Digit PIN',
+        '请查看手机 Sonify「WiFi 传歌」界面显示的 4 位临时 PIN 码': 'Check the 4-digit temporary PIN shown in Sonify WiFi Transfer on your phone',
+        '验证并进入': 'Verify & Enter',
+        '连接手机服务失败，请确认 App 保持开启': 'Connection failed — make sure Sonify is running',
+        '请输入完整 4 位数字 PIN 码': 'Enter the full 4-digit PIN',
+        '验证通过，已连接 Sonify': 'Verified — connected to Sonify',
+        'PIN 码错误': 'Incorrect PIN',
+        '网络异常，请重试': 'Network error, please retry',
+        '正在计算防重指纹…': 'Computing fingerprint…',
+        '等待上传…': 'Queued…',
+        '不支持的文件格式': 'Unsupported file format',
+        '重复文件已跳过': 'Duplicate skipped',
+        '等待上传（覆盖模式）…': 'Queued (overwrite)…',
+        '正在高速传输…': 'Uploading…',
+        '上传并自动解析入库成功': 'Uploaded & indexed',
+        '重复文件已自动跳过': 'Duplicate skipped automatically',
+        '需要重新验证 4 位 PIN 码': 'PIN verification required',
+        '网络连接中断，请检查手机 WiFi 状态': 'Connection lost — check phone WiFi',
+        '已手动取消': 'Cancelled',
+        '等待强制覆盖上传…': 'Queued for overwrite…',
+        '已取消': 'Cancelled',
+        '已入库': 'Indexed',
+        '队列中': 'Queued',
+        '不支持': 'Unsupported',
+        '覆盖上传': 'Overwrite',
+        '取消': 'Cancel',
+        '重试': 'Retry',
+        '成功': 'Success',
+        '删除': 'Delete',
+        '已清空上传历史记录': 'Upload history cleared'
+      };
+      var EXACT_ZH = {};
+      Object.keys(EXACT_EN).forEach(function(k) { EXACT_ZH[EXACT_EN[k]] = k; });
+
+      function translateText(s, toLang) {
+        if (!s) return s;
+        var t = s.trim();
+        if (toLang === 'en') {
+          if (EXACT_EN[t]) return EXACT_EN[t];
+          var m;
+          if ((m = t.match(/^剩余\s+(.+)$/))) return 'Free ' + m[1];
+          if ((m = t.match(/^共\s+(\d+)\s+条记录\s*·\s*与手机端实时同步$/))) return m[1] + ' records · Live synced';
+          if ((m = t.match(/^与\s+(.+)\s+一致$/))) return 'Matches ' + m[1];
+          if ((m = t.match(/^传输中\s+(\d+%)\s*·\s*(.+)$/))) return 'Uploading ' + m[1] + ' · ' + m[2];
+          if ((m = t.match(/^上传失败\s*\(HTTP\s*(\d+)\)$/))) return 'Upload failed (HTTP ' + m[1] + ')';
+          if ((m = t.match(/^防重拦截\s*(\d+)\s*个重复文件，已自动跳过$/))) return 'Dedup skipped ' + m[1] + ' duplicate file(s)';
+          if ((m = t.match(/^本次共\s*(\d+)\s*项\s*·\s*成功\s*(\d+)\s*·\s*重复跳过\s*(\d+)(?:\s*·\s*进行中\s*(\d+))?$/))) {
+            return m[1] + ' total · ' + m[2] + ' ok · ' + m[3] + ' skipped' + (m[4] ? ' · ' + m[4] + ' active' : '');
+          }
+          if (t.indexOf('Android 设备') !== -1) return t.replace('Android 设备', 'Android Device');
+          return s;
+        } else {
+          if (EXACT_ZH[t]) return EXACT_ZH[t];
+          var m2;
+          if ((m2 = t.match(/^Free\s+(.+)$/))) return '剩余 ' + m2[1];
+          if ((m2 = t.match(/^(\d+)\s+records\s*·\s*Live synced$/))) return '共 ' + m2[1] + ' 条记录 · 与手机端实时同步';
+          if ((m2 = t.match(/^Matches\s+(.+)$/))) return '与 ' + m2[1] + ' 一致';
+          if ((m2 = t.match(/^Uploading\s+(\d+%)\s*·\s*(.+)$/))) return '传输中 ' + m2[1] + ' · ' + m2[2];
+          if ((m2 = t.match(/^(\d+)\s+total\s*·\s*(\d+)\s+ok\s*·\s*(\d+)\s+skipped(?:\s*·\s*(\d+)\s+active)?$/))) {
+            return '本次共 ' + m2[1] + ' 项 · 成功 ' + m2[2] + ' · 重复跳过 ' + m2[3] + (m2[4] ? ' · 进行中 ' + m2[4] : '');
+          }
+          return s;
+        }
+      }
+
+      var applying = false;
+      function applyLang(lang) {
+        if (applying) return;
+        applying = true;
+        try {
+          curLang = lang;
+          document.documentElement.lang = (lang === 'en') ? 'en' : 'zh-CN';
+          document.title = (lang === 'en') ? 'Sonify · WiFi LAN Transfer' : 'Sonify · WiFi 局域网传歌';
+          var btn = document.getElementById('langToggleBtn');
+          if (btn) btn.textContent = (lang === 'en') ? '中 / EN ✓' : '✓ 中 / EN';
+          var search = document.getElementById('historySearch');
+          if (search) {
+            search.placeholder = (lang === 'en')
+              ? 'Search filename, album path, or client…'
+              : '搜索文件名、专辑路径或来源设备…';
+          }
+          var histTab = document.getElementById('tabHistoryBtn');
+          var cntEl = document.getElementById('histTabCount');
+          if (histTab && cntEl) {
+            var cnt = cntEl.textContent || '0';
+            histTab.innerHTML = (lang === 'en' ? 'History (' : '上传历史 (') + '<span id="histTabCount">' + cnt + '</span>)';
+          }
+          var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+          var node;
+          while ((node = walker.nextNode())) {
+            var parent = node.parentElement;
+            if (!parent || parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE' || parent.id === 'langToggleBtn') continue;
+            var orig = node.nodeValue;
+            if (!orig || !orig.trim()) continue;
+            var next = translateText(orig, lang);
+            if (next !== orig) node.nodeValue = next;
+          }
+        } finally {
+          applying = false;
+        }
+      }
+
+      var origConfirm = window.confirm;
+      window.confirm = function(msg) {
+        if (curLang === 'en' && typeof msg === 'string' && msg.indexOf('仅清空上传历史记录') !== -1) {
+          return origConfirm('Clear all upload history records? Uploaded lossless files on your phone will be kept.');
+        }
+        return origConfirm(msg);
+      };
+
+      window.__sonifyToggleLang = function() {
+        var next = (curLang === 'zh') ? 'en' : 'zh';
+        localStorage.setItem('sonify_wifi_lang', next);
+        applyLang(next);
+      };
+
+      var obs = new MutationObserver(function() {
+        if (curLang === 'en') applyLang('en');
+      });
+      obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+      applyLang(curLang);
+    })();
+  </script>
+"""
+            val bodyClose = "</body>"
+            if (out.contains(bodyClose)) {
+                out = out.replace(bodyClose, "$i18nScript$bodyClose")
+            } else {
+                out += i18nScript
+            }
+            return out.toByteArray(Charsets.UTF_8)
+        }
     }
 }
 
 private class ExactLengthInputStream(
     private val upstream: InputStream,
     private var remaining: Long,
+    private val eofMessage: String = "Client disconnected before upload completed",
 ) : InputStream() {
     override fun read(): Int {
         if (remaining <= 0L) return -1
         val b = upstream.read()
-        if (b < 0) throw EOFException("客户端连接提前断开")
+        if (b < 0) throw EOFException(eofMessage)
         remaining--
         return b
     }
@@ -424,7 +638,7 @@ private class ExactLengthInputStream(
         if (remaining <= 0L) return -1
         val toRead = minOf(len.toLong(), remaining).toInt()
         val n = upstream.read(b, off, toRead)
-        if (n < 0) throw EOFException("客户端连接提前断开")
+        if (n < 0) throw EOFException(eofMessage)
         remaining -= n
         return n
     }

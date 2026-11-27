@@ -2,9 +2,11 @@ package com.sonify.player.ui
 
 import android.app.Application
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sonify.player.HiFiApp
+import com.sonify.player.R
 import com.sonify.player.data.DownloadedTrackEntity
 import com.sonify.player.data.PlaylistEntity
 import com.sonify.player.data.TrackEntity
@@ -30,6 +32,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val app = HiFiApp.from(application)
     private val playlistRepo = app.playlistRepo
     private val downloadMgr = app.downloadManager
+
+    private fun s(@StringRes id: Int, vararg args: Any): String {
+        val ctx = app.localizedContext()
+        return if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    }
 
     val playlists: StateFlow<List<PlaylistSummary>> = playlistRepo.playlists
     val downloadedList: StateFlow<List<DownloadedTrackEntity>> = downloadMgr.downloadedList
@@ -82,12 +89,16 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 }
                 created
             }.onSuccess { pl ->
-                val suffix = if (initialTracks.isNotEmpty()) "并加入 ${initialTracks.size} 首歌曲" else ""
-                showToast("已创建歌单「${pl.name}」$suffix")
+                val msg = if (initialTracks.isNotEmpty()) {
+                    s(R.string.toast_playlist_created_with_tracks, pl.name, initialTracks.size)
+                } else {
+                    s(R.string.toast_playlist_created, pl.name)
+                }
+                showToast(msg)
                 app.analytics.track("playlist_action", mapOf("action" to "create", "scope" to "local"))
                 onCreated(pl)
             }.onFailure {
-                showToast(it.message ?: "创建歌单失败")
+                showToast(it.message ?: s(R.string.err_playlist_create_fail))
             }
         }
     }
@@ -103,9 +114,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             runCatching {
                 playlistRepo.updatePlaylist(playlistId, name, description, newCoverUri, clearCustomCover)
             }.onSuccess {
-                showToast("歌单信息已更新")
+                showToast(s(R.string.toast_playlist_updated))
             }.onFailure {
-                showToast(it.message ?: "更新歌单失败")
+                showToast(it.message ?: s(R.string.err_playlist_update_fail))
             }
         }
     }
@@ -115,11 +126,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             runCatching {
                 playlistRepo.deletePlaylist(playlistId)
             }.onSuccess {
-                showToast("已删除歌单「$playlistName」")
+                showToast(s(R.string.toast_playlist_deleted, playlistName))
                 app.analytics.track("playlist_action", mapOf("action" to "delete", "scope" to "local"))
                 onDeleted()
             }.onFailure {
-                showToast(it.message ?: "删除歌单失败")
+                showToast(it.message ?: s(R.string.err_playlist_delete_fail))
             }
         }
     }
@@ -131,18 +142,18 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             }.onSuccess { res ->
                 val msg = when {
                     res.added > 0 && res.skippedDuplicates > 0 ->
-                        "已加入「$playlistName」${res.added} 首（跳过 ${res.skippedDuplicates} 首重复）"
+                        s(R.string.toast_added_with_dups, res.added, playlistName, res.skippedDuplicates)
                     res.added > 0 ->
-                        "已加入「$playlistName」${res.added} 首歌曲"
+                        s(R.string.toast_added_tracks, res.added, playlistName)
                     else ->
-                        "所选歌曲已在「$playlistName」中"
+                        s(R.string.toast_already_in_playlist, playlistName)
                 }
                 showToast(msg)
                 if (res.added > 0) {
                     app.analytics.track("playlist_action", mapOf("action" to "add", "scope" to "local", "count" to res.added))
                 }
             }.onFailure {
-                showToast(it.message ?: "加入歌单失败")
+                showToast(it.message ?: s(R.string.err_playlist_add_fail))
             }
         }
     }
@@ -152,9 +163,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             runCatching {
                 playlistRepo.removeTracksFromPlaylist(playlistId, trackPaths)
             }.onSuccess {
-                showToast("已从歌单移除 ${trackPaths.size} 首歌曲")
+                showToast(s(R.string.toast_removed_tracks, trackPaths.size))
             }.onFailure {
-                showToast(it.message ?: "移除歌曲失败")
+                showToast(it.message ?: s(R.string.err_playlist_remove_fail))
             }
         }
     }
@@ -183,10 +194,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             runCatching {
                 playlistRepo.createRemotePlaylist(serverId, name, initialTracks)
             }.onSuccess {
-                showToast("已在服务器创建歌单「$name」")
+                showToast(s(R.string.toast_remote_pl_created, name))
                 onDone()
             }.onFailure {
-                showToast(it.message ?: "创建服务器歌单失败")
+                showToast(it.message ?: s(R.string.err_remote_pl_create_fail))
             }
         }
     }
@@ -202,10 +213,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             runCatching {
                 playlistRepo.updateRemotePlaylistMeta(serverId, playlistId, name, comment)
             }.onSuccess {
-                showToast("已同步更新服务器歌单")
+                showToast(s(R.string.toast_remote_pl_updated))
                 onDone()
             }.onFailure {
-                showToast(it.message ?: "更新服务器歌单失败")
+                showToast(it.message ?: s(R.string.err_remote_pl_update_fail))
             }
         }
     }
@@ -221,11 +232,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             runCatching {
                 playlistRepo.addTracksToRemotePlaylist(serverId, playlistId, tracks)
             }.onSuccess { count ->
-                if (count > 0) showToast("已添加 $count 首歌曲到服务器歌单「$playlistName」")
-                else showToast("仅支持添加来自同一 Subsonic 服务器的歌曲")
+                if (count > 0) showToast(s(R.string.toast_remote_pl_added, count, playlistName))
+                else showToast(s(R.string.toast_remote_pl_same_server))
                 onDone()
             }.onFailure {
-                showToast(it.message ?: "添加到服务器歌单失败")
+                showToast(it.message ?: s(R.string.err_remote_pl_add_fail))
             }
         }
     }
@@ -240,10 +251,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             runCatching {
                 playlistRepo.removeIndexesFromRemotePlaylist(serverId, playlistId, indexes)
             }.onSuccess {
-                showToast("已从服务器歌单移除 ${indexes.size} 首歌曲")
+                showToast(s(R.string.toast_remote_pl_removed, indexes.size))
                 onDone()
             }.onFailure {
-                showToast(it.message ?: "移除服务器歌单曲目失败")
+                showToast(it.message ?: s(R.string.err_remote_pl_remove_fail))
             }
         }
     }
@@ -258,10 +269,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             runCatching {
                 playlistRepo.deleteRemotePlaylist(serverId, playlistId)
             }.onSuccess {
-                showToast("已删除服务器歌单「$playlistName」")
+                showToast(s(R.string.toast_remote_pl_deleted, playlistName))
                 onDone()
             }.onFailure {
-                showToast(it.message ?: "删除服务器歌单失败")
+                showToast(it.message ?: s(R.string.err_remote_pl_delete_fail))
             }
         }
     }
@@ -277,13 +288,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             is EnqueueDownloadResult.Started -> {
                 val msg = when {
                     res.queuedCount > 0 && res.skippedAlreadyDownloaded > 0 ->
-                        "已加入下载队列 ${res.queuedCount} 首（${res.skippedAlreadyDownloaded} 首已下载跳过）"
+                        s(R.string.toast_dl_queued_with_skip, res.queuedCount, res.skippedAlreadyDownloaded)
                     res.queuedCount > 0 ->
-                        "已开始下载 ${res.queuedCount} 首歌曲"
+                        s(R.string.toast_dl_started, res.queuedCount)
                     res.skippedAlreadyDownloaded > 0 ->
-                        "所选远程歌曲均已离线下载"
+                        s(R.string.toast_dl_all_offline)
                     else ->
-                        "所选均为本地歌曲，无需下载"
+                        s(R.string.toast_dl_all_local)
                 }
                 showToast(msg)
             }
@@ -308,14 +319,14 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun deleteDownloadedTrack(remotePath: String, title: String) {
         viewModelScope.launch {
             downloadMgr.deleteDownloadedTrack(remotePath)
-            showToast("已删除离线文件「$title」")
+            showToast(s(R.string.toast_dl_deleted_file, title))
         }
     }
 
     fun deleteAllDownloads() {
         viewModelScope.launch {
             downloadMgr.deleteAllDownloads()
-            showToast("已清空全部离线下载文件")
+            showToast(s(R.string.toast_dl_cleared_all))
         }
     }
 }

@@ -249,16 +249,21 @@ class SubsonicClient {
         } catch (e: SubsonicException) {
             throw e
         } catch (e: Exception) {
+            val isZh = java.util.Locale.getDefault().language.equals("zh", ignoreCase = true)
             val detail = when (e) {
                 is javax.net.ssl.SSLHandshakeException ->
-                    "HTTPS 证书校验失败（若为私有自签名证书，请在高级选项开启「信任自签名证书」）"
+                    if (isZh) "HTTPS 证书校验失败（若为私有自签名证书，请在高级选项开启「信任自签名证书」）"
+                    else "HTTPS certificate validation failed (enable \"Trust Self-Signed Cert\" in Advanced Options if self-hosted)"
                 is java.net.UnknownHostException ->
-                    "无法解析服务器域名，请检查网络或地址拼写"
+                    if (isZh) "无法解析服务器域名，请检查网络或地址拼写"
+                    else "Cannot resolve server hostname — check network or URL"
                 is java.net.ConnectException ->
-                    "无法连接到服务器端口，请确认服务器已启动且网络互通"
+                    if (isZh) "无法连接到服务器端口，请确认服务器已启动且网络互通"
+                    else "Cannot connect to server port — verify server is running"
                 is java.net.SocketTimeoutException ->
-                    "连接服务器超时，请稍后重试"
-                else -> e.message ?: "网络请求失败"
+                    if (isZh) "连接服务器超时，请稍后重试"
+                    else "Server connection timed out — please retry"
+                else -> e.message ?: if (isZh) "网络请求失败" else "Network request failed"
             }
             throw IOException(detail, e)
         }

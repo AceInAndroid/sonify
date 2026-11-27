@@ -21,19 +21,21 @@ object SonifyNotificationFormat {
         usbConnected: Boolean,
         stats: UacStats,
         deviceName: String,
+        usbExclusiveLabel: String = "USB 独占",
+        systemOutputLabel: String = "本机输出",
     ): String {
         if (activeRoute == ActiveOutputRoute.USB_EXCLUSIVE && usbConnected) {
             return if (stats.rate > 0 && stats.bits > 0) {
                 val sr = if (stats.rate % 1000 == 0) "${stats.rate / 1000}k"
                 else "%.1fk".format(stats.rate / 1000.0)
-                "USB 独占 · $sr/${stats.bits}b"
+                "$usbExclusiveLabel · $sr/${stats.bits}b"
             } else if (deviceName.isNotBlank()) {
-                "USB 独占 · $deviceName"
+                "$usbExclusiveLabel · $deviceName"
             } else {
-                "USB 独占"
+                usbExclusiveLabel
             }
         }
-        return "本机输出"
+        return systemOutputLabel
     }
 
     fun formatArtistLine(
@@ -41,8 +43,9 @@ object SonifyNotificationFormat {
         album: String,
         showSpec: Boolean,
         specBadge: String,
+        unknownArtistLabel: String = "未知艺术家",
     ): String {
-        val cleanArtist = artist.ifBlank { "未知艺术家" }
+        val cleanArtist = artist.ifBlank { unknownArtistLabel }
         return if (showSpec && specBadge.isNotBlank()) {
             "$cleanArtist · $specBadge"
         } else if (album.isNotBlank()) {

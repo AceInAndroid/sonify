@@ -30,11 +30,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.audio.ActiveOutputRoute
 import com.sonify.player.data.AppSettings
 import com.sonify.player.data.TrackEntity
@@ -75,15 +77,16 @@ fun OutputDeviceSheet(
                 .padding(bottom = 28.dp)
         ) {
             Text(
-                text = "音频输出与信号链路",
+                text = stringResource(R.string.player_output_sheet_title),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = if (isUsbActive) "Bit-Perfect USB 独占已锁定（绕过 Android 混音）"
-                else "当前经由 Android 系统音频通路输出",
+                text = stringResource(
+                    if (isUsbActive) R.string.player_output_usb_locked else R.string.player_output_android_route
+                ),
                 fontSize = 12.sp,
                 color = if (isUsbActive) colors.exclusiveGreen else colors.textSecondary,
             )
@@ -101,26 +104,32 @@ fun OutputDeviceSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 SignalRow(
-                    label = "音频源",
-                    value = currentTrack?.formatBadgeFull() ?: "未在播放",
+                    label = stringResource(R.string.player_output_source),
+                    value = currentTrack?.formatBadgeFull() ?: stringResource(R.string.player_output_idle),
                     valueColor = colors.textPrimary,
                 )
                 SignalRow(
-                    label = "输出协商",
+                    label = stringResource(R.string.player_output_negotiated),
                     value = if (isUsbActive && stats.rate > 0) {
                         "UAC${usbState.uacInfo?.uacVersion ?: 2} · ${stats.rate}Hz / ${stats.bits}bit (${stats.subslot}B)"
                     } else if (usbState.isConnected && settings.usbExclusiveEnabled) {
-                        "已连接 ${usbState.deviceDisplayName}（待起播）"
+                        stringResource(R.string.player_output_usb_ready, usbState.deviceDisplayName)
                     } else {
                         "Android AudioTrack"
                     },
                     valueColor = if (isUsbActive) colors.exclusiveGreen else colors.textSecondary,
                 )
                 if (isUsbActive) {
-                    val fbStr = if (stats.fbRate > 0) "%.1f Hz".format(stats.fbRate) else "无 feedback"
+                    val fbStr = if (stats.fbRate > 0) "%.1f Hz".format(stats.fbRate) else stringResource(R.string.player_output_no_feedback)
                     SignalRow(
-                        label = "时钟反馈",
-                        value = "设备 $fbStr · 缓冲 %.0f ms · 欠载 ${stats.underruns}/${stats.ringUnderruns}".format(stats.bufferFillMs),
+                        label = stringResource(R.string.player_output_clock_feedback),
+                        value = stringResource(
+                            R.string.player_output_clock_detail,
+                            fbStr,
+                            stats.bufferFillMs,
+                            stats.underruns,
+                            stats.ringUnderruns,
+                        ),
                         valueColor = colors.textSecondary,
                     )
                 }
@@ -128,7 +137,7 @@ fun OutputDeviceSheet(
 
             Spacer(Modifier.height(18.dp))
             Text(
-                text = "选择输出设备",
+                text = stringResource(R.string.player_output_select),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.textSecondary,
@@ -143,9 +152,13 @@ fun OutputDeviceSheet(
                     icon = Icons.Rounded.Usb,
                     title = dev.productName ?: dev.deviceName,
                     subtitle = if (isThisConnected) {
-                        "USB 独占 · UAC${usbState.uacInfo?.uacVersion ?: 2} · ${usbState.supportedRates.size} 档采样率"
+                        stringResource(
+                            R.string.player_output_usb_sub,
+                            usbState.uacInfo?.uacVersion ?: 2,
+                            usbState.supportedRates.size,
+                        )
                     } else {
-                        "VID 0x%04X · PID 0x%04X（点击授权并独占连接）".format(dev.vendorId, dev.productId)
+                        stringResource(R.string.player_output_usb_vid_pid, dev.vendorId, dev.productId)
                     },
                     selected = isSelected,
                     highlightColor = colors.exclusiveGreen,
@@ -159,8 +172,8 @@ fun OutputDeviceSheet(
             // 本机扬声器 / 耳机回退选项
             DeviceOptionRow(
                 icon = Icons.Rounded.Headphones,
-                title = "本机扬声器 / 有线耳机 / 蓝牙",
-                subtitle = "走系统 AudioTrack（退出 USB 独占模式）",
+                title = stringResource(R.string.player_output_local_title),
+                subtitle = stringResource(R.string.player_output_local_sub),
                 selected = !isUsbActive && (!settings.usbExclusiveEnabled || !usbState.isConnected),
                 highlightColor = colors.accent,
                 onClick = onSwitchToSystem,
@@ -248,7 +261,7 @@ private fun DeviceOptionRow(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
-                    contentDescription = "已选",
+                    contentDescription = stringResource(R.string.common_selected),
                     tint = Color.Black,
                     modifier = Modifier.size(15.dp),
                 )

@@ -66,6 +66,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,8 +75,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.sonify.player.HiFiApp
 import com.sonify.player.MainActivity
+import com.sonify.player.R
 import com.sonify.player.audio.ActiveOutputRoute
 import com.sonify.player.data.CoverStyle
+import com.sonify.player.i18n.ProvideAppLanguage
+import com.sonify.player.i18n.SonifyLocaleManager
 import com.sonify.player.playback.HiFiPlaybackService
 import com.sonify.player.ui.PlayerViewModel
 import com.sonify.player.ui.components.VinylDisc
@@ -114,6 +118,10 @@ class LockScreenActivity : ComponentActivity() {
         }
     }
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(SonifyLocaleManager.wrapContext(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SystemBarsController.enableEdgeToEdge(window)
@@ -147,21 +155,23 @@ class LockScreenActivity : ComponentActivity() {
                 SystemBarsController.apply(window, barsSpec)
             }
 
-            HiFiPlayerTheme(
-                canvasStyle = settings.darkCanvasStyle,
-                accentStyle = settings.accentStyle,
-            ) {
-                Surface(
-                    color = LocalHiFiColors.current.canvas,
-                    modifier = Modifier.fillMaxSize(),
+            ProvideAppLanguage(settings.appLanguage) {
+                HiFiPlayerTheme(
+                    canvasStyle = settings.darkCanvasStyle,
+                    accentStyle = settings.accentStyle,
                 ) {
-                    LockScreenContent(
-                        vm = vm,
-                        barsSpec = barsSpec,
-                        isScreenActive = isActiveOnScreen.value,
-                        onDismissLockScreen = { finish() },
-                        onUnlockAndOpenApp = ::unlockAndOpenSonify,
-                    )
+                    Surface(
+                        color = LocalHiFiColors.current.canvas,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        LockScreenContent(
+                            vm = vm,
+                            barsSpec = barsSpec,
+                            isScreenActive = isActiveOnScreen.value,
+                            onDismissLockScreen = { finish() },
+                            onUnlockAndOpenApp = ::unlockAndOpenSonify,
+                        )
+                    }
                 }
             }
         }
@@ -260,8 +270,10 @@ private fun LockScreenContent(
             delay(10_000)
         }
     }
-    val timeStr = remember(nowMs) { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(nowMs)) }
-    val dateStr = remember(nowMs) { SimpleDateFormat("M月d日 · EEEE", Locale.CHINA).format(Date(nowMs)) }
+    val activeLocale = LocalConfiguration.current.locales.get(0) ?: Locale.getDefault()
+    val datePattern = stringResource(R.string.lock_date_pattern)
+    val timeStr = remember(nowMs, activeLocale) { SimpleDateFormat("HH:mm", activeLocale).format(Date(nowMs)) }
+    val dateStr = remember(nowMs, activeLocale, datePattern) { SimpleDateFormat(datePattern, activeLocale).format(Date(nowMs)) }
 
     var rawAmbient by remember(track?.coverPath) { mutableStateOf(AmbientColorExtractor.DefaultAmbient) }
     LaunchedEffect(track?.coverPath, settings.ambientBackground) {
@@ -405,11 +417,11 @@ private fun LockScreenContent(
                     val outTxt = if (isUsbExclusive && stats.rate > 0) {
                         val sr = if (stats.rate % 1000 == 0) "${stats.rate / 1000}k"
                         else "%.1fk".format(stats.rate / 1000.0)
-                        "USB 独占 $sr/${stats.bits}b"
+                        stringResource(R.string.player_usb_exclusive_spec, sr, stats.bits)
                     } else if (isUsbExclusive) {
-                        "USB 独占"
+                        stringResource(R.string.player_usb_exclusive_short)
                     } else {
-                        "本机输出"
+                        stringResource(R.string.player_system_output)
                     }
                     Text(
                         text = outTxt,
@@ -438,7 +450,7 @@ private fun LockScreenContent(
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = if (track != null) "${track.artist} · ${track.album}" else "等待播放",
+                        text = if (track != null) "${track.artist} · ${track.album}" else stringResource(R.string.lock_waiting),
                         fontSize = 13.sp,
                         color = colors.textSecondary,
                         maxLines = 1,
@@ -449,7 +461,7 @@ private fun LockScreenContent(
                     IconButton(onClick = { vm.toggleFavorite(track) }) {
                         Icon(
                             imageVector = if (track.isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                            contentDescription = "收藏",
+                            contentDescription = stringResource(R.string.player_favorite),
                             tint = if (track.isFavorite) colors.exclusiveGreen else colors.textSecondary,
                             modifier = Modifier.size(24.dp),
                         )
@@ -508,7 +520,7 @@ private fun LockScreenContent(
                         modifier = Modifier.size(18.dp),
                     )
                     Text(
-                        text = if (isUsbExclusive) "${volumeState.volumePercent}%" else "系统",
+                        text = if (isUsbExclusive) "${volumeState.volumePercent}%" else stringResource(R.string.lock_system_vol),
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         color = if (isUsbExclusive) colors.exclusiveGreen else colors.textMuted,
@@ -518,7 +530,7 @@ private fun LockScreenContent(
                 IconButton(onClick = vm::skipPrevious, modifier = Modifier.size(48.dp)) {
                     Icon(
                         imageVector = Icons.Rounded.SkipPrevious,
-                        contentDescription = "上一曲",
+                        contentDescription = stringResource(R.string.player_prev),
                         tint = colors.textPrimary,
                         modifier = Modifier.size(34.dp),
                     )
@@ -534,7 +546,7 @@ private fun LockScreenContent(
                 ) {
                     Icon(
                         imageVector = if (playback.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (playback.isPlaying) "暂停" else "播放",
+                        contentDescription = stringResource(if (playback.isPlaying) R.string.common_pause else R.string.common_play),
                         tint = Color.Black,
                         modifier = Modifier.size(36.dp),
                     )
@@ -543,7 +555,7 @@ private fun LockScreenContent(
                 IconButton(onClick = vm::skipNext, modifier = Modifier.size(48.dp)) {
                     Icon(
                         imageVector = Icons.Rounded.SkipNext,
-                        contentDescription = "下一曲",
+                        contentDescription = stringResource(R.string.player_next),
                         tint = colors.textPrimary,
                         modifier = Modifier.size(34.dp),
                     )
@@ -552,7 +564,7 @@ private fun LockScreenContent(
                 IconButton(onClick = onUnlockAndOpenApp) {
                     Icon(
                         imageVector = Icons.Rounded.LockOpen,
-                        contentDescription = "解锁进入 Sonify",
+                        contentDescription = stringResource(R.string.lock_unlock),
                         tint = colors.textSecondary,
                         modifier = Modifier.size(22.dp),
                     )
@@ -576,7 +588,7 @@ private fun LockScreenContent(
                     modifier = Modifier.size(16.dp),
                 )
                 Text(
-                    text = "向上滑动退出锁屏",
+                    text = stringResource(R.string.lock_swipe_up),
                     fontSize = 11.sp,
                     color = colors.textMuted,
                 )

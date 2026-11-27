@@ -1,6 +1,7 @@
 package com.sonify.player
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -9,6 +10,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.view.KeyEvent
+import androidx.annotation.StringRes
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -65,12 +67,16 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.sonify.player.crash.CrashReporter
+import com.sonify.player.i18n.ProvideAppLanguage
+import com.sonify.player.i18n.SonifyLocaleManager
+import com.sonify.player.i18n.findActivity
 import com.sonify.player.ui.crash.CrashRecoveryActivity
 import com.sonify.player.data.PlaylistEntity
 import com.sonify.player.data.TrackEntity
@@ -111,10 +117,10 @@ import com.sonify.player.ui.theme.SystemBarsSpec
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-private enum class MainTab(val label: String, val icon: ImageVector) {
-    LIBRARY("音乐库", Icons.Rounded.LibraryMusic),
-    USB("USB 设备", Icons.Rounded.Usb),
-    SETTINGS("设置", Icons.Rounded.Settings),
+private enum class MainTab(@StringRes val labelRes: Int, val icon: ImageVector) {
+    LIBRARY(R.string.tab_library, Icons.Rounded.LibraryMusic),
+    USB(R.string.tab_usb, Icons.Rounded.Usb),
+    SETTINGS(R.string.tab_settings, Icons.Rounded.Settings),
 }
 
 private sealed interface PlaylistEditorMode {
@@ -153,6 +159,10 @@ class MainActivity : ComponentActivity() {
     private val openPlayerTrigger = mutableStateOf(0L)
     private var latestBarsSpec = SystemBarsSpec()
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(SonifyLocaleManager.wrapContext(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SystemBarsController.enableEdgeToEdge(window)
@@ -171,24 +181,26 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val settings by vm.settings.collectAsState()
-            HiFiPlayerTheme(
-                canvasStyle = settings.darkCanvasStyle,
-                accentStyle = settings.accentStyle,
-            ) {
-                Surface(
-                    color = LocalHiFiColors.current.canvas,
-                    modifier = Modifier.fillMaxSize(),
+            ProvideAppLanguage(settings.appLanguage) {
+                HiFiPlayerTheme(
+                    canvasStyle = settings.darkCanvasStyle,
+                    accentStyle = settings.accentStyle,
                 ) {
-                    HiFiRootScreen(
-                        vm = vm,
-                        subsonicVm = subsonicVm,
-                        libraryVm = libraryVm,
-                        openPlayerTrigger = openPlayerTrigger.value,
-                        onApplySystemBars = { spec ->
-                            latestBarsSpec = spec
-                            SystemBarsController.apply(window, spec)
-                        },
-                    )
+                    Surface(
+                        color = LocalHiFiColors.current.canvas,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        HiFiRootScreen(
+                            vm = vm,
+                            subsonicVm = subsonicVm,
+                            libraryVm = libraryVm,
+                            openPlayerTrigger = openPlayerTrigger.value,
+                            onApplySystemBars = { spec ->
+                                latestBarsSpec = spec
+                                SystemBarsController.apply(window, spec)
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -469,7 +481,7 @@ private fun HiFiRootScreen(
                             },
                             onPlayTracks = { list, idx, ctxLabel -> vm.playTracks(list, idx, ctxLabel) },
                             onPlayLyricHit = { track, timeMs ->
-                                vm.playTracks(listOf(track), 0, "歌词搜索")
+                                vm.playTracks(listOf(track), 0, context.getString(R.string.search_lyrics_queue_label))
                                 if (timeMs > 0L) vm.seekTo(timeMs)
                             },
                             onOpenLocalPlaylist = { summary ->
@@ -523,7 +535,7 @@ private fun HiFiRootScreen(
                                 onBack = { openLocalPlaylistId = null },
                                 onPlayTracks = { list, idx, label -> vm.playTracks(list, idx, label) },
                                 onShufflePlay = { list, label ->
-                                    if (list.isNotEmpty()) vm.playTracks(list.shuffled(), 0, "$label · 随机")
+                                    if (list.isNotEmpty()) vm.playTracks(list.shuffled(), 0, context.getString(R.string.lib_shuffle_suffix, label))
                                 },
                                 onChangeSort = { field, asc ->
                                     libraryVm.setLocalPlaylistSort(currentPl.id, field, asc)
@@ -776,10 +788,11 @@ private fun HiFiRootScreen(
                             .padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
+                        val tabLabel = stringResource(tab.labelRes)
                         Box {
                             Icon(
                                 imageVector = tab.icon,
-                                contentDescription = tab.label,
+                                contentDescription = tabLabel,
                                 tint = tint,
                                 modifier = Modifier.size(24.dp),
                             )
@@ -803,7 +816,7 @@ private fun HiFiRootScreen(
                         }
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            text = tab.label,
+                            text = tabLabel,
                             fontSize = 10.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                             color = tint,
@@ -1074,7 +1087,7 @@ private fun HiFiRootScreen(
             isDownloaded = downloadsByPath.containsKey(t.path),
             showRemoveFromPlaylist = ctx.localPlaylistId != null || ctx.remotePlaylistRemove != null,
             onDismiss = { trackMenuCtx = null },
-            onPlayNow = { vm.playTracks(listOf(t), 0, t.album.ifBlank { "立即播放" }) },
+            onPlayNow = { vm.playTracks(listOf(t), 0, t.album.ifBlank { context.getString(R.string.common_play_now) }) },
             onAddToPlaylist = { pendingAddTracks = listOf(t) },
             onToggleFavorite = { vm.toggleFavorite(t) },
             onDownload = { libraryVm.enqueueDownload(listOf(t)) },
@@ -1166,24 +1179,28 @@ private fun HiFiRootScreen(
                     val found = tracks.firstOrNull { it.path == savedPath }
                         ?: app.db.trackDao().findByPath(savedPath)
                     if (found != null) {
-                        vm.playTracks(listOf(found), 0, "WiFi 传歌")
+                        vm.playTracks(listOf(found), 0, context.getString(R.string.wifi_queue_label))
                         showWifiTransferSheet = false
                         showNowPlaying = true
                     } else {
-                        libraryVm.showToast("文件尚未索引，请稍后再试")
+                        libraryVm.showToast(context.getString(R.string.toast_not_indexed_yet))
                     }
                 }
             },
             onDeleteHistoryItem = { id, deleteFile ->
                 scope.launch {
                     app.wifiTransferManager.deleteHistoryItem(id, deleteFile)
-                    libraryVm.showToast(if (deleteFile) "已删除记录与本地文件" else "已删除上传记录")
+                    libraryVm.showToast(
+                        context.getString(
+                            if (deleteFile) R.string.toast_deleted_record_and_file else R.string.toast_deleted_record
+                        )
+                    )
                 }
             },
             onClearHistory = { deleteFiles ->
                 scope.launch {
                     app.wifiTransferManager.clearHistory(deleteFiles)
-                    libraryVm.showToast("已清空上传历史")
+                    libraryVm.showToast(context.getString(R.string.toast_cleared_history))
                 }
             },
             onShowToast = libraryVm::showToast,
@@ -1203,7 +1220,7 @@ private fun HiFiRootScreen(
                 app.updateManager.recordInstallTriggered(release, forced, hadPerm)
             },
             onExitApp = {
-                (context as? ComponentActivity)?.finishAffinity()
+                context.findActivity()?.finishAffinity()
             },
             onDismiss = { app.updateManager.dismissDialog() },
         )
@@ -1226,22 +1243,22 @@ private fun HiFiRootScreen(
         AlertDialog(
             onDismissRequest = libraryVm::dismissCellularDownload,
             containerColor = colors.surface1,
-            title = { Text("当前为移动网络", color = colors.textPrimary) },
+            title = { Text(stringResource(R.string.playlist_cellular_title), color = colors.textPrimary) },
             text = {
                 Text(
-                    "您已开启「仅 Wi-Fi 下载」，本次待下载 ${pending.size} 首无损/音频曲目。是否允许本次使用移动流量继续下载？",
+                    stringResource(R.string.playlist_cellular_msg, pending.size),
                     color = colors.textSecondary,
                     fontSize = 13.sp,
                 )
             },
             confirmButton = {
                 TextButton(onClick = libraryVm::confirmCellularDownload) {
-                    Text("继续下载", color = colors.accent, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.playlist_cellular_continue), color = colors.accent, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = libraryVm::dismissCellularDownload) {
-                    Text("取消", color = colors.textSecondary)
+                    Text(stringResource(R.string.common_cancel), color = colors.textSecondary)
                 }
             },
         )

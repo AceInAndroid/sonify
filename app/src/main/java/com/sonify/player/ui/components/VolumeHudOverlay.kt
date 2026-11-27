@@ -38,11 +38,13 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.ui.theme.LocalHiFiColors
 import com.sonify.player.usb.EffectiveVolumeEngine
 import com.sonify.player.usb.VolumeHudState
@@ -79,9 +81,10 @@ fun VolumeHudOverlay(
             volumeState.engine != EffectiveVolumeEngine.FIXED_DIRECT
         val dbText = when {
             volumeState.engine == EffectiveVolumeEngine.FIXED_DIRECT -> "0.0 dBFS"
-            isMuted -> "静音"
+            isMuted -> stringResource(R.string.player_muted)
             else -> "%.1f dB".format(volumeState.effectiveDb)
         }
+        val engineLabel = stringResource(volumeState.engine.shortLabelRes)
         val barColor = when {
             volumeState.engine == EffectiveVolumeEngine.FIXED_DIRECT -> colors.danger
             volumeState.hitLimit -> colors.accent
@@ -116,7 +119,7 @@ fun VolumeHudOverlay(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = buildString {
-                        append(volumeState.engine.shortLabel)
+                        append(engineLabel)
                         if (volumeState.deviceName.isNotBlank()) {
                             append(" · ")
                             append(volumeState.deviceName)
@@ -162,7 +165,7 @@ fun VolumeHudOverlay(
                         modifier = Modifier.size(13.dp),
                     )
                     Text(
-                        text = "已达耳朵保护上限 ${volumeState.maxLimitPercent}%（可在设置中调整）",
+                        text = stringResource(R.string.player_vol_hud_limit, volumeState.maxLimitPercent),
                         fontSize = 11.sp,
                         color = colors.accent,
                     )
@@ -170,7 +173,7 @@ fun VolumeHudOverlay(
             } else if (volumeState.engine == EffectiveVolumeEngine.FIXED_DIRECT) {
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "当前为固定直通 0 dBFS 模式，请用外接耳放调节音量",
+                    text = stringResource(R.string.player_vol_hud_direct),
                     fontSize = 11.sp,
                     color = colors.danger,
                 )

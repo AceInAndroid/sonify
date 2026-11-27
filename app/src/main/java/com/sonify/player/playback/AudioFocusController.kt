@@ -8,18 +8,20 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.annotation.StringRes
+import com.sonify.player.R
 import com.sonify.player.data.AudioFocusPolicy
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class AudioFocusState(val bannerText: String?) {
+enum class AudioFocusState(@StringRes val bannerTextRes: Int?) {
     NONE(null),
     GRANTED(null),
-    DELAYED("正在通话或系统占用焦点 · 结束后自动开始播放"),
-    DUCKED("导航/提示音避让中 (-12 dB) · 结束后自动恢复原音量"),
-    PAUSED_TRANSIENT("音频焦点被临时占用 · 结束后自动恢复播放"),
-    LOST_PERMANENT("音频焦点已被其他应用接管 · 点击播放可重新抢占"),
+    DELAYED(R.string.player_focus_call),
+    DUCKED(R.string.player_focus_ducking),
+    PAUSED_TRANSIENT(R.string.player_focus_transient),
+    LOST_PERMANENT(R.string.player_focus_lost),
 }
 
 sealed interface FocusDecision {

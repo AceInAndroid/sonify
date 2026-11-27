@@ -59,12 +59,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sonify.player.R
 import com.sonify.player.data.DownloadedTrackEntity
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.library.PlaylistSorter
@@ -174,7 +176,7 @@ fun PlaylistDetailScreen(
                 }) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = "返回",
+                        contentDescription = stringResource(R.string.common_back),
                         tint = colors.textPrimary,
                     )
                 }
@@ -195,7 +197,7 @@ fun PlaylistDetailScreen(
                     }) {
                         Icon(
                             imageVector = Icons.Rounded.SwapVert,
-                            contentDescription = "调整顺序",
+                            contentDescription = stringResource(R.string.playlist_detail_reorder),
                             tint = if (reorderMode) colors.accent else colors.textPrimary,
                         )
                     }
@@ -208,16 +210,16 @@ fun PlaylistDetailScreen(
                     }) {
                         Icon(
                             imageVector = Icons.Rounded.Checklist,
-                            contentDescription = "批量管理",
+                            contentDescription = stringResource(R.string.playlist_detail_batch),
                             tint = if (selectionMode) colors.accent else colors.textPrimary,
                         )
                     }
                 }
                 IconButton(onClick = onEditPlaylist) {
-                    Icon(Icons.Rounded.Edit, contentDescription = "编辑歌单", tint = colors.textPrimary)
+                    Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.playlist_edit_title), tint = colors.textPrimary)
                 }
                 IconButton(onClick = { confirmDelete = true }) {
-                    Icon(Icons.Rounded.Delete, contentDescription = "删除歌单", tint = colors.textSecondary)
+                    Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.playlist_detail_delete), tint = colors.textSecondary)
                 }
             }
 
@@ -246,7 +248,7 @@ fun PlaylistDetailScreen(
                                 .clickable { onRetry() }
                                 .padding(horizontal = 20.dp, vertical = 9.dp)
                         ) {
-                            Text("重试", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                            Text(stringResource(R.string.common_retry), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
                         }
                     }
                 }
@@ -305,11 +307,13 @@ fun PlaylistDetailScreen(
                                 }
                                 Spacer(Modifier.height(6.dp))
                                 val mins = (totalDurationMs / 60_000L).coerceAtLeast(0L)
-                                val metaText = buildString {
-                                    append(if (isRemotePlaylist) "服务器歌单 · " else "本地歌单 · ")
-                                    append("${sortedTracks.size} 首")
-                                    if (mins > 0) append(" · 约 $mins 分钟")
-                                }
+                                val prefix = stringResource(
+                                    if (isRemotePlaylist) R.string.playlist_detail_remote_prefix
+                                    else R.string.playlist_detail_local_prefix
+                                )
+                                val countPart = stringResource(R.string.common_tracks_short, sortedTracks.size)
+                                val minsPart = if (mins > 0) stringResource(R.string.common_approx_mins, mins) else ""
+                                val metaText = prefix + countPart + minsPart
                                 Text(
                                     text = metaText,
                                     fontSize = 11.sp,
@@ -343,7 +347,7 @@ fun PlaylistDetailScreen(
                                 ) {
                                     Icon(Icons.Rounded.Add, contentDescription = null, tint = colors.accent, modifier = Modifier.size(15.dp))
                                     Spacer(Modifier.width(3.dp))
-                                    Text("加歌", fontSize = 12.sp, color = colors.textPrimary, maxLines = 1, softWrap = false)
+                                    Text(stringResource(R.string.playlist_detail_add_short), fontSize = 12.sp, color = colors.textPrimary, maxLines = 1, softWrap = false)
                                 }
 
                                 // 歌单排序胶囊
@@ -363,7 +367,7 @@ fun PlaylistDetailScreen(
                                     )
                                     Spacer(Modifier.width(4.dp))
                                     val arrow = if (sortAscending) "↑" else "↓"
-                                    Text("${sortField.label} $arrow", fontSize = 12.sp, color = colors.textPrimary, maxLines = 1, softWrap = false)
+                                    Text("${stringResource(sortField.labelRes)} $arrow", fontSize = 12.sp, color = colors.textPrimary, maxLines = 1, softWrap = false)
                                 }
 
                                 // 歌单下载按钮（仅含 Subsonic 远程曲目时展示）
@@ -381,15 +385,15 @@ fun PlaylistDetailScreen(
                                     ) {
                                         Icon(
                                             imageVector = if (allRemoteDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
-                                            contentDescription = "下载歌单",
+                                            contentDescription = stringResource(R.string.playlist_detail_download_all),
                                             tint = if (allRemoteDownloaded) colors.exclusiveGreen else colors.textPrimary,
                                             modifier = Modifier.size(15.dp),
                                         )
                                         Spacer(Modifier.width(4.dp))
                                         Text(
-                                            text = if (allRemoteDownloaded) "已离线"
+                                            text = if (allRemoteDownloaded) stringResource(R.string.common_downloaded)
                                             else if (downloadedRemoteCount > 0) "$downloadedRemoteCount/${remoteTracks.size}"
-                                            else "下载",
+                                            else stringResource(R.string.common_download),
                                             fontSize = 11.sp,
                                             color = if (allRemoteDownloaded) colors.exclusiveGreen else colors.textPrimary,
                                             maxLines = 1,
@@ -409,7 +413,7 @@ fun PlaylistDetailScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Shuffle,
-                                    contentDescription = "歌单随机播放",
+                                    contentDescription = stringResource(R.string.playlist_detail_shuffle),
                                     tint = if (sortedTracks.isNotEmpty()) colors.textPrimary else colors.textMuted,
                                     modifier = Modifier.size(22.dp),
                                 )
@@ -430,7 +434,7 @@ fun PlaylistDetailScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.PlayArrow,
-                                    contentDescription = "播放歌单",
+                                    contentDescription = stringResource(R.string.lib_play_playlist),
                                     tint = if (sortedTracks.isNotEmpty()) colors.onAccent else colors.textMuted,
                                     modifier = Modifier.size(26.dp),
                                 )
@@ -440,7 +444,7 @@ fun PlaylistDetailScreen(
                         if (reorderMode) {
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = "排序微调中：点击右侧上下箭头调整顺序，再次点击顶栏排序图标完成",
+                                text = stringResource(R.string.playlist_detail_reorder_hint),
                                 fontSize = 11.sp,
                                 color = colors.accent,
                             )
@@ -456,9 +460,9 @@ fun PlaylistDetailScreen(
                                 .padding(vertical = 48.dp, horizontal = 32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Text("歌单里还没有歌曲", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
+                            Text(stringResource(R.string.playlist_detail_empty_title), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
                             Spacer(Modifier.height(6.dp))
-                            Text("点击下方按钮从音乐库挑选歌曲加入", fontSize = 12.sp, color = colors.textSecondary)
+                            Text(stringResource(R.string.playlist_detail_empty_desc), fontSize = 12.sp, color = colors.textSecondary)
                             Spacer(Modifier.height(16.dp))
                             Box(
                                 modifier = Modifier
@@ -467,7 +471,7 @@ fun PlaylistDetailScreen(
                                     .clickable { onOpenAddTracks() }
                                     .padding(horizontal = 22.dp, vertical = 10.dp)
                             ) {
-                                Text("添加歌曲", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
+                                Text(stringResource(R.string.playlist_detail_add_tracks), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.onAccent)
                             }
                         }
                     }
@@ -557,7 +561,7 @@ fun PlaylistDetailScreen(
 
     if (showSortSheet) {
         TrackSortSheet(
-            title = "歌单曲目排序",
+            title = stringResource(R.string.playlist_detail_sort_title),
             fields = TrackSortField.entries,
             selectedField = sortField,
             ascending = sortAscending,
@@ -573,14 +577,14 @@ fun PlaylistDetailScreen(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             containerColor = colors.surface1,
-            title = { Text("删除歌单", color = colors.textPrimary) },
+            title = { Text(stringResource(R.string.playlist_detail_delete), color = colors.textPrimary) },
             text = {
                 Text(
-                    text = if (isRemotePlaylist) {
-                        "确定删除服务器歌单「$title」吗？此操作将同步到 Subsonic 服务器，不会删除歌曲原文件。"
-                    } else {
-                        "确定删除歌单「$title」吗？此操作仅移除歌单，不会删除任何本地或远程音频文件。"
-                    },
+                    text = stringResource(
+                        if (isRemotePlaylist) R.string.playlist_detail_delete_remote_msg
+                        else R.string.playlist_detail_delete_local_msg,
+                        title,
+                    ),
                     color = colors.textSecondary,
                     fontSize = 13.sp,
                 )
@@ -590,12 +594,12 @@ fun PlaylistDetailScreen(
                     confirmDelete = false
                     onDeletePlaylist()
                 }) {
-                    Text("确认删除", color = colors.danger, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.playlist_detail_delete_confirm), color = colors.danger, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDelete = false }) {
-                    Text("取消", color = colors.textSecondary)
+                    Text(stringResource(R.string.common_cancel), color = colors.textSecondary)
                 }
             },
         )
@@ -661,7 +665,7 @@ private fun PlaylistTrackRow(
                 if (isDownloaded) {
                     Icon(
                         imageVector = Icons.Rounded.DownloadDone,
-                        contentDescription = "已离线下载",
+                        contentDescription = stringResource(R.string.common_downloaded_full),
                         tint = colors.exclusiveGreen,
                         modifier = Modifier
                             .padding(end = 4.dp)
@@ -699,7 +703,7 @@ private fun PlaylistTrackRow(
                 IconButton(onClick = onMoveUp, enabled = canMoveUp, modifier = Modifier.size(32.dp)) {
                     Icon(
                         Icons.Rounded.KeyboardArrowUp,
-                        contentDescription = "上移",
+                        contentDescription = stringResource(R.string.playlist_detail_move_up),
                         tint = if (canMoveUp) colors.textPrimary else colors.textMuted,
                         modifier = Modifier.size(20.dp),
                     )
@@ -707,7 +711,7 @@ private fun PlaylistTrackRow(
                 IconButton(onClick = onMoveDown, enabled = canMoveDown, modifier = Modifier.size(32.dp)) {
                     Icon(
                         Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = "下移",
+                        contentDescription = stringResource(R.string.playlist_detail_move_down),
                         tint = if (canMoveDown) colors.textPrimary else colors.textMuted,
                         modifier = Modifier.size(20.dp),
                     )
@@ -718,7 +722,7 @@ private fun PlaylistTrackRow(
                 IconButton(onClick = onMoreClick, modifier = Modifier.size(34.dp)) {
                     Icon(
                         Icons.Rounded.MoreVert,
-                        contentDescription = "更多操作",
+                        contentDescription = stringResource(R.string.common_more_actions),
                         tint = colors.textSecondary,
                         modifier = Modifier.size(18.dp),
                     )

@@ -70,6 +70,7 @@
 - **Crash Interception, Isolated `:crash` Auto-Restart & Sanitized Reporting**: Main-process `SonifyCrashHandler` safely closes the USB DAC stream (160 ms non-blocking guard), strips local file paths and Subsonic credentials, saves sanitized JSON reports locally, evaluates a **30s / 3-crash loop breaker**, and launches an isolated `:crash` process (`CrashRecoveryActivity`) with a **3-second auto-restart countdown** (pausable to inspect/copy/upload stack traces, plus safe-mode cache reset if a crash loop is detected).
 - **In-App Updates, Hardened Force Update & Self-Hosted Cloud Distribution**: Automatic 12-hour throttled checks + manual checks in Settings, release notes & **full-lifecycle Force Update protection** (persists non-dismissable lock across `Available` / `Downloading` / `Verifying` / `ReadyToInstall` / `Error`, bypasses `autoCheckUpdate=false` & ignored versions, offers「Exit App」instead of skip/close), HTTP/1.1 streaming download with live speed/progress, **mandatory SHA-256 integrity verification**, Android 7–15 `FileProvider` & auto-resume unknown-sources permission guidance, plus a zero-dependency Python 3 server package (`server/sonify_server.py`, Caddy/Nginx HTTPS, `systemd` service) and one-command release script (`scripts/publish_release.sh`).
 - **Privacy-First DAU Analytics & Authenticated Ops Dashboard (`/admin`)**: Anonymous random UUIDv4 `installId` (zero IMEI/OAID/file paths/song titles/search keywords), local JSONL batch queue with instant Settings opt-out toggle, SQLite WAL telemetry backend (`POST /api/v1/telemetry/events`) with UTC+8 DAU/WAU/MAU/new-device/D1/D7 retention aggregation, and a built-in Spotify-Dark Web Ops Dashboard (`/admin`, token-protected via `/etc/sonify-server/admin.env`) featuring interactive SVG DAU charts, USB DAC & device model leaderboards, sanitized crash log inspection, and live Force Update policy controls.
+- **Multi-Language (i18n) & Zero-Interruption Language Switching**: Full **English & Simplified Chinese** localization (with **Follow System** default and Android 13+ per-app locale config) across all screens, settings enums, notifications, lockscreen, isolated `:crash` recovery page, and WiFi transfer Web UI. Switches language in 1 frame without recreating Activities or interrupting USB DAC playback. Standardized contributor docs & automated validator included ([I18N_STANDARD.md](docs/i18n/I18N_STANDARD.md) · [STRING_KEY_CATALOG.md](docs/i18n/STRING_KEY_CATALOG.md)).
 
 ---
 
@@ -133,7 +134,8 @@ APK output: `app/build/outputs/apk/debug/app-debug.apk`
 Every feature and modification must pass unit tests **and** real-device verification before release:
 - Mandatory Gate Rule: [AGENTS.md](AGENTS.md) & [Release Gate SOP](docs/testing/RELEASE_GATE.md)
 - Master Test Plan: [docs/testing/TEST_PLAN.md](docs/testing/TEST_PLAN.md)
-- End-to-End Test Cases (78 cases): [docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
+- End-to-End Test Cases (83 cases): [docs/testing/TEST_CASES.md](docs/testing/TEST_CASES.md)
+- Multi-Language Standard & Key Catalog: [docs/i18n/I18N_STANDARD.md](docs/i18n/I18N_STANDARD.md) · [docs/i18n/STRING_KEY_CATALOG.md](docs/i18n/STRING_KEY_CATALOG.md)
 - Device QA Reports: [docs/testing/reports/](docs/testing/reports/)
 
 ### Debugging USB Audio Logs

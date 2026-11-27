@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.util.Log
 import androidx.annotation.OptIn
+import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
@@ -46,6 +47,7 @@ import com.sonify.player.audio.HybridAudioSink
 import com.sonify.player.data.PlaybackPositionEntity
 import com.sonify.player.data.TrackEntity
 import com.sonify.player.data.VolumeMode
+import com.sonify.player.i18n.SonifyLocaleManager
 import com.sonify.player.subsonic.SubsonicDataSourceFactory
 import com.sonify.player.subsonic.SubsonicUri
 import com.sonify.player.ui.lockscreen.LockScreenActivity
@@ -75,6 +77,15 @@ import java.io.File
 class HiFiPlaybackService : MediaSessionService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(SonifyLocaleManager.wrapContext(base))
+    }
+
+    private fun s(@StringRes id: Int, vararg args: Any): String {
+        val ctx = (applicationContext as? HiFiApp)?.localizedContext() ?: this
+        return if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    }
 
     private lateinit var hybridSink: HybridAudioSink
     private lateinit var player: ExoPlayer
@@ -255,12 +266,13 @@ class HiFiPlaybackService : MediaSessionService() {
             }
         }
 
-        // 监听音量/护耳/通知规格显示开关变化
+        // 监听音量/护耳/通知规格/语言变化
         serviceScope.launch {
             app.prefs.settings.collect {
                 app.volumeController.onProtectionPolicyChanged()
                 sessionPlayer.notifyDeviceInfoChanged()
                 sessionPlayer.notifyMediaMetadataChanged()
+                updateNotificationCustomLayout()
             }
         }
 
@@ -368,13 +380,13 @@ class HiFiPlaybackService : MediaSessionService() {
                 if (currentTrackIsFavorite) R.drawable.ic_notif_favorite_filled
                 else R.drawable.ic_notif_favorite_outline
             )
-            .setDisplayName(if (currentTrackIsFavorite) "取消收藏" else "收藏")
+            .setDisplayName(s(if (currentTrackIsFavorite) R.string.player_unfavorite else R.string.player_favorite))
             .build()
 
         val (repeatIcon, repeatLabel) = when (player.repeatMode) {
-            Player.REPEAT_MODE_ALL -> R.drawable.ic_notif_repeat_all to "列表循环"
-            Player.REPEAT_MODE_ONE -> R.drawable.ic_notif_repeat_one to "单曲循环"
-            else -> R.drawable.ic_notif_repeat_off to "顺序播放"
+            Player.REPEAT_MODE_ALL -> R.drawable.ic_notif_repeat_all to s(R.string.player_repeat_all)
+            Player.REPEAT_MODE_ONE -> R.drawable.ic_notif_repeat_one to s(R.string.player_repeat_one)
+            else -> R.drawable.ic_notif_repeat_off to s(R.string.player_repeat_off)
         }
         val repeatButton = CommandButton.Builder()
             .setSessionCommand(SessionCommand(CMD_CYCLE_REPEAT, Bundle.EMPTY))
@@ -406,7 +418,7 @@ class HiFiPlaybackService : MediaSessionService() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
                 val ch = NotificationChannel(
                     LOCKSCREEN_CHANNEL_ID,
-                    "Sonify 黑胶锁屏",
+                    s(R.string.notif_lockscreen_channel),
                     NotificationManager.IMPORTANCE_HIGH,
                 ).apply {
                     setSound(null, null)
@@ -420,7 +432,7 @@ class HiFiPlaybackService : MediaSessionService() {
             val notif = NotificationCompat.Builder(this, LOCKSCREEN_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_sonify_notification)
                 .setContentTitle(player.currentMediaItem?.mediaMetadata?.title ?: "Sonify")
-                .setContentText("黑胶锁屏播放中")
+                .setContentText(s(R.string.notif_lockscreen_playing))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -511,7 +523,7 @@ class HiFiPlaybackService : MediaSessionService() {
                         app.db.trackDao().observeAll().first()
                     }
                     if (allTracks.isEmpty()) {
-                        future.setException(IllegalStateException("媒体库为空"))
+                        future.setException(IllegalStateException(s(R.string.notif_library_empty)))
                         return@launch
                     }
                     val startIdx = allTracks.indexOfFirst { it.path == lastPath }.coerceAtLeast(0)
@@ -763,11 +775,14 @@ private class UsbVolumeForwardingPlayer(
         val usbSt = app.usbManager.state.value
         val route = HiFiPlaybackService.activeRouteFlow.value
 
+        val lctx = app.localizedContext()
         val specBadge = SonifyNotificationFormat.formatSpecBadge(
             activeRoute = route,
             usbConnected = usbSt.isConnected,
             stats = usbSt.stats,
             deviceName = usbSt.deviceDisplayName,
+            usbExclusiveLabel = lctx.getString(R.string.player_usb_exclusive_short),
+            systemOutputLabel = lctx.getString(R.string.player_system_output),
         )
         val rawArtist = base.artist?.toString().orEmpty()
         val rawAlbum = base.albumTitle?.toString().orEmpty()
@@ -776,6 +791,7 @@ private class UsbVolumeForwardingPlayer(
             album = rawAlbum,
             showSpec = settings.notifShowAudioSpec,
             specBadge = specBadge,
+            unknownArtistLabel = lctx.getString(R.string.common_unknown_artist),
         )
 
         return base.buildUpon()
